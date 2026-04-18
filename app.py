@@ -1,5 +1,4 @@
-import os, math, json, sqlite3
-from datetime import datetime
+import os, math, json, sqlite3, secrets
 from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, g, send_file, abort)
@@ -8,13 +7,10 @@ from werkzeug.utils import secure_filename
 import io
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'sa-change-this-in-production-2024')
+app.secret_key = os.environ.get('SECRET_KEY', 'sa-dev-key-change-in-prod')
 
 DATABASE = os.environ.get('DATABASE_PATH', 'shade_america.db')
-UPLOAD_FOLDER = 'uploads'
 MAX_FILE_MB = 50
-
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ─────────────────────────────────────────────────────────────
 # DATABASE
@@ -50,10 +46,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             client TEXT,
+            phone TEXT,
             location TEXT,
-            status TEXT DEFAULT 'lead',
-            estimate_amount REAL DEFAULT 0,
-            estimate_data TEXT,
+            status TEXT DEFAULT 'quoted',
+            estimate_total REAL DEFAULT 0,
             notes TEXT,
             created_by INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -74,7 +70,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             category TEXT NOT NULL,
             name TEXT NOT NULL,
-            value REAL DEFAULT 0,
+            price REAL DEFAULT 0,
             unit TEXT,
             sort_order INTEGER DEFAULT 0
         );
@@ -83,16 +79,15 @@ def init_db():
 
     # Seed users
     users = [
-        ('james',   'SA-James#1',   'James Rehberg', 'admin', 1),
-        ('muller',  'SA-Muller#1',  'Muller',        'admin', 1),
-        ('jaco',    'SA-Jaco#1',    'Jaco',          'admin', 1),
-        ('carrie',  'SA-Carrie#1',  'Carrie',        'admin', 1),
-        ('stefani', 'SA-Stefani#1', 'Stefani',       'admin', 1),
-        ('field',   'SunShade24!',  'Field Team',    'field', 0),
+        ('james',   'SA-James#1',   'James',   'admin', 1),
+        ('muller',  'SA-Muller#1',  'Muller',  'admin', 1),
+        ('jaco',    'SA-Jaco#1',    'Jaco',    'admin', 1),
+        ('carrie',  'SA-Carrie#1',  'Carrie',  'admin', 1),
+        ('stefani', 'SA-Stefani#1', 'Stefani', 'admin', 1),
+        ('field',   'SunShade24!',  'Field Team', 'field', 0),
     ]
     for uname, pwd, name, role, must_change in users:
-        existing = db.execute("SELECT id FROM users WHERE username=?", (uname,)).fetchone()
-        if not existing:
+        if not db.execute("SELECT id FROM users WHERE username=?", (uname,)).fetchone():
             db.execute(
                 "INSERT INTO users (username,password_hash,name,role,must_change_password) VALUES (?,?,?,?,?)",
                 (uname, generate_password_hash(pwd), name, role, must_change)
@@ -101,43 +96,33 @@ def init_db():
     # Seed pricing
     if not db.execute("SELECT id FROM pricing LIMIT 1").fetchone():
         pricing_data = [
-            # SCH40 Pipe  (category, name, value, unit, sort)
             ('pipe','5" SCH40 Galv 21ft',   412,  '$/stick', 1),
-            ('pipe','5" SCH40 Galv 24ft',   0,    '$/stick', 2),
-            ('pipe','5" SCH40 Black 21ft',  359,  '$/stick', 3),
-            ('pipe','5" SCH40 Black 42ft',  718,  '$/stick', 4),
-            ('pipe','6" SCH40 Galv 21ft',   536,  '$/stick', 5),
-            ('pipe','6" SCH40 Galv 24ft',   0,    '$/stick', 6),
-            ('pipe','6" SCH40 Black 21ft',  383,  '$/stick', 7),
-            ('pipe','6" SCH40 Black 42ft',  780,  '$/stick', 8),
-            ('pipe','8" SCH40 Galv 21ft',   743,  '$/stick', 9),
-            ('pipe','8" SCH40 Galv 24ft',   0,    '$/stick',10),
-            ('pipe','8" SCH40 Black 21ft',  590,  '$/stick',11),
-            ('pipe','8" SCH40 Black 42ft',  1179, '$/stick',12),
-            ('pipe','3" OD Galv 24ft',      183,  '$/stick',13),
-            ('pipe','4" OD Galv 24ft',      259,  '$/stick',14),
-            ('pipe','5" OD Galv 24ft',      321,  '$/stick',15),
-            ('pipe','4x4 1/4" 20ft',        237,  '$/stick',16),
-            ('pipe','4x4 1/4" 24ft',        317,  '$/stick',17),
-            ('pipe','4x4 1/4" 40ft',        528,  '$/stick',18),
-            ('pipe','4x4 1/4" 48ft',        633,  '$/stick',19),
-            ('pipe','4x4 3/16" 20ft',       204,  '$/stick',20),
-            ('pipe','4x4 3/16" 24ft',       244,  '$/stick',21),
-            ('pipe','4x6 1/4" 24ft',        405,  '$/stick',22),
-            ('pipe','4x6 1/4" 40ft',        675,  '$/stick',23),
-            ('pipe','4x6 3/16" 20ft',       259,  '$/stick',24),
-            ('pipe','4x6 3/16" 24ft',       311,  '$/stick',25),
-            ('pipe','4x6 3/16" 40ft',       576,  '$/stick',26),
-            ('pipe','4x6 3/16" 48ft',       621,  '$/stick',27),
-            # Concrete
-            ('concrete','Price per CY',     200,  '$/CY',    1),
-            # Hardware
+            ('pipe','5" SCH40 Black 21ft',  359,  '$/stick', 2),
+            ('pipe','5" SCH40 Black 42ft',  718,  '$/stick', 3),
+            ('pipe','6" SCH40 Galv 21ft',   536,  '$/stick', 4),
+            ('pipe','6" SCH40 Black 21ft',  383,  '$/stick', 5),
+            ('pipe','6" SCH40 Black 42ft',  780,  '$/stick', 6),
+            ('pipe','8" SCH40 Galv 21ft',   743,  '$/stick', 7),
+            ('pipe','8" SCH40 Black 21ft',  590,  '$/stick', 8),
+            ('pipe','8" SCH40 Black 42ft',  1179, '$/stick', 9),
+            ('pipe','3" OD Galv Tubing 24ft', 183, '$/stick',10),
+            ('pipe','4" OD Galv Tubing 24ft', 259, '$/stick',11),
+            ('pipe','5" OD Galv Tubing 24ft', 321, '$/stick',12),
+            ('pipe','4x4 HSS 1/4" 20ft',    237,  '$/stick',13),
+            ('pipe','4x4 HSS 1/4" 24ft',    317,  '$/stick',14),
+            ('pipe','4x4 HSS 1/4" 40ft',    528,  '$/stick',15),
+            ('pipe','4x4 HSS 3/16" 20ft',   204,  '$/stick',16),
+            ('pipe','4x4 HSS 3/16" 24ft',   244,  '$/stick',17),
+            ('pipe','4x6 HSS 1/4" 24ft',    405,  '$/stick',18),
+            ('pipe','4x6 HSS 1/4" 40ft',    675,  '$/stick',19),
+            ('pipe','4x6 HSS 3/16" 20ft',   259,  '$/stick',20),
+            ('pipe','4x6 HSS 3/16" 24ft',   311,  '$/stick',21),
+            ('pipe','4x6 HSS 3/16" 40ft',   576,  '$/stick',22),
             ('hardware','Weld Lug',         0,    '$/piece', 1),
             ('hardware','All Thread',       0,    '$/piece', 2),
             ('hardware','Clamp',            0,    '$/piece', 3),
             ('hardware','Wall Mount',       0,    '$/piece', 4),
             ('hardware','Welding Rate',     95,   '$/weld',  5),
-            # Powder Coating
             ('powder','5" SCH40',           0,    '$/LF',    1),
             ('powder','6" SCH40',           0,    '$/LF',    2),
             ('powder','8" SCH40',           0,    '$/LF',    3),
@@ -147,19 +132,17 @@ def init_db():
             ('powder','4x4 HSS',            0,    '$/LF',    7),
             ('powder','4x6 HSS',            0,    '$/LF',    8),
             ('powder','4x8 HSS',            0,    '$/LF',    9),
-            # Fabric
-            ('fabric','Cost per Sq Ft',     3.25, '$/sqft',  1),
-            # Crew rates
+            ('fabric','Fabric per Sq Ft',   3.25, '$/sqft',  1),
+            ('concrete','Price per CY',     200,  '$/CY',    1),
             ('crew','Rate - Person 1',      650,  '$/day',   1),
             ('crew','Rate - Person 2',      550,  '$/day',   2),
             ('crew','Rate - Person 3',      500,  '$/day',   3),
             ('crew','Rate - Person 4',      450,  '$/day',   4),
             ('crew','Rate - Person 5',      400,  '$/day',   5),
-            # Travel
             ('travel','Fuel Cost per Mile', 0.40, '$/mile',  1),
         ]
         for row in pricing_data:
-            db.execute("INSERT INTO pricing (category,name,value,unit,sort_order) VALUES (?,?,?,?,?)", row)
+            db.execute("INSERT INTO pricing (category,name,price,unit,sort_order) VALUES (?,?,?,?,?)", row)
 
     db.commit()
     db.close()
@@ -167,6 +150,16 @@ def init_db():
 # ─────────────────────────────────────────────────────────────
 # AUTH HELPERS
 # ─────────────────────────────────────────────────────────────
+
+def get_current_user():
+    if 'user_id' not in session:
+        return None
+    return {'id': session['user_id'], 'username': session['username'],
+            'name': session.get('name', ''), 'role': session['role']}
+
+@app.context_processor
+def inject_user():
+    return {'current_user': get_current_user()}
 
 def login_required(f):
     @wraps(f)
@@ -186,24 +179,14 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-def current_user():
-    if 'user_id' not in session:
-        return None
-    return {'id': session['user_id'], 'username': session['username'],
-            'name': session['name'], 'role': session['role']}
-
-app.jinja_env.globals['current_user'] = current_user
-
 # ─────────────────────────────────────────────────────────────
 # AUTH ROUTES
 # ─────────────────────────────────────────────────────────────
 
-@app.route('/', methods=['GET'])
+@app.route('/')
 def index():
     if 'user_id' in session:
-        if session.get('role') == 'field':
-            return redirect(url_for('field'))
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('field') if session.get('role') == 'field' else url_for('dashboard'))
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -217,13 +200,12 @@ def login():
             session.clear()
             session['user_id'] = user['id']
             session['username'] = user['username']
-            session['name'] = user['name']
+            session['name'] = user['name'] or user['username']
             session['role'] = user['role']
             if user['must_change_password']:
+                session['must_change'] = True
                 return redirect(url_for('change_password'))
-            if user['role'] == 'field':
-                return redirect(url_for('field'))
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('field') if user['role'] == 'field' else url_for('dashboard'))
         flash('Invalid username or password.', 'error')
     return render_template('login.html')
 
@@ -235,11 +217,12 @@ def logout():
 @app.route('/change-password', methods=['GET', 'POST'])
 @login_required
 def change_password():
+    must_change = session.get('must_change', False)
     if request.method == 'POST':
-        new_pw = request.form.get('new_password', '')
+        new_pw  = request.form.get('new_password', '')
         confirm = request.form.get('confirm_password', '')
-        if len(new_pw) < 8:
-            flash('Password must be at least 8 characters.', 'error')
+        if len(new_pw) < 6:
+            flash('Password must be at least 6 characters.', 'error')
         elif new_pw != confirm:
             flash('Passwords do not match.', 'error')
         else:
@@ -247,11 +230,10 @@ def change_password():
             db.execute("UPDATE users SET password_hash=?, must_change_password=0 WHERE id=?",
                        (generate_password_hash(new_pw), session['user_id']))
             db.commit()
-            flash('Password updated successfully.', 'success')
-            if session.get('role') == 'field':
-                return redirect(url_for('field'))
-            return redirect(url_for('dashboard'))
-    return render_template('change_password.html')
+            session.pop('must_change', None)
+            flash('Password updated.', 'success')
+            return redirect(url_for('field') if session.get('role') == 'field' else url_for('dashboard'))
+    return render_template('change_password.html', must_change=must_change)
 
 # ─────────────────────────────────────────────────────────────
 # DASHBOARD
@@ -261,18 +243,16 @@ def change_password():
 @admin_required
 def dashboard():
     db = get_db()
-    jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
-    statuses = ['lead', 'estimated', 'sold', 'progress', 'complete']
-    board = {s: [j for j in jobs if j['status'] == s] for s in statuses}
-    pipeline_val = sum(j['estimate_amount'] for j in jobs if j['status'] in ('estimated','sold','progress'))
-    active = sum(1 for j in jobs if j['status'] in ('sold','progress'))
-    in_progress = sum(1 for j in jobs if j['status'] == 'progress')
-    completed_mtd = sum(1 for j in jobs if j['status'] == 'complete')
-    completed_rev = sum(j['estimate_amount'] for j in jobs if j['status'] == 'complete')
-    return render_template('dashboard.html', board=board, statuses=statuses,
-                           pipeline_val=pipeline_val, active=active,
-                           in_progress=in_progress, completed_mtd=completed_mtd,
-                           completed_rev=completed_rev)
+    all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
+    statuses = ['quoted', 'approved', 'in_progress', 'install', 'completed']
+    jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
+    stats = {
+        'total':       len(all_jobs),
+        'quoted':      len(jobs_by_status['quoted']),
+        'in_progress': len(jobs_by_status['in_progress']),
+        'completed':   len(jobs_by_status['completed']),
+    }
+    return render_template('dashboard.html', jobs_by_status=jobs_by_status, stats=stats)
 
 # ─────────────────────────────────────────────────────────────
 # JOBS
@@ -285,27 +265,6 @@ def jobs():
     all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
     return render_template('jobs.html', jobs=all_jobs)
 
-@app.route('/jobs/<int:job_id>')
-@login_required
-def job_detail(job_id):
-    db = get_db()
-    job = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
-    if not job:
-        abort(404)
-    is_admin = session.get('role') == 'admin'
-    docs = db.execute(
-        "SELECT d.*, u.name as uploader_name FROM documents d "
-        "LEFT JOIN users u ON d.uploaded_by=u.id WHERE d.job_id=? ORDER BY d.uploaded_at DESC",
-        (job_id,)
-    ).fetchall()
-    drawings = [d for d in docs if d['doc_type'] == 'drawing']
-    financials = [d for d in docs if d['doc_type'] == 'financial'] if is_admin else []
-    photos = [d for d in docs if d['doc_type'] == 'photo']
-    other = [d for d in docs if d['doc_type'] == 'other'] if is_admin else []
-    return render_template('job_detail.html', job=job, drawings=drawings,
-                           financials=financials, photos=photos, other=other,
-                           is_admin=is_admin)
-
 @app.route('/jobs/new', methods=['GET', 'POST'])
 @admin_required
 def new_job():
@@ -315,71 +274,96 @@ def new_job():
             flash('Job name is required.', 'error')
             return redirect(url_for('new_job'))
         db = get_db()
+        try:
+            est = float(request.form.get('estimate_total', 0) or 0)
+        except ValueError:
+            est = 0
         db.execute(
-            "INSERT INTO jobs (name,client,location,status,notes,created_by) VALUES (?,?,?,?,?,?)",
-            (name, request.form.get('client',''), request.form.get('location',''),
-             request.form.get('status','lead'), request.form.get('notes',''),
+            "INSERT INTO jobs (name,client,phone,location,status,estimate_total,notes,created_by) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (name,
+             request.form.get('client', ''),
+             request.form.get('phone', ''),
+             request.form.get('location', ''),
+             request.form.get('status', 'quoted'),
+             est,
+             request.form.get('notes', ''),
              session['user_id'])
         )
         db.commit()
-        flash('Job created.', 'success')
+        flash(f'Job "{name}" created.', 'success')
         return redirect(url_for('dashboard'))
-    return render_template('new_job.html')
+    prefill = {
+        'name':           request.args.get('name', ''),
+        'client':         request.args.get('client', ''),
+        'estimate_total': request.args.get('estimate', ''),
+    }
+    return render_template('new_job.html', prefill=prefill)
+
+@app.route('/jobs/<int:job_id>')
+@login_required
+def job_detail(job_id):
+    db = get_db()
+    job = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        abort(404)
+    is_admin = session.get('role') == 'admin'
+    docs = db.execute(
+        "SELECT * FROM documents WHERE job_id=? ORDER BY uploaded_at DESC", (job_id,)
+    ).fetchall()
+    if not is_admin:
+        docs = [d for d in docs if d['doc_type'] in ('drawing', 'photo')]
+    return render_template('job_detail.html', job=job, documents=docs, is_admin=is_admin)
 
 @app.route('/jobs/<int:job_id>/status', methods=['POST'])
 @admin_required
 def update_status(job_id):
     status = request.form.get('status')
-    valid = ['lead','estimated','sold','progress','complete']
-    if status in valid:
+    if status in ['quoted', 'approved', 'in_progress', 'install', 'completed']:
         db = get_db()
         db.execute("UPDATE jobs SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", (status, job_id))
         db.commit()
     return redirect(request.referrer or url_for('dashboard'))
 
 # ─────────────────────────────────────────────────────────────
-# DOCUMENTS / PHOTOS
+# DOCUMENTS
 # ─────────────────────────────────────────────────────────────
 
 @app.route('/jobs/<int:job_id>/upload', methods=['POST'])
 @login_required
 def upload_doc(job_id):
     db = get_db()
-    job = db.execute("SELECT id FROM jobs WHERE id=?", (job_id,)).fetchone()
-    if not job:
+    if not db.execute("SELECT id FROM jobs WHERE id=?", (job_id,)).fetchone():
         abort(404)
-    is_admin = session.get('role') == 'admin'
     doc_type = request.form.get('doc_type', 'photo')
-    if doc_type != 'photo' and not is_admin:
+    if doc_type != 'photo' and session.get('role') != 'admin':
         abort(403)
     file = request.files.get('file')
     if not file or not file.filename:
         flash('No file selected.', 'error')
         return redirect(url_for('job_detail', job_id=job_id))
-    original_name = secure_filename(file.filename)
     file_data = file.read()
     if len(file_data) > MAX_FILE_MB * 1024 * 1024:
-        flash(f'File too large (max {MAX_FILE_MB}MB).', 'error')
+        flash(f'File too large (max {MAX_FILE_MB} MB).', 'error')
         return redirect(url_for('job_detail', job_id=job_id))
-    mime = file.content_type or 'application/octet-stream'
     db.execute(
         "INSERT INTO documents (job_id,original_name,doc_type,file_data,mime_type,file_size,uploaded_by) "
         "VALUES (?,?,?,?,?,?,?)",
-        (job_id, original_name, doc_type, file_data, mime, len(file_data), session['user_id'])
+        (job_id, secure_filename(file.filename), doc_type, file_data,
+         file.content_type or 'application/octet-stream', len(file_data), session['user_id'])
     )
     db.commit()
-    flash('File uploaded successfully.', 'success')
+    flash('File uploaded.', 'success')
     return redirect(url_for('job_detail', job_id=job_id))
 
 @app.route('/docs/<int:doc_id>')
 @login_required
-def download_doc(doc_id):
+def serve_doc(doc_id):
     db = get_db()
     doc = db.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
     if not doc:
         abort(404)
-    is_admin = session.get('role') == 'admin'
-    if doc['doc_type'] in ('financial','other') and not is_admin:
+    if doc['doc_type'] in ('estimate', 'contract', 'other') and session.get('role') != 'admin':
         abort(403)
     return send_file(
         io.BytesIO(doc['file_data']),
@@ -393,13 +377,13 @@ def download_doc(doc_id):
 def delete_doc(doc_id):
     db = get_db()
     doc = db.execute("SELECT job_id FROM documents WHERE id=?", (doc_id,)).fetchone()
-    if doc:
-        job_id = doc['job_id']
-        db.execute("DELETE FROM documents WHERE id=?", (doc_id,))
-        db.commit()
-        flash('File deleted.', 'success')
-        return redirect(url_for('job_detail', job_id=job_id))
-    abort(404)
+    if not doc:
+        abort(404)
+    job_id = doc['job_id']
+    db.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+    db.commit()
+    flash('File deleted.', 'success')
+    return redirect(url_for('job_detail', job_id=job_id))
 
 # ─────────────────────────────────────────────────────────────
 # FIELD VIEW
@@ -409,9 +393,23 @@ def delete_doc(doc_id):
 @login_required
 def field():
     db = get_db()
-    jobs = db.execute(
-        "SELECT * FROM jobs WHERE status IN ('sold','progress') ORDER BY updated_at DESC"
+    raw_jobs = db.execute(
+        "SELECT * FROM jobs WHERE status IN ('approved','in_progress','install') ORDER BY updated_at DESC"
     ).fetchall()
+    jobs = []
+    for job in raw_jobs:
+        docs = db.execute(
+            "SELECT * FROM documents WHERE job_id=? AND doc_type IN ('drawing','photo')"
+            " ORDER BY uploaded_at DESC", (job['id'],)
+        ).fetchall()
+        jobs.append({
+            'id':       job['id'],
+            'name':     job['name'],
+            'location': job['location'],
+            'status':   job['status'],
+            'drawings': [d for d in docs if d['doc_type'] == 'drawing'],
+            'photos':   [d for d in docs if d['doc_type'] == 'photo'],
+        })
     return render_template('field.html', jobs=jobs)
 
 # ─────────────────────────────────────────────────────────────
@@ -419,72 +417,68 @@ def field():
 # ─────────────────────────────────────────────────────────────
 
 def get_pricing_map(db):
-    rows = db.execute("SELECT name, value FROM pricing").fetchall()
-    return {r['name']: r['value'] for r in rows}
+    rows = db.execute("SELECT name, price FROM pricing").fetchall()
+    return {r['name']: r['price'] for r in rows}
 
-def pipe_cost(size, material, length_ft, qty, pm):
-    """Calculate pipe cost for a pole given size, material, length, qty."""
+def pipe_cost_calc(size, length_ft, qty, pm):
     if not size or not length_ft or not qty:
-        return 0
+        return 0, 0
     length_ft = float(length_ft)
     qty = int(qty)
-    # Find best stock lengths for this pipe type
     options = []
-    if '4x' in size:
-        wall = material  # wall thickness stored in material field for square tubing
-        prefix = size + ' ' + wall + ' '
-        for stick_len in [20, 24, 40, 48]:
-            key = prefix + str(stick_len) + 'ft'
-            if key in pm and pm[key] > 0:
-                options.append((stick_len, pm[key]))
+    if size in ('4x4', '4x6', '4x8'):
+        for wall in ['1/4"', '3/16"']:
+            for stick_len in [20, 24, 40, 48]:
+                key = f'{size} HSS {wall} {stick_len}ft'
+                if key in pm and pm[key] > 0:
+                    options.append((stick_len, pm[key]))
     elif 'OD Galv' in size:
-        key = size + ' 24ft'
+        key = f'{size} 24ft'
         if key in pm and pm[key] > 0:
             options.append((24, pm[key]))
     else:
-        mat_label = 'Galv' if material == 'Galvanized' else 'Black'
-        for stick_len in [21, 24, 40, 42, 48]:
-            key = size + ' ' + mat_label + ' ' + str(stick_len) + 'ft'
-            if key in pm and pm[key] > 0:
-                options.append((stick_len, pm[key]))
+        for color in ['Galv', 'Black']:
+            for stick_len in [21, 24, 40, 42, 48]:
+                key = f'{size} {color} {stick_len}ft'
+                if key in pm and pm[key] > 0:
+                    options.append((stick_len, pm[key]))
     if not options:
-        return 0
-    # Choose most cost-efficient stock length
+        return 0, 0
     best_cost = None
+    best_unit = 0
     for stick_len, price in options:
         sticks_per_pole = math.ceil(length_ft / stick_len)
         cost_per_pole = sticks_per_pole * price
         if best_cost is None or cost_per_pole < best_cost:
             best_cost = cost_per_pole
-    return (best_cost or 0) * qty
+            best_unit = cost_per_pole
+    return (best_cost or 0) * qty, best_unit
 
-def powder_cost_for_poles(poles, pm):
-    total = 0
-    powder_map = {
-        '5" SCH40': pm.get('5" SCH40', 0),
-        '6" SCH40': pm.get('6" SCH40', 0),
-        '8" SCH40': pm.get('8" SCH40', 0),
-        '3" OD Galv Tubing': pm.get('3" OD Galv', 0),
-        '4" OD Galv Tubing': pm.get('4" OD Galv', 0),
-        '5" OD Galv Tubing': pm.get('5" OD Galv', 0),
-        '4x4': pm.get('4x4 HSS', 0),
-        '4x6': pm.get('4x6 HSS', 0),
-        '4x8': pm.get('4x8 HSS', 0),
+def get_powder_rate(size, pm):
+    key_map = {
+        '5" SCH40': '5" SCH40', '6" SCH40': '6" SCH40', '8" SCH40': '8" SCH40',
+        '3" OD Galv Tubing': '3" OD Galv', '4" OD Galv Tubing': '4" OD Galv',
+        '5" OD Galv Tubing': '5" OD Galv',
+        '4x4': '4x4 HSS', '4x6': '4x6 HSS', '4x8': '4x8 HSS',
     }
-    for p in poles:
-        size = p.get('size', '')
-        length = float(p.get('length', 0) or 0)
-        qty = int(p.get('qty', 0) or 0)
-        rate = powder_map.get(size, 0)
-        total += rate * length * qty
-    return total
+    return pm.get(key_map.get(size, ''), 0)
 
-@app.route('/estimator', methods=['GET'])
+def parse_pole_rows(prefix, f):
+    n = int(f.get(f'{prefix}_count', 1) or 1)
+    rows = []
+    for i in range(n):
+        rows.append({
+            'size':   f.get(f'{prefix}_size_{i}', ''),
+            'length': f.get(f'{prefix}_len_{i}', 0),
+            'qty':    f.get(f'{prefix}_qty_{i}', 0),
+            'attach': f.get(f'{prefix}_attach_{i}', ''),
+        })
+    return rows
+
+@app.route('/estimator')
 @admin_required
 def estimator():
-    db = get_db()
-    pm = get_pricing_map(db)
-    return render_template('estimator.html', pm=pm)
+    return render_template('estimator.html')
 
 @app.route('/estimator/calculate', methods=['POST'])
 @admin_required
@@ -493,193 +487,77 @@ def calculate():
     pm = get_pricing_map(db)
     f = request.form
 
-    # ── Job Info ──
-    job_name     = f.get('job_name', '')
-    client       = f.get('client', '')
-    location     = f.get('location', '')
-    sq_quote_amt = float(f.get('sq_quote_amount', 0) or 0)
+    job_name   = f.get('job_name', '')
+    client     = f.get('client', '')
+    markup_pct = float(f.get('markup_pct', 30) or 30)
+    tax_pct    = float(f.get('tax_pct', 0) or 0)
 
-    # ── Fabric ──
-    total_sqft = float(f.get('total_sqft', 0) or 0)
-    fabric_rate = pm.get('Cost per Sq Ft', 3.25)
-    fabric_cost = total_sqft * fabric_rate
+    sail_rows  = parse_pole_rows('sail', f)
+    hip_rows   = parse_pole_rows('hip', f)
+    cpost_rows = parse_pole_rows('cpost', f)
+    cbeam_rows = parse_pole_rows('cbeam', f)
 
-    # ── Sail Poles ──
-    sail_sizes    = f.getlist('sail_size[]')
-    sail_mats     = f.getlist('sail_material[]')
-    sail_lengths  = f.getlist('sail_length[]')
-    sail_qtys     = f.getlist('sail_qty[]')
-    sail_attaches = f.getlist('sail_attach[]')
-    sail_poles = []
-    sail_pipe_cost = 0
+    pole_detail = []
+    steel_cost = 0
     weld_lug_count = 0
-    all_thread_count = 0
-    for i in range(len(sail_sizes)):
-        sz = sail_sizes[i] if i < len(sail_sizes) else ''
-        mat = sail_mats[i] if i < len(sail_mats) else ''
-        ln = sail_lengths[i] if i < len(sail_lengths) else 0
-        qt = sail_qtys[i] if i < len(sail_qtys) else 0
-        at = sail_attaches[i] if i < len(sail_attaches) else ''
-        c = pipe_cost(sz, mat, ln, qt, pm)
-        sail_pipe_cost += c
-        sail_poles.append({'size': sz, 'length': ln, 'qty': qt})
-        if at == 'Weld Lug':
-            weld_lug_count += int(qt or 0)
-        elif at == 'All Thread':
-            all_thread_count += int(qt or 0)
 
-    # Attach hardware costs
-    weld_lug_unit = pm.get('Weld Lug', 0)
-    all_thread_unit = pm.get('All Thread', 0)
-    attach_cost = (weld_lug_count * weld_lug_unit) + (all_thread_count * all_thread_unit)
+    for section, rows in [('Sail', sail_rows), ('Hip/Canopy', hip_rows),
+                           ('Cant. Post', cpost_rows), ('Cant. Beam', cbeam_rows)]:
+        for row in rows:
+            if not row['size'] or not row['length'] or not row['qty']:
+                continue
+            cost, unit_cost = pipe_cost_calc(row['size'], row['length'], row['qty'], pm)
+            steel_cost += cost
+            pole_detail.append({
+                'section': section, 'size': row['size'],
+                'length': row['length'], 'qty': row['qty'],
+                'unit_cost': unit_cost, 'total': cost,
+            })
+            if row.get('attach') == 'Weld Lug':
+                weld_lug_count += int(row['qty'] or 0)
 
-    # Welding cost (sail weld lugs)
-    welding_rate = pm.get('Welding Rate', 95)
-    welding_cost = weld_lug_count * welding_rate
+    weld_rate    = pm.get('Welding Rate', 95)
+    cant_posts   = sum(int(r['qty'] or 0) for r in cpost_rows if r['size'])
+    cant_beams   = sum(int(r['qty'] or 0) for r in cbeam_rows if r['size'])
+    welding_cost = (weld_lug_count + cant_posts + cant_beams) * weld_rate
 
-    # ── Hip Poles ──
-    hip_sizes   = f.getlist('hip_size[]')
-    hip_mats    = f.getlist('hip_material[]')
-    hip_lengths = f.getlist('hip_length[]')
-    hip_qtys    = f.getlist('hip_qty[]')
-    hip_poles = []
-    hip_pipe_cost = 0
-    for i in range(len(hip_sizes)):
-        sz = hip_sizes[i] if i < len(hip_sizes) else ''
-        mat = hip_mats[i] if i < len(hip_mats) else ''
-        ln = hip_lengths[i] if i < len(hip_lengths) else 0
-        qt = hip_qtys[i] if i < len(hip_qtys) else 0
-        c = pipe_cost(sz, mat, ln, qt, pm)
-        hip_pipe_cost += c
-        hip_poles.append({'size': sz, 'length': ln, 'qty': qt})
+    powder_cost = 0
+    for rows in [sail_rows, hip_rows, cpost_rows, cbeam_rows]:
+        for row in rows:
+            if not row['size'] or not row['length'] or not row['qty']:
+                continue
+            rate = get_powder_rate(row['size'], pm)
+            powder_cost += rate * float(row['length'] or 0) * int(row['qty'] or 0)
 
-    # ── Cantilever Posts ──
-    cp_sizes   = f.getlist('cp_size[]')
-    cp_walls   = f.getlist('cp_wall[]')
-    cp_lengths = f.getlist('cp_length[]')
-    cp_qtys    = f.getlist('cp_qty[]')
-    cp_poles = []
-    cp_pipe_cost = 0
-    cant_post_qty_total = 0
-    for i in range(len(cp_sizes)):
-        sz = cp_sizes[i] if i < len(cp_sizes) else ''
-        wl = cp_walls[i] if i < len(cp_walls) else ''
-        ln = cp_lengths[i] if i < len(cp_lengths) else 0
-        qt = cp_qtys[i] if i < len(cp_qtys) else 0
-        c = pipe_cost(sz, wl, ln, qt, pm)
-        cp_pipe_cost += c
-        cp_poles.append({'size': sz, 'length': ln, 'qty': qt})
-        cant_post_qty_total += int(qt or 0)
+    fabric_cost    = float(f.get('fabric_cost', 0) or 0)
+    superior_quote = float(f.get('superior_quote', 0) or 0)
+    labor_hours    = float(f.get('labor_hours', 0) or 0)
+    labor_rate     = float(f.get('labor_rate', 75) or 75)
+    labor_cost     = labor_hours * labor_rate
 
-    # ── Cantilever Beams ──
-    cb_sizes   = f.getlist('cb_size[]')
-    cb_walls   = f.getlist('cb_wall[]')
-    cb_lengths = f.getlist('cb_length[]')
-    cb_qtys    = f.getlist('cb_qty[]')
-    cb_poles = []
-    cb_pipe_cost = 0
-    cant_beam_qty_total = 0
-    for i in range(len(cb_sizes)):
-        sz = cb_sizes[i] if i < len(cb_sizes) else ''
-        wl = cb_walls[i] if i < len(cb_walls) else ''
-        ln = cb_lengths[i] if i < len(cb_lengths) else 0
-        qt = cb_qtys[i] if i < len(cb_qtys) else 0
-        c = pipe_cost(sz, wl, ln, qt, pm)
-        cb_pipe_cost += c
-        cb_poles.append({'size': sz, 'length': ln, 'qty': qt})
-        cant_beam_qty_total += int(qt or 0)
+    materials_total = steel_cost + welding_cost + powder_cost + fabric_cost + superior_quote
+    subtotal        = materials_total + labor_cost
+    markup_amount   = subtotal * (markup_pct / 100)
+    tax_amount      = (subtotal + markup_amount) * (tax_pct / 100)
+    total           = subtotal + markup_amount + tax_amount
 
-    # Welding cost for cantilever posts + beams
-    welding_cost += (cant_post_qty_total + cant_beam_qty_total) * welding_rate
-
-    # ── Hardware ──
-    wall_mount_qty = int(f.get('wall_mount_qty', 0) or 0)
-    clamp_qty      = int(f.get('clamp_qty', 0) or 0)
-    wall_mount_cost = wall_mount_qty * pm.get('Wall Mount', 0)
-    clamp_cost      = clamp_qty * pm.get('Clamp', 0)
-
-    # ── Steel/Pipe Total ──
-    steel_total = sail_pipe_cost + hip_pipe_cost + cp_pipe_cost + cb_pipe_cost + wall_mount_cost + clamp_cost + attach_cost
-
-    # ── Powder Coating ──
-    all_poles = sail_poles + hip_poles + cp_poles + cb_poles
-    powder_total = powder_cost_for_poles(all_poles, pm)
-
-    # ── Concrete ──
-    concrete_cy = float(f.get('concrete_cy', 0) or 0)
-    concrete_cost = concrete_cy * pm.get('Price per CY', 200) * 1.1
-
-    # ── Labor ──
-    crew_size = int(f.get('crew_size', 1) or 1)
-    install_days = float(f.get('install_days', 1) or 1)
-    daily_cost = 0
-    for i in range(1, crew_size + 1):
-        key = f'Rate - Person {i}'
-        daily_cost += pm.get(key, 400)
-    labor_cost = daily_cost * install_days
-
-    # ── Travel ──
-    miles = float(f.get('miles', 0) or 0)
-    trips = int(f.get('trips', 1) or 1)
-    fuel_rate = pm.get('Fuel Cost per Mile', 0.40)
-    fuel_cost = miles * 2 * fuel_rate * trips
-    lodging = float(f.get('lodging', 0) or 0)
-    travel_total = fuel_cost + lodging
-
-    # ── Other Costs ──
-    equipment = float(f.get('equipment', 0) or 0)
-    permit    = float(f.get('permit', 0) or 0)
-    vendor    = float(f.get('vendor', 0) or 0)
-    misc      = float(f.get('misc', 0) or 0)
-    other_total = equipment + permit + vendor + misc
-
-    # ── Materials Total ──
-    materials_total = (sq_quote_amt + fabric_cost + concrete_cost +
-                       steel_total + welding_cost + powder_total +
-                       float(f.get('hardware_misc', 0) or 0) +
-                       float(f.get('job_supplies', 0) or 0) +
-                       float(f.get('galvanizing', 0) or 0))
-
-    # ── Grand Total ──
-    total_cost = materials_total + labor_cost + travel_total + other_total
-    markup_pct = float(f.get('markup_pct', 50) or 50)
-    markup_amt = total_cost * (markup_pct / 100)
-    sell_price = total_cost + markup_amt
-
-    estimate = {
-        'job_name': job_name, 'client': client, 'location': location,
-        'sq_quote_amt': sq_quote_amt,
-        'fabric_cost': fabric_cost, 'concrete_cost': concrete_cost,
-        'steel_total': steel_total, 'welding_cost': welding_cost,
-        'powder_total': powder_total,
+    result = {
+        'job_name': job_name, 'client': client,
+        'steel_cost': steel_cost, 'welding_cost': welding_cost,
+        'powder_cost': powder_cost, 'fabric_cost': fabric_cost,
+        'superior_quote': superior_quote,
         'materials_total': materials_total,
-        'labor_cost': labor_cost, 'travel_total': travel_total,
-        'fuel_cost': fuel_cost, 'lodging': lodging,
-        'other_total': other_total,
-        'equipment': equipment, 'permit': permit, 'vendor': vendor, 'misc': misc,
-        'total_cost': total_cost,
-        'markup_pct': markup_pct, 'markup_amt': markup_amt,
-        'sell_price': sell_price,
-        'hardware_misc': float(f.get('hardware_misc', 0) or 0),
-        'job_supplies': float(f.get('job_supplies', 0) or 0),
-        'galvanizing': float(f.get('galvanizing', 0) or 0),
+        'labor_hours': labor_hours, 'labor_rate': labor_rate, 'labor_cost': labor_cost,
+        'subtotal': subtotal,
+        'markup_pct': markup_pct, 'markup_amount': markup_amount,
+        'tax_pct': tax_pct, 'tax_amount': tax_amount,
+        'total': total,
+        'pole_detail': pole_detail,
     }
-
-    save_as_job = f.get('save_as_job')
-    if save_as_job and job_name:
-        db.execute(
-            "INSERT INTO jobs (name,client,location,status,estimate_amount,estimate_data,created_by) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (job_name, client, location, 'estimated', sell_price,
-             json.dumps(dict(f)), session['user_id'])
-        )
-        db.commit()
-        flash(f'Job "{job_name}" saved to the job board.', 'success')
-
-    return render_template('estimate_result.html', e=estimate)
+    return render_template('estimate_result.html', result=result)
 
 # ─────────────────────────────────────────────────────────────
-# PRICING ADMIN
+# PRICING
 # ─────────────────────────────────────────────────────────────
 
 @app.route('/pricing')
@@ -687,10 +565,7 @@ def calculate():
 def pricing():
     db = get_db()
     rows = db.execute("SELECT * FROM pricing ORDER BY category, sort_order").fetchall()
-    categories = {}
-    for r in rows:
-        categories.setdefault(r['category'], []).append(r)
-    return render_template('pricing.html', categories=categories)
+    return render_template('pricing.html', pricing=rows)
 
 @app.route('/pricing/update', methods=['POST'])
 @admin_required
@@ -700,7 +575,7 @@ def update_pricing():
         if key.startswith('price_'):
             pid = int(key.split('_')[1])
             try:
-                db.execute("UPDATE pricing SET value=? WHERE id=?", (float(val), pid))
+                db.execute("UPDATE pricing SET price=? WHERE id=?", (float(val), pid))
             except (ValueError, TypeError):
                 pass
     db.commit()
@@ -715,21 +590,23 @@ def update_pricing():
 @admin_required
 def admin_users():
     db = get_db()
-    users = db.execute("SELECT id,username,name,role,must_change_password FROM users ORDER BY role,name").fetchall()
+    users = db.execute(
+        "SELECT id,username,name,role,must_change_password FROM users ORDER BY role,name"
+    ).fetchall()
     return render_template('admin_users.html', users=users)
 
-@app.route('/admin/users/<int:uid>/reset', methods=['POST'])
+@app.route('/admin/users/<int:user_id>/reset', methods=['POST'])
 @admin_required
-def reset_password(uid):
-    new_pw = request.form.get('new_password', '')
-    if len(new_pw) < 6:
-        flash('Password must be at least 6 characters.', 'error')
-        return redirect(url_for('admin_users'))
+def reset_user(user_id):
+    temp_pw = 'SA-' + secrets.token_hex(3).upper()
     db = get_db()
+    user = db.execute("SELECT username FROM users WHERE id=?", (user_id,)).fetchone()
+    if not user:
+        abort(404)
     db.execute("UPDATE users SET password_hash=?, must_change_password=1 WHERE id=?",
-               (generate_password_hash(new_pw), uid))
+               (generate_password_hash(temp_pw), user_id))
     db.commit()
-    flash('Password reset.', 'success')
+    flash(f'Password for {user["username"]} reset to: {temp_pw}  — send this to them.', 'success')
     return redirect(url_for('admin_users'))
 
 # ─────────────────────────────────────────────────────────────
@@ -738,11 +615,13 @@ def reset_password(uid):
 
 @app.errorhandler(403)
 def forbidden(e):
-    return render_template('error.html', code=403, msg="You don't have permission to view this page."), 403
+    return render_template('error.html', error='Access Denied',
+                           message="You don't have permission to view this page."), 403
 
 @app.errorhandler(404)
 def not_found(e):
-    return render_template('error.html', code=404, msg="Page not found."), 404
+    return render_template('error.html', error='Page Not Found',
+                           message="The page you're looking for doesn't exist."), 404
 
 # ─────────────────────────────────────────────────────────────
 # STARTUP
