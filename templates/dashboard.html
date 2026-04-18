@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Row -->
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total }}</div>
+        <div class="stat-label">Total Jobs</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value text-yellow">{{ stats.in_progress }}</div>
+        <div class="stat-label">In Progress</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value text-green">{{ stats.completed }}</div>
+        <div class="stat-label">Completed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value text-blue">{{ stats.quoted }}</div>
+        <div class="stat-label">Quoted</div>
+    </div>
+</div>
+
+<!-- Pipeline Board -->
+<div class="section-header">
+    <h2>Job Pipeline</h2>
+    <a href="{{ url_for('new_job') }}" class="btn btn-primary btn-sm">+ New Job</a>
+</div>
+
+<div class="pipeline-board">
+    {% set columns = [
+        ('quoted',      '📋', 'Quoted',      'col-blue'),
+        ('approved',    '✅', 'Approved',    'col-green'),
+        ('in_progress', '🔨', 'In Progress', 'col-yellow'),
+        ('install',     '🏗️', 'Install',     'col-orange'),
+        ('completed',   '🎉', 'Completed',   'col-grey'),
+    ] %}
+
+    {% for status, icon, label, cls in columns %}
+    <div class="pipeline-col">
+        <div class="col-header {{ cls }}">
+            <span>{{ icon }} {{ label }}</span>
+            <span class="col-count">{{ jobs_by_status[status]|length }}</span>
+        </div>
+        <div class="col-cards" data-status="{{ status }}">
+            {% for job in jobs_by_status[status] %}
+            <a href="{{ url_for('job_detail', job_id=job.id) }}" class="job-card">
+                <div class="job-card-name">{{ job.name }}</div>
+                {% if job.client %}
+                <div class="job-card-client">{{ job.client }}</div>
+                {% endif %}
+                {% if job.location %}
+                <div class="job-card-loc">📍 {{ job.location }}</div>
+                {% endif %}
+                {% if job.estimate_total %}
+                <div class="job-card-value">${{ "{:,.0f}".format(job.estimate_total) }}</div>
+                {% endif %}
+            </a>
+            {% else %}
+            <div class="col-empty">No jobs</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

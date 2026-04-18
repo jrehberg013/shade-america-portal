@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Estimator{% endblock %}
+{% block page_title %}Estimator{% endblock %}
+
+{% block content %}
+<form method="POST" action="{{ url_for('calculate') }}" id="estimatorForm">
+
+<!-- Job Info -->
+<div class="card">
+    <div class="card-header"><h3>Job Information</h3></div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Job Name</label>
+            <input type="text" name="job_name" placeholder="e.g. Smith Residence">
+        </div>
+        <div class="form-group">
+            <label>Client</label>
+            <input type="text" name="client" placeholder="Customer name">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Markup %</label>
+            <input type="number" name="markup_pct" value="30" min="0" max="200" step="1">
+        </div>
+        <div class="form-group">
+            <label>Tax %</label>
+            <input type="number" name="tax_pct" value="0" min="0" max="20" step="0.1">
+        </div>
+    </div>
+</div>
+
+<!-- Sail Poles -->
+<div class="card">
+    <div class="card-header"><h3>Sail Poles</h3></div>
+    <div class="est-section-hint">Add each unique pole size used for sail/canopy structures.</div>
+    <div id="sailRows">
+        <div class="pole-row-header">
+            <span>Pipe Size</span>
+            <span>Length (ft)</span>
+            <span>Qty</span>
+            <span>Attachment</span>
+            <span></span>
+        </div>
+        <div class="pole-row" id="sail_0">
+            <select name="sail_size_0" class="pipe-select">
+                <option value="">-- Size --</option>
+                <option value='5" SCH40'>5" SCH40</option>
+                <option value='6" SCH40'>6" SCH40</option>
+                <option value='8" SCH40'>8" SCH40</option>
+            </select>
+            <input type="number" name="sail_len_0" placeholder="ft" min="1" max="40" step="0.5">
+            <input type="number" name="sail_qty_0" placeholder="qty" min="1" max="50">
+            <select name="sail_attach_0">
+                <option value="All Thread">All Thread</option>
+                <option value="Weld Lug">Weld Lug</option>
+                <option value="Wall Mount">Wall Mount</option>
+                <option value="Drive Post">Drive Post</option>
+                <option value="Surface Mount">Surface Mount</option>
+            </select>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeRow('sail_0')">✕</button>
+        </div>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline" onclick="addRow('sail','sailRows')">+ Add Row</button>
+    <input type="hidden" name="sail_count" id="sail_count" value="1">
+</div>
+
+<!-- Hip Poles -->
+<div class="card">
+    <div class="card-header"><h3>Hip / Canopy Poles</h3></div>
+    <div id="hipRows">
+        <div class="pole-row-header">
+            <span>Pipe Size</span>
+            <span>Length (ft)</span>
+            <span>Qty</span>
+            <span></span>
+        </div>
+        <div class="pole-row" id="hip_0">
+            <select name="hip_size_0" class="pipe-select">
+                <option value="">-- Size --</option>
+                <option value='5" SCH40'>5" SCH40</option>
+                <option value='6" SCH40'>6" SCH40</option>
+                <option value='8" SCH40'>8" SCH40</option>
+                <option value='3" OD Galv Tubing'>3" OD Galv</option>
+                <option value='4" OD Galv Tubing'>4" OD Galv</option>
+                <option value='5" OD Galv Tubing'>5" OD Galv</option>
+            </select>
+            <input type="number" name="hip_len_0" placeholder="ft" min="1" max="40" step="0.5">
+            <input type="number" name="hip_qty_0" placeholder="qty" min="1" max="50">
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeRow('hip_0')">✕</button>
+        </div>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline" onclick="addRow('hip','hipRows')">+ Add Row</button>
+    <input type="hidden" name="hip_count" id="hip_count" value="1">
+</div>
+
+<!-- Cantilever -->
+<div class="card">
+    <div class="card-header"><h3>Cantilever Posts</h3></div>
+    <div id="cpostRows">
+        <div class="pole-row-header">
+            <span>HSS Size</span>
+            <span>Length (ft)</span>
+            <span>Qty</span>
+            <span></span>
+        </div>
+        <div class="pole-row" id="cpost_0">
+            <select name="cpost_size_0" class="pipe-select">
+                <option value="">-- Size --</option>
+                <option value="4x4">4x4 HSS</option>
+                <option value="4x6">4x6 HSS</option>
+                <option value="4x8">4x8 HSS</option>
+            </select>
+            <input type="number" name="cpost_len_0" placeholder="ft" min="1" max="40" step="0.5">
+            <input type="number" name="cpost_qty_0" placeholder="qty" min="1" max="50">
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeRow('cpost_0')">✕</button>
+        </div>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline" onclick="addRow('cpost','cpostRows')">+ Add Row</button>
+    <input type="hidden" name="cpost_count" id="cpost_count" value="1">
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Cantilever Beams</h3></div>
+    <div id="cbeamRows">
+        <div class="pole-row-header">
+            <span>HSS Size</span>
+            <span>Length (ft)</span>
+            <span>Qty</span>
+            <span></span>
+        </div>
+        <div class="pole-row" id="cbeam_0">
+            <select name="cbeam_size_0" class="pipe-select">
+                <option value="">-- Size --</option>
+                <option value="4x4">4x4 HSS</option>
+                <option value="4x6">4x6 HSS</option>
+                <option value="4x8">4x8 HSS</option>
+            </select>
+            <input type="number" name="cbeam_len_0" placeholder="ft" min="1" max="40" step="0.5">
+            <input type="number" name="cbeam_qty_0" placeholder="qty" min="1" max="50">
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeRow('cbeam_0')">✕</button>
+        </div>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline" onclick="addRow('cbeam','cbeamRows')">+ Add Row</button>
+    <input type="hidden" name="cbeam_count" id="cbeam_count" value="1">
+</div>
+
+<!-- Fabric -->
+<div class="card">
+    <div class="card-header"><h3>Fabric / Shade Material</h3></div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Fabric Cost ($)</label>
+            <input type="number" name="fabric_cost" value="0" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+            <label>Superior Quote ($) <span class="form-hint">— vendor package quote</span></label>
+            <input type="number" name="superior_quote" value="0" min="0" step="0.01">
+        </div>
+    </div>
+</div>
+
+<!-- Labor -->
+<div class="card">
+    <div class="card-header"><h3>Labor</h3></div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Labor Hours</label>
+            <input type="number" name="labor_hours" value="0" min="0" step="0.5">
+        </div>
+        <div class="form-group">
+            <label>Labor Rate ($/hr)</label>
+            <input type="number" name="labor_rate" value="75" min="0" step="1">
+        </div>
+    </div>
+</div>
+
+<div class="form-actions">
+    <button type="submit" class="btn btn-primary btn-lg">Calculate Estimate →</button>
+</div>
+
+</form>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Pricing{% endblock %}
+{% block page_title %}Pricing Table{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>Pipe & Material Pricing</h2>
+        <p class="text-muted">Update unit prices used by the estimator. Changes take effect immediately.</p>
+    </div>
+    <form method="POST" action="{{ url_for('update_pricing') }}">
+        <table class="data-table pricing-table">
+            <thead>
+                <tr><th>Item</th><th>Category</th><th>Unit</th><th>Price ($)</th></tr>
+            </thead>
+            <tbody>
+                {% for item in pricing %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td><span class="tag">{{ item.category }}</span></td>
+                    <td class="text-muted">{{ item.unit or 'ea' }}</td>
+                    <td>
+                        <input type="number" name="price_{{ item.id }}" value="{{ item.price }}"
+                               step="0.01" min="0" class="price-input">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Prices</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+*.pyc
+__pycache__/
+*.pyo
+.env
+venv/
+.venv/
+instance/
+shade_america.db
+uploads/
+*.sqlite
+*.db
+.DS_Store
+Thumbs.db

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Estimate Result{% endblock %}
+{% block page_title %}Estimate Result{% endblock %}
+
+{% block content %}
+<div class="estimate-result">
+    <div class="card">
+        <div class="card-header card-header-row">
+            <div>
+                <h2>{{ result.job_name or 'Estimate' }}</h2>
+                {% if result.client %}<p class="text-muted">{{ result.client }}</p>{% endif %}
+            </div>
+            <a href="{{ url_for('estimator') }}" class="btn btn-outline btn-sm">← New Estimate</a>
+        </div>
+
+        <!-- Materials Breakdown -->
+        <h3 class="section-label">Materials</h3>
+        <table class="result-table">
+            <tbody>
+                {% if result.steel_cost > 0 %}
+                <tr><td>Steel / Pipe</td><td class="td-right">${{ "{:,.2f}".format(result.steel_cost) }}</td></tr>
+                {% endif %}
+                {% if result.powder_cost > 0 %}
+                <tr><td>Powder Coating</td><td class="td-right">${{ "{:,.2f}".format(result.powder_cost) }}</td></tr>
+                {% endif %}
+                {% if result.welding_cost > 0 %}
+                <tr><td>Welding</td><td class="td-right">${{ "{:,.2f}".format(result.welding_cost) }}</td></tr>
+                {% endif %}
+                {% if result.superior_quote > 0 %}
+                <tr><td>Superior Quote</td><td class="td-right">${{ "{:,.2f}".format(result.superior_quote) }}</td></tr>
+                {% endif %}
+                {% if result.fabric_cost > 0 %}
+                <tr><td>Fabric / Shade Material</td><td class="td-right">${{ "{:,.2f}".format(result.fabric_cost) }}</td></tr>
+                {% endif %}
+                <tr class="subtotal-row"><td><strong>Materials Subtotal</strong></td><td class="td-right"><strong>${{ "{:,.2f}".format(result.materials_total) }}</strong></td></tr>
+            </tbody>
+        </table>
+
+        <!-- Labor -->
+        {% if result.labor_cost > 0 %}
+        <h3 class="section-label">Labor</h3>
+        <table class="result-table">
+            <tbody>
+                <tr><td>{{ result.labor_hours }} hrs × ${{ result.labor_rate }}/hr</td><td class="td-right">${{ "{:,.2f}".format(result.labor_cost) }}</td></tr>
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- Totals -->
+        <div class="totals-box">
+            <div class="totals-row">
+                <span>Subtotal</span>
+                <span>${{ "{:,.2f}".format(result.subtotal) }}</span>
+            </div>
+            {% if result.markup_amount > 0 %}
+            <div class="totals-row">
+                <span>Markup ({{ result.markup_pct }}%)</span>
+                <span>${{ "{:,.2f}".format(result.markup_amount) }}</span>
+            </div>
+            {% endif %}
+            {% if result.tax_amount > 0 %}
+            <div class="totals-row">
+                <span>Tax ({{ result.tax_pct }}%)</span>
+                <span>${{ "{:,.2f}".format(result.tax_amount) }}</span>
+            </div>
+            {% endif %}
+            <div class="totals-row totals-final">
+                <span>TOTAL</span>
+                <span>${{ "{:,.2f}".format(result.total) }}</span>
+            </div>
+        </div>
+
+        <!-- Pole Detail -->
+        {% if result.pole_detail %}
+        <details class="pole-detail-toggle">
+            <summary>View Pole Detail</summary>
+            <table class="result-table" style="margin-top:.5rem">
+                <thead>
+                    <tr><th>Section</th><th>Size</th><th>Length</th><th>Qty</th><th>Unit Cost</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in result.pole_detail %}
+                    <tr>
+                        <td>{{ row.section }}</td>
+                        <td>{{ row.size }}</td>
+                        <td>{{ row.length }} ft</td>
+                        <td>{{ row.qty }}</td>
+                        <td>${{ "{:,.2f}".format(row.unit_cost) }}</td>
+                        <td>${{ "{:,.2f}".format(row.total) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </details>
+        {% endif %}
+
+        <div class="form-actions" style="margin-top:1.5rem">
+            <a href="{{ url_for('new_job') }}?name={{ result.job_name }}&client={{ result.client }}&estimate={{ result.total }}" class="btn btn-primary">Save as Job</a>
+            <button onclick="window.print()" class="btn btn-outline">🖨 Print</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

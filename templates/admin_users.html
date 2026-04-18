@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block page_title %}Team Users{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header"><h2>Team Members</h2></div>
+    <table class="data-table">
+        <thead>
+            <tr><th>Username</th><th>Role</th><th>Must Change PW</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td><strong>{{ user.username.title() }}</strong></td>
+                <td><span class="user-role {{ user.role }}">{{ user.role.title() }}</span></td>
+                <td>{% if user.must_change_password %}<span class="badge-warn">Yes</span>{% else %}—{% endif %}</td>
+                <td>
+                    {% if user.id != current_user.id %}
+                    <form method="POST" action="{{ url_for('reset_user', user_id=user.id) }}"
+                          onsubmit="return confirm('Reset password for {{ user.username }}?')" style="display:inline">
+                        <button type="submit" class="btn btn-sm btn-outline">Reset PW</button>
+                    </form>
+                    {% else %}
+                    <span class="text-muted">You</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card" style="margin-top:1.5rem">
+    <div class="card-header"><h3>Password Reference</h3></div>
+    <p class="text-muted" style="padding:0 1.5rem 1rem">Temporary passwords for new accounts (share via WhatsApp, then have them change on first login).</p>
+    <table class="data-table">
+        <thead><tr><th>User</th><th>Role</th><th>Temp Password</th></tr></thead>
+        <tbody>
+            <tr><td>james</td><td>admin</td><td><code>SA-James#1</code></td></tr>
+            <tr><td>muller</td><td>admin</td><td><code>SA-Muller#1</code></td></tr>
+            <tr><td>jaco</td><td>admin</td><td><code>SA-Jaco#1</code></td></tr>
+            <tr><td>carrie</td><td>admin</td><td><code>SA-Carrie#1</code></td></tr>
+            <tr><td>stefani</td><td>admin</td><td><code>SA-Stefani#1</code></td></tr>
+            <tr><td>field (all field workers)</td><td>field</td><td><code>SunShade24!</code></td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

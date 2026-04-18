@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}My Jobs{% endblock %}
+{% block page_title %}My Jobs{% endblock %}
+
+{% block content %}
+<p class="text-muted" style="margin-bottom:1.5rem">Tap a job to view drawings and upload photos.</p>
+
+{% if jobs %}
+<div class="field-job-list">
+    {% for job in jobs %}
+    <div class="field-job-card">
+        <div class="field-job-header">
+            <div>
+                <div class="field-job-name">{{ job.name }}</div>
+                {% if job.location %}<div class="field-job-loc">📍 {{ job.location }}</div>{% endif %}
+            </div>
+            <span class="status-badge status-{{ job.status }}">{{ job.status.replace('_',' ').title() }}</span>
+        </div>
+
+        <!-- Drawings -->
+        {% if job.drawings %}
+        <div class="field-section-label">📐 Drawings</div>
+        <div class="field-doc-list">
+            {% for doc in job.drawings %}
+            <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank" class="field-doc-link">
+                📄 {{ doc.original_name }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Photo Upload -->
+        <div class="field-section-label">📷 Upload Photo</div>
+        <form method="POST" action="{{ url_for('upload_doc', job_id=job.id) }}" enctype="multipart/form-data" class="field-upload-form">
+            <input type="hidden" name="doc_type" value="photo">
+            <label class="upload-btn-label">
+                <input type="file" name="file" accept="image/*" capture="environment"
+                       onchange="this.form.submit()" class="visually-hidden">
+                📸 Take / Choose Photo
+            </label>
+        </form>
+
+        <!-- Recent Photos -->
+        {% if job.photos %}
+        <div class="photo-grid photo-grid-sm">
+            {% for doc in job.photos[-4:] %}
+            <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank">
+                <img src="{{ url_for('serve_doc', doc_id=doc.id) }}" alt="photo" class="photo-thumb">
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">💼</div>
+    <p>No active jobs assigned.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Jobs{% endblock %}
+{% block page_title %}Jobs{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <div class="search-bar">
+        <input type="text" id="jobSearch" placeholder="🔍 Search jobs..." class="search-input">
+    </div>
+    <a href="{{ url_for('new_job') }}" class="btn btn-primary">+ New Job</a>
+</div>
+
+<div class="card">
+    <table class="data-table" id="jobsTable">
+        <thead>
+            <tr>
+                <th>Job Name</th>
+                <th>Client</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Estimate</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in jobs %}
+            <tr class="job-row">
+                <td><strong>{{ job.name }}</strong></td>
+                <td>{{ job.client or '—' }}</td>
+                <td>{{ job.location or '—' }}</td>
+                <td>
+                    <span class="status-badge status-{{ job.status }}">
+                        {{ job.status.replace('_', ' ').title() }}
+                    </span>
+                </td>
+                <td>{% if job.estimate_total %}${{ "{:,.0f}".format(job.estimate_total) }}{% else %}—{% endif %}</td>
+                <td>{{ job.created_at[:10] if job.created_at else '—' }}</td>
+                <td><a href="{{ url_for('job_detail', job_id=job.id) }}" class="btn btn-sm btn-outline">View</a></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted">No jobs yet. <a href="{{ url_for('new_job') }}">Create the first one.</a></td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
