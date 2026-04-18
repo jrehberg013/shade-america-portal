@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Hip Shade Calculator{% endblock %}
+{% block page_title %}Hip Shade Calculator{% endblock %}
+
+{% block content %}
+<div class="hip-calc-wrap">
+
+  {# ── INPUT FORM ── #}
+  <form method="post" class="card hip-form">
+    <h2 class="section-title">Structure Inputs</h2>
+    <div class="hip-inputs">
+
+      <div class="input-group">
+        <label>Long Side (ft)</label>
+        <input type="number" name="long_side" step="0.5" min="1"
+               value="{{ inputs.get('long_side','') }}" required placeholder="e.g. 27">
+      </div>
+
+      <div class="input-group">
+        <label>Short Side (ft)</label>
+        <input type="number" name="short_side" step="0.5" min="1"
+               value="{{ inputs.get('short_side','') }}" required placeholder="e.g. 18">
+      </div>
+
+      <div class="input-group">
+        <label>Eave Height (ft)</label>
+        <input type="number" name="eave_ht" step="0.5" min="1"
+               value="{{ inputs.get('eave_ht','') }}" required placeholder="e.g. 11">
+      </div>
+
+      <div class="input-group">
+        <label>Column Size</label>
+        <select name="col_size">
+          {% for opt in col_options %}
+          <option value="{{ opt }}" {{ 'selected' if inputs.get('col_size') == opt }}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label>Rafter Dia.</label>
+        <select name="rafter_dia">
+          {% for opt in rafter_options %}
+          <option value="{{ opt }}" {{ 'selected' if inputs.get('rafter_dia') == opt }}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label>Qty</label>
+        <input type="number" name="qty" min="1" max="99"
+               value="{{ inputs.get('qty', 1) }}" required>
+      </div>
+
+      <div class="input-group">
+        <label>Glides</label>
+        <select name="glides">
+          {% for opt in ['No Glides','Glides','Elbow'] %}
+          <option value="{{ opt }}" {{ 'selected' if inputs.get('glides') == opt }}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+    </div>
+    <button type="submit" class="btn btn-primary">Calculate</button>
+  </form>
+
+  {# ── RESULTS ── #}
+  {% if result %}
+  <div class="hip-results">
+
+    <div class="profile-badge profile-{{ result.profile.lower() }}">
+      Determined Profile: <strong>{{ result.profile }}</strong>
+      &nbsp;·&nbsp; {{ inputs.long_side }}' × {{ inputs.short_side }}'
+      &nbsp;·&nbsp; Eave {{ inputs.eave_ht }}'
+    </div>
+
+    {# result table helper macro #}
+    {% macro row_table(r) %}
+    <table class="hip-table">
+      <thead>
+        <tr>
+          <th>Profile</th>
+          <th>Rafter</th>
+          <th>Rafter (ft)</th>
+          <th>To Swage</th>
+          <th>Ridge</th>
+          <th>Ridge (ft)</th>
+          <th>Ridge Swage</th>
+          <th>Total (RMRT)</th>
+          <th>Total (ft)</th>
+          <th>Cable</th>
+          <th>1 Cable</th>
+          <th>2 Cables</th>
+          <th>Diagonal</th>
+          <th>Powder</th>
+          <th>Peak Above Col.</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="{{ 'active-row' if r.profile == result.profile }}">
+          <td><strong>{{ r.profile }}</strong></td>
+          <td>{{ r.rafter }}"</td>
+          <td>{{ (r.rafter / 12) | round(2) }}'</td>
+          <td>{{ r.to_swage }}"</td>
+          <td>{{ r.ridge }}"</td>
+          <td>{{ (r.ridge / 12) | round(2) }}'</td>
+          <td>{{ r.ridge_swage }}"</td>
+          <td>{{ r.total }}"</td>
+          <td>{{ (r.total / 12) | round(2) }}'</td>
+          <td>{{ r.cable_size }}</td>
+          <td>{{ r.cable_1 }}</td>
+          <td>{{ r.cable_2 }}</td>
+          <td>{{ r.diagonal }}</td>
+          <td>{{ r.powder }}</td>
+          <td>{{ r.peak }}</td>
+        </tr>
+      </tbody>
+    </table>
+    {% endmacro %}
+
+    <h3 class="results-heading">Square Profile</h3>
+    {{ row_table(result.sq) }}
+
+    <h3 class="results-heading">Rectangle Profile</h3>
+    {{ row_table(result.rect) }}
+
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+.hip-calc-wrap { display: flex; flex-direction: column; gap: 1.5rem; }
+.hip-form { padding: 1.5rem; }
+.section-title { font-size: 1rem; font-weight: 600; margin: 0 0 1rem; color: var(--text-secondary,#666); text-transform: uppercase; letter-spacing: .04em; }
+.hip-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+.input-group { display: flex; flex-direction: column; gap: .35rem; }
+.input-group label { font-size: .8rem; font-weight: 600; color: var(--text-secondary,#666); }
+.input-group input, .input-group select { padding: .45rem .6rem; border: 1px solid var(--border,#ddd); border-radius: 6px; font-size: .9rem; background: #fff; }
+.profile-badge { padding: .75rem 1rem; border-radius: 8px; font-size: .95rem; font-weight: 500; background: #e8f4fd; border-left: 4px solid #2e75b6; margin-bottom: .5rem; }
+.profile-badge.profile-square { border-color: #2e75b6; background: #e8f4fd; }
+.profile-badge.profile-rectangle { border-color: #7b3f9e; background: #f3eaf9; }
+.results-heading { font-size: .85rem; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .05em; margin: 1rem 0 .4rem; }
+.hip-table { width: 100%; border-collapse: collapse; font-size: .82rem; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.hip-table th { background: #f5f7fa; padding: .55rem .7rem; text-align: left; font-size: .75rem; font-weight: 600; color: #888; white-space: nowrap; border-bottom: 2px solid #e8eaed; }
+.hip-table td { padding: .6rem .7rem; border-bottom: 1px solid #f0f2f4; white-space: nowrap; }
+.hip-table .active-row td { background: #fffbea; font-weight: 600; }
+.hip-table .active-row td:first-child { color: #2e75b6; }
+@media (max-width: 900px) {
+  .hip-table-wrap { overflow-x: auto; }
+  .hip-table { min-width: 900px; }
+}
+</style>
+<script>
+// Wrap each table in a scrollable div for mobile
+document.querySelectorAll('.hip-table').forEach(t => {
+  const wrap = document.createElement('div');
+  wrap.className = 'hip-table-wrap';
+  t.parentNode.insertBefore(wrap, t);
+  wrap.appendChild(t);
+});
+</script>
+{% endblock %}

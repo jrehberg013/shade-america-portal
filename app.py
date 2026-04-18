@@ -9,19 +9,57 @@ import io
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'sa-dev-key-change-in-prod')
 
-DATABASE = os.environ.get('DATABASE_PATH', 'shade_america.db')
+# ─────────────────────────────────────────────────────────────
+# DATABASE — supports SQLite (local) and PostgreSQL (production)
+# Set DATABASE_URL env var on Render to use PostgreSQL.
+# ─────────────────────────────────────────────────────────────
+
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+# Render provides postgres:// but psycopg2 requires postgresql://
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+USE_PG = bool(DATABASE_URL)
+
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
+else:
+    DATABASE = os.environ.get('DATABASE_PATH', 'shade_america.db')
+
 MAX_FILE_MB = 50
 
-# ─────────────────────────────────────────────────────────────
-# DATABASE
-# ─────────────────────────────────────────────────────────────
+
+class _DB:
+    """Thin wrapper so both sqlite3 and psycopg2 share the same API."""
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql, params=()):
+        if USE_PG:
+            cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur.execute(sql.replace('?', '%s'), params)
+            return cur
+        return self._conn.execute(sql, params)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
 
 def get_db():
     if 'db' not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA journal_mode=WAL")
+        if USE_PG:
+            conn = psycopg2.connect(DATABASE_URL)
+            g.db = _DB(conn)
+        else:
+            raw = sqlite3.connect(DATABASE)
+            raw.row_factory = sqlite3.Row
+            raw.execute("PRAGMA journal_mode=WAL")
+            g.db = _DB(raw)
     return g.db
+
 
 @app.teardown_appcontext
 def close_db(e=None):
@@ -29,53 +67,114 @@ def close_db(e=None):
     if db:
         db.close()
 
+
+def _bin(data):
+    """Wrap binary data correctly for each database driver."""
+    if USE_PG:
+        return psycopg2.Binary(data)
+    return data
+
+
 def init_db():
-    db = sqlite3.connect(DATABASE)
-    db.row_factory = sqlite3.Row
-    db.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            name TEXT,
-            role TEXT DEFAULT 'field',
-            must_change_password INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE TABLE IF NOT EXISTS jobs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            client TEXT,
-            phone TEXT,
-            location TEXT,
-            status TEXT DEFAULT 'quoted',
-            estimate_total REAL DEFAULT 0,
-            notes TEXT,
-            created_by INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE TABLE IF NOT EXISTS documents (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            job_id INTEGER NOT NULL,
-            original_name TEXT NOT NULL,
-            doc_type TEXT DEFAULT 'other',
-            file_data BLOB,
-            mime_type TEXT,
-            file_size INTEGER,
-            uploaded_by INTEGER,
-            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE TABLE IF NOT EXISTS pricing (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT NOT NULL,
-            name TEXT NOT NULL,
-            price REAL DEFAULT 0,
-            unit TEXT,
-            sort_order INTEGER DEFAULT 0
-        );
-    """)
-    db.commit()
+    if USE_PG:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        statements = [
+            """CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                name TEXT,
+                role TEXT DEFAULT 'field',
+                must_change_password INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS jobs (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                client TEXT,
+                phone TEXT,
+                location TEXT,
+                status TEXT DEFAULT 'quoted',
+                estimate_total REAL DEFAULT 0,
+                notes TEXT,
+                created_by INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS documents (
+                id SERIAL PRIMARY KEY,
+                job_id INTEGER NOT NULL,
+                original_name TEXT NOT NULL,
+                doc_type TEXT DEFAULT 'other',
+                file_data BYTEA,
+                mime_type TEXT,
+                file_size INTEGER,
+                uploaded_by INTEGER,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pricing (
+                id SERIAL PRIMARY KEY,
+                category TEXT NOT NULL,
+                name TEXT NOT NULL,
+                price REAL DEFAULT 0,
+                unit TEXT,
+                sort_order INTEGER DEFAULT 0
+            )""",
+        ]
+        for stmt in statements:
+            cur.execute(stmt)
+        conn.commit()
+        db = _DB(conn)
+        db._conn = conn
+    else:
+        conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                name TEXT,
+                role TEXT DEFAULT 'field',
+                must_change_password INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                client TEXT,
+                phone TEXT,
+                location TEXT,
+                status TEXT DEFAULT 'quoted',
+                estimate_total REAL DEFAULT 0,
+                notes TEXT,
+                created_by INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id INTEGER NOT NULL,
+                original_name TEXT NOT NULL,
+                doc_type TEXT DEFAULT 'other',
+                file_data BLOB,
+                mime_type TEXT,
+                file_size INTEGER,
+                uploaded_by INTEGER,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS pricing (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                name TEXT NOT NULL,
+                price REAL DEFAULT 0,
+                unit TEXT,
+                sort_order INTEGER DEFAULT 0
+            );
+        """)
+        conn.commit()
+        db = _DB(conn)
 
     # Seed users
     users = [
@@ -147,6 +246,7 @@ def init_db():
     db.commit()
     db.close()
 
+
 # ─────────────────────────────────────────────────────────────
 # AUTH HELPERS
 # ─────────────────────────────────────────────────────────────
@@ -178,6 +278,7 @@ def admin_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated
+
 
 # ─────────────────────────────────────────────────────────────
 # AUTH ROUTES
@@ -235,6 +336,7 @@ def change_password():
             return redirect(url_for('field') if session.get('role') == 'field' else url_for('dashboard'))
     return render_template('change_password.html', must_change=must_change)
 
+
 # ─────────────────────────────────────────────────────────────
 # DASHBOARD
 # ─────────────────────────────────────────────────────────────
@@ -253,6 +355,7 @@ def dashboard():
         'completed':   len(jobs_by_status['completed']),
     }
     return render_template('dashboard.html', jobs_by_status=jobs_by_status, stats=stats)
+
 
 # ─────────────────────────────────────────────────────────────
 # JOBS
@@ -325,6 +428,7 @@ def update_status(job_id):
         db.commit()
     return redirect(request.referrer or url_for('dashboard'))
 
+
 # ─────────────────────────────────────────────────────────────
 # DOCUMENTS
 # ─────────────────────────────────────────────────────────────
@@ -349,7 +453,7 @@ def upload_doc(job_id):
     db.execute(
         "INSERT INTO documents (job_id,original_name,doc_type,file_data,mime_type,file_size,uploaded_by) "
         "VALUES (?,?,?,?,?,?,?)",
-        (job_id, secure_filename(file.filename), doc_type, file_data,
+        (job_id, secure_filename(file.filename), doc_type, _bin(file_data),
          file.content_type or 'application/octet-stream', len(file_data), session['user_id'])
     )
     db.commit()
@@ -366,7 +470,7 @@ def serve_doc(doc_id):
     if doc['doc_type'] in ('estimate', 'contract', 'other') and session.get('role') != 'admin':
         abort(403)
     return send_file(
-        io.BytesIO(doc['file_data']),
+        io.BytesIO(bytes(doc['file_data'])),
         mimetype=doc['mime_type'],
         as_attachment=False,
         download_name=doc['original_name']
@@ -384,6 +488,7 @@ def delete_doc(doc_id):
     db.commit()
     flash('File deleted.', 'success')
     return redirect(url_for('job_detail', job_id=job_id))
+
 
 # ─────────────────────────────────────────────────────────────
 # FIELD VIEW
@@ -411,6 +516,7 @@ def field():
             'photos':   [d for d in docs if d['doc_type'] == 'photo'],
         })
     return render_template('field.html', jobs=jobs)
+
 
 # ─────────────────────────────────────────────────────────────
 # ESTIMATOR
@@ -479,6 +585,150 @@ def parse_pole_rows(prefix, f):
 @admin_required
 def estimator():
     return render_template('estimator.html')
+
+
+# ─────────────────────────────────────────────────────────────
+# HIP SHADE CALCULATOR
+# ─────────────────────────────────────────────────────────────
+
+def _half_round(val):
+    """Round to nearest 0.5 — matches Excel's ROUND(x*2,0)/2 pattern."""
+    return round(val * 2) / 2
+
+def _fmt_fraction(sixteenths):
+    """Convert a count of 1/16-inch units to a simplified fraction string."""
+    from math import gcd
+    if sixteenths == 0:
+        return ''
+    g = gcd(int(sixteenths), 16)
+    return f'{int(sixteenths)//g}/{16//g}'
+
+def _diagonal_sq(A1, D1):
+    """Z2 formula: feet'-whole_inches  fraction" """
+    import math
+    diag_ft   = math.sqrt(A1**2 + D1**2)
+    n16       = round(diag_ft * 12 * 16)          # total 1/16-inch units
+    feet      = int(n16 // (12 * 16))
+    remain16  = n16 - feet * 12 * 16
+    whole_in  = remain16 // 16
+    frac16    = remain16 % 16
+    frac      = _fmt_fraction(frac16)
+    return f"{feet}'-{whole_in}  {frac}\"" if frac else f"{feet}'-{whole_in}\""
+
+def _diagonal_rect(A1, D1):
+    """Z3 formula: total inches as simplified fraction" """
+    import math
+    diag_ft = math.sqrt(A1**2 + D1**2)
+    n16     = round(diag_ft * 12 * 16)
+    whole   = n16 // 16
+    frac16  = n16 % 16
+    frac    = _fmt_fraction(frac16)
+    return f"{whole} {frac}\"" if frac else f'{whole}"'
+
+def hip_calc_compute(A1, D1, F1, col_size, rafter_dia, qty=1, glides='No Glides'):
+    import math
+    B9   = qty
+    AB4  = 0.67   # constant from spreadsheet
+
+    # Profile
+    ratio   = A1 / D1 if D1 else 1
+    profile = 'Square' if 1 <= ratio < 1.175 else 'Rectangle'
+
+    # Rafter OD for powder calc (per J4-J8 options)
+    rafter_od = {
+        'Ø2 1/2" 12-Ga': 2.5,
+        'Ø2 7/8" 12-Ga': 2.875,
+        'Ø3 1/2" 11-Ga': 3.5,
+        'Ø5" 11-Ga':     5.0,
+        'Ø5" 7-Ga':      5.0,
+    }.get(rafter_dia, 3.5)
+
+    def _sq():
+        rafter  = _half_round(D1 * 0.6535 * 12)
+        swage   = rafter - 4.25
+        ridge   = _half_round(D1 * 0.25 * 12 if A1 == D1 else (D1 * 0.25 * 12) + (A1 - D1) * 12)
+        rswage  = ridge - 8.5
+        total   = _half_round((rafter * 4 + ridge) * B9)
+        powder  = round(math.pi * rafter_od * total * 0.000376, 2)
+        peak_v  = D1 * 0.1853 + AB4
+        peak    = f"{int(peak_v)}'-{round((peak_v - int(peak_v)) * 12)}\""
+        cable_sz = '3/16"' if A1*D1<400 else ('1/4"' if A1*D1<1000 else '5/16"')
+        diag    = _diagonal_sq(A1, D1)
+        return dict(
+            profile='Square', rafter=rafter, to_swage=swage,
+            ridge=ridge, ridge_swage=rswage, total=total,
+            cable_size=cable_sz,
+            cable_1=f"{round(A1*2+D1*2+10)}'",
+            cable_2=f"{round(A1+D1+10)}' Each",
+            diagonal=diag,
+            powder=f'{powder} lb',
+            peak=peak,
+        )
+
+    def _rect():
+        rafter  = _half_round(D1 * 0.7115 * 12)
+        swage   = rafter - 4.25
+        ridge   = _half_round(D1 * 0.06655 * 12 if A1 == D1 else (D1 * 0.06655 * 12) + (A1 - D1) * 12)
+        rswage  = ridge - 8.5
+        total   = _half_round((rafter * 4 + ridge) * B9)
+        powder  = round(math.pi * rafter_od * total * 0.000376, 2)
+        peak_v  = D1 * 0.2026 + AB4
+        peak    = f"{int(peak_v)}'-{round((peak_v - int(peak_v)) * 12)}\""
+        perim   = A1 * 2 + D1 * 2 + 10
+        c_qty   = 1 if (glides == 'Glides' or perim < 150) else 2
+        cable_sz = '3/16"' if A1*D1<400 else ('1/4"' if A1*D1<1000 else '5/16"')
+        diag    = _diagonal_rect(A1, D1)
+        return dict(
+            profile='Rectangle', rafter=rafter, to_swage=swage,
+            ridge=ridge, ridge_swage=rswage, total=total,
+            cable_size=f'Qty: {c_qty}',
+            cable_1=f'{round(perim)*12*B9}" Total',
+            cable_2=f'{round(A1+D1+10)*2*12*B9}" Total',
+            diagonal=diag,
+            powder=f'{powder} lb',
+            peak=peak,
+        )
+
+    sq   = _sq()
+    rect = _rect()
+    return profile, sq, rect
+
+@app.route('/hip-calc', methods=['GET', 'POST'])
+@admin_required
+def hip_calc():
+    col_options = [
+        'Ø3.5" 11-Ga', 'Ø5.0" 11-Ga', 'Ø5.0" 7-Ga', 'Ø5.5" Sch-40',
+        'Ø6.6" Sch-40', 'Ø8.6" Sch-40', '10"x10"x1/4"', '12"x12"x1/4"',
+    ]
+    rafter_options = [
+        'Ø2 1/2" 12-Ga', 'Ø2 7/8" 12-Ga', 'Ø3 1/2" 11-Ga',
+        'Ø5" 11-Ga', 'Ø5" 7-Ga',
+    ]
+    result = None
+    inputs = {}
+    if request.method == 'POST':
+        try:
+            inputs = {
+                'long_side':  float(request.form.get('long_side', 0)),
+                'short_side': float(request.form.get('short_side', 0)),
+                'eave_ht':    float(request.form.get('eave_ht', 0)),
+                'col_size':   request.form.get('col_size', col_options[3]),
+                'rafter_dia': request.form.get('rafter_dia', rafter_options[2]),
+                'qty':        int(request.form.get('qty', 1) or 1),
+                'glides':     request.form.get('glides', 'No Glides'),
+            }
+            profile, sq, rect = hip_calc_compute(
+                inputs['long_side'], inputs['short_side'], inputs['eave_ht'],
+                inputs['col_size'], inputs['rafter_dia'],
+                inputs['qty'], inputs['glides'],
+            )
+            result = {'profile': profile, 'sq': sq, 'rect': rect}
+        except (ValueError, ZeroDivisionError) as e:
+            flash(f'Check your inputs: {e}', 'error')
+    return render_template('hip_calc.html',
+                           col_options=col_options,
+                           rafter_options=rafter_options,
+                           inputs=inputs, result=result)
 
 @app.route('/estimator/calculate', methods=['POST'])
 @admin_required
@@ -556,6 +806,7 @@ def calculate():
     }
     return render_template('estimate_result.html', result=result)
 
+
 # ─────────────────────────────────────────────────────────────
 # PRICING
 # ─────────────────────────────────────────────────────────────
@@ -581,6 +832,7 @@ def update_pricing():
     db.commit()
     flash('Prices updated.', 'success')
     return redirect(url_for('pricing'))
+
 
 # ─────────────────────────────────────────────────────────────
 # ADMIN — USER MANAGEMENT
@@ -609,6 +861,7 @@ def reset_user(user_id):
     flash(f'Password for {user["username"]} reset to: {temp_pw}  — send this to them.', 'success')
     return redirect(url_for('admin_users'))
 
+
 # ─────────────────────────────────────────────────────────────
 # ERROR PAGES
 # ─────────────────────────────────────────────────────────────
@@ -622,6 +875,7 @@ def forbidden(e):
 def not_found(e):
     return render_template('error.html', error='Page Not Found',
                            message="The page you're looking for doesn't exist."), 404
+
 
 # ─────────────────────────────────────────────────────────────
 # STARTUP

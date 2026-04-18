@@ -36,6 +36,8 @@
             <span class="nav-label">Estimator</span></a></li>
         <li><a href="{{ url_for('pricing') }}" class="{{ 'active' if request.endpoint == 'pricing' }}">
             <span class="nav-label">Pricing</span></a></li>
+        <li><a href="{{ url_for('hip_calc') }}" class="{{ 'active' if request.endpoint == 'hip_calc' }}">
+            <span class="nav-label">Hip Calc</span></a></li>
         {% if current_user.role == 'admin' %}
         <li><a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint == 'admin_users' }}">
             <span class="nav-label">Users</span></a></li>
