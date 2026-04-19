@@ -388,9 +388,9 @@
 
 <style>
 .est-table-wrap { overflow-x: auto; }
-.est-table { width:100%; border-collapse:collapse; font-size:.85rem; margin-bottom:.75rem; }
+.est-table { width:100%; border-collapse:collapse; font-size:.85rem; margin-bottom:.75rem; min-width:650px; }
 .est-table th { background:#f5f7fa; padding:.4rem .5rem; text-align:left; font-size:.75rem; font-weight:600; color:#888; white-space:nowrap; border-bottom:2px solid #e8eaed; }
-.est-table td { padding:.35rem .5rem; border-bottom:1px solid #f0f2f4; vertical-align:middle; }
+.est-table td { padding:.35rem .5rem; border-bottom:1px solid #f0f2f4; vertical-align:middle; white-space:nowrap; }
 .est-table input[type=number], .est-table select { padding:.3rem .4rem; border:1px solid #ddd; border-radius:5px; font-size:.85rem; background:#fff; width:100%; box-sizing:border-box; }
 .est-table .row-num { color:#aaa; font-size:.75rem; width:24px; text-align:center; }
 .est-section-hint { font-size:.8rem; color:#888; margin-bottom:.75rem; }
@@ -531,6 +531,14 @@ function removeRow(id, containerId, prefix) {
   const el = document.getElementById(id);
   if (el) el.remove();
   updateCount(prefix, containerId);
+  renumberRows(containerId);
+}
+
+function renumberRows(containerId) {
+  const tbody = document.getElementById(containerId);
+  if (!tbody) return;
+  const nums = tbody.querySelectorAll('.row-num');
+  nums.forEach((el, i) => { el.textContent = i + 1; });
 }
 
 function updateCount(prefix, containerId) {
