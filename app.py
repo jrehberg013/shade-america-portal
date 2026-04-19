@@ -1,10 +1,54 @@
-import os, math, json, sqlite3, secrets
+import os, math, json, sqlite3, secrets, urllib.request, urllib.parse
 from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
-                   session, flash, g, send_file, abort)
+                   session, flash, g, send_file, abort, jsonify)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import io
+
+# ─────────────────────────────────────────────────────────────
+# LOCATION DISTANCE TABLE (one-way miles from St. Augustine, FL)
+# ─────────────────────────────────────────────────────────────
+LOCATION_MILES = {
+    "Green Cove Springs, FL": 28, "Palm Coast, FL": 30, "Orange Park, FL": 35,
+    "Palatka, FL": 35, "Flagler Beach, FL": 38, "Jacksonville, FL": 40,
+    "Crescent City, FL": 45, "Starke, FL": 50, "Ormond Beach, FL": 55,
+    "Daytona Beach, FL": 62, "Fernandina Beach, FL": 65, "Lake City, FL": 65,
+    "Port Orange, FL": 65, "Amelia Island, FL": 68, "DeLand, FL": 75,
+    "Gainesville, FL": 77, "Brunswick, GA": 77, "Deltona, FL": 80,
+    "New Smyrna Beach, FL": 82, "Live Oak, FL": 82, "Ocala, FL": 87,
+    "Sanford, FL": 90, "Lake Mary, FL": 92, "The Villages, FL": 92,
+    "Titusville, FL": 96, "Cocoa, FL": 102, "Altamonte Springs, FL": 102,
+    "Leesburg, FL": 102, "Cocoa Beach, FL": 106, "Oviedo, FL": 107,
+    "Winter Park, FL": 112, "Orlando, FL": 112, "Apopka, FL": 118,
+    "Savannah, GA": 118, "Kissimmee, FL": 122, "Winter Garden, FL": 123,
+    "Celebration, FL": 126, "Clermont, FL": 128, "Melbourne, FL": 128,
+    "Palm Bay, FL": 133, "Winter Haven, FL": 142, "Lakeland, FL": 147,
+    "Valdosta, GA": 147, "Sebastian, FL": 148, "Bartow, FL": 152,
+    "Vero Beach, FL": 158, "Brooksville, FL": 158, "Spring Hill, FL": 162,
+    "Zephyrhills, FL": 167, "Wesley Chapel, FL": 168, "Plant City, FL": 168,
+    "Brandon, FL": 172, "Tampa, FL": 177, "New Port Richey, FL": 178,
+    "Riverview, FL": 178, "Fort Pierce, FL": 178, "Safety Harbor, FL": 187,
+    "Port St. Lucie, FL": 188, "Clearwater, FL": 192, "Largo, FL": 193,
+    "St. Petersburg, FL": 193, "Tarpon Springs, FL": 197, "Dunedin, FL": 198,
+    "Stuart, FL": 203, "Bradenton, FL": 207, "Hobe Sound, FL": 215,
+    "Sarasota, FL": 218, "Tallahassee, FL": 218, "Venice, FL": 228,
+    "North Port, FL": 232, "Jupiter, FL": 232, "Quincy, FL": 232,
+    "Englewood, FL": 238, "Palm Beach Gardens, FL": 247, "Port Charlotte, FL": 248,
+    "Punta Gorda, FL": 253, "Marianna, FL": 258, "West Palm Beach, FL": 263,
+    "Lake Worth, FL": 268, "Boynton Beach, FL": 272, "Delray Beach, FL": 278,
+    "Cape Coral, FL": 278, "Chipley, FL": 278, "Boca Raton, FL": 283,
+    "Fort Myers, FL": 283, "Deerfield Beach, FL": 288, "Bonita Springs, FL": 292,
+    "Estero, FL": 297, "Pompano Beach, FL": 298, "Naples, FL": 308,
+    "Fort Lauderdale, FL": 308, "Hollywood, FL": 318, "Panama City, FL": 318,
+    "Hallandale Beach, FL": 322, "Panama City Beach, FL": 322, "Marco Island, FL": 323,
+    "Miramar, FL": 323, "Hialeah, FL": 337, "Miami, FL": 338, "Doral, FL": 342,
+    "Coral Gables, FL": 342, "Miami Beach, FL": 348, "Niceville, FL": 362,
+    "Homestead, FL": 363, "Fort Walton Beach, FL": 363, "Destin, FL": 368,
+    "Crestview, FL": 373, "Key Largo, FL": 378, "Milton, FL": 387,
+    "Pensacola, FL": 398, "Islamorada, FL": 403, "Marathon, FL": 428,
+    "Key West, FL": 468,
+}
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'sa-dev-key-change-in-prod')
@@ -247,6 +291,9 @@ def init_db():
             ('fittings','Y Fitting',    0, '$/ea', 2),
             ('fittings','Adapter',      0, '$/ea', 3),
             ('fittings','Swivel Cross', 0, '$/ea', 4),
+            ('fittings','Post/Purlin Adapter Slip In', 45, '$/ea', 5),
+            ('pipe','1.9" Steel Tubing 16ft', 63, '$/stick', 23),
+            ('pipe','1.9" Steel Tubing 24ft', 94, '$/stick', 24),
         ]
         for row in pricing_data:
             db.execute("INSERT INTO pricing (category,name,price,unit,sort_order) VALUES (?,?,?,?,?)", row)
@@ -261,6 +308,9 @@ def init_db():
         ('fittings','Y Fitting',    0, '$/ea', 2),
         ('fittings','Adapter',      0, '$/ea', 3),
         ('fittings','Swivel Cross', 0, '$/ea', 4),
+        ('fittings','Post/Purlin Adapter Slip In', 45, '$/ea', 5),
+        ('pipe','1.9" Steel Tubing 16ft', 63, '$/stick', 23),
+        ('pipe','1.9" Steel Tubing 24ft', 94, '$/stick', 24),
     ]
     for cat, name, price, unit, sort in new_items:
         if not db.execute("SELECT id FROM pricing WHERE category=? AND name=?", (cat, name)).fetchone():
@@ -615,19 +665,36 @@ def estimator():
     db = get_db()
     pm = get_pricing_map(db)
     fabric_rate = pm.get('Fabric per Sq Ft', 3.25)
-    pipe_sizes   = ['5" SCH40', '6" SCH40', '8" SCH40',
-                    '3" OD Galv Tubing', '4" OD Galv Tubing', '5" OD Galv Tubing']
-    hss_profiles = ['4x4', '4x6', '4x8']
-    hss_walls    = ['1/4"', '3/16"']
+    pipe_sizes      = ['5" SCH40', '6" SCH40', '8" SCH40',
+                       '3" OD Galv Tubing', '4" OD Galv Tubing', '5" OD Galv Tubing']
+    hss_profiles    = ['4x4', '4x6', '4x8']
+    hss_walls       = ['1/4"', '3/16"']
+    # OD tubing for hip upper frame ridge/rafters (3/4/5" OD Galv only)
+    od_tubing_names = [
+        '3" OD Galv Tubing 24ft',
+        '4" OD Galv Tubing 24ft',
+        '5" OD Galv Tubing 24ft',
+    ]
+    # Tubing for cantilever upper frames (general tubing)
     tubing_names = ['2 1/2" OD Tubing 24ft', '2 7/8" OD Tubing 24ft',
                     '3 1/2" OD Tubing 24ft', '5" OD Tubing 24ft']
+    # Purlin tubing — 1.9" Steel only
+    purlin_tubing_names = [
+        '1.9" Steel Tubing 16ft',
+        '1.9" Steel Tubing 24ft',
+    ]
+    location_cities = sorted(LOCATION_MILES.keys())
     return render_template('estimator.html',
                            pricing_json=json.dumps(pm),
                            fabric_rate=fabric_rate,
                            pipe_sizes=pipe_sizes,
                            hss_profiles=hss_profiles,
                            hss_walls=hss_walls,
-                           tubing_names=tubing_names)
+                           tubing_names=tubing_names,
+                           od_tubing_names=od_tubing_names,
+                           purlin_tubing_names=purlin_tubing_names,
+                           location_cities=location_cities,
+                           location_miles_json=json.dumps(LOCATION_MILES))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -901,25 +968,43 @@ def calculate():
     _fitting_keys = {
         'elbows': 'Elbow', 'ys': 'Y Fitting',
         'adapters': 'Adapter', 'swivel_cross': 'Swivel Cross',
+        'post_purlin_adapter': 'Post/Purlin Adapter Slip In',
     }
 
     def _upper_frames(prefix, fitting_comps, tubing_comps, manual_comps=None):
         manual_comps = manual_comps or []
+        n = int(f.get(f'{prefix}_frame_count', 5) or 5)
         total = 0.0
-        for i in range(5):
-            for comp in fitting_comps:
-                qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
-                price = pm.get(_fitting_keys.get(comp, comp), 0)
-                total += qty * price
-            for comp in tubing_comps:
-                size  = f.get(f'{prefix}_{comp}_size_{i}', '')
-                qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
-                price = pm.get(size, 0)
-                total += qty * price
-            for comp in manual_comps:
-                qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
-                price = float(f.get(f'{prefix}_{comp}_price_{i}', 0) or 0)
-                total += qty * price
+        for i in range(n):
+            # For purlin frames, dome_qty multiplies everything (entered per-dome quantities)
+            if prefix == 'pf':
+                dome_qty   = float(f.get(f'pf_domes_qty_{i}', 1) or 1)
+                dome_price = float(f.get(f'pf_domes_price_{i}', 0) or 0)
+                per_dome = dome_price  # start with dome unit cost
+                for comp in fitting_comps:
+                    qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
+                    price = pm.get(_fitting_keys.get(comp, comp), 0)
+                    per_dome += qty * price
+                for comp in tubing_comps:
+                    size  = f.get(f'{prefix}_{comp}_size_{i}', '')
+                    qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
+                    price = pm.get(size, 0)
+                    per_dome += qty * price
+                total += dome_qty * per_dome
+            else:
+                for comp in fitting_comps:
+                    qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
+                    price = pm.get(_fitting_keys.get(comp, comp), 0)
+                    total += qty * price
+                for comp in tubing_comps:
+                    size  = f.get(f'{prefix}_{comp}_size_{i}', '')
+                    qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
+                    price = pm.get(size, 0)
+                    total += qty * price
+                for comp in manual_comps:
+                    qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
+                    price = float(f.get(f'{prefix}_{comp}_price_{i}', 0) or 0)
+                    total += qty * price
         return total
 
     hip_frames_cost  = _upper_frames('hf',
@@ -929,7 +1014,7 @@ def calculate():
                            fitting_comps=['elbows', 'ys', 'adapters', 'swivel_cross'],
                            tubing_comps=['ridge', 'rafters'])
     purlin_cost      = _upper_frames('pf',
-                           fitting_comps=['adapters', 'swivel_cross'],
+                           fitting_comps=['adapters', 'swivel_cross', 'post_purlin_adapter'],
                            tubing_comps=['purlin_len', 'purlin_wid', 'hoops'],
                            manual_comps=['domes'])
 
@@ -1046,6 +1131,282 @@ def reset_user(user_id):
     db.commit()
     flash(f'Password for {user["username"]} reset to: {temp_pw}  — send this to them.', 'success')
     return redirect(url_for('admin_users'))
+
+
+# ─────────────────────────────────────────────────────────────
+# TRELLO API PROXY
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/api/trello')
+@admin_required
+def trello_data():
+    api_key = os.environ.get('TRELLO_API_KEY', '')
+    token   = os.environ.get('TRELLO_TOKEN', '')
+    if not api_key or not token:
+        return jsonify({'error': 'not_configured'})
+
+    target_boards = ['Shade America', 'Installation', 'Sewing Shop']
+    try:
+        # Fetch all boards for the authenticated member
+        url = (f'https://api.trello.com/1/members/me/boards'
+               f'?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}'
+               f'&fields=name,id,url&filter=open')
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            all_boards = json.loads(resp.read())
+
+        result = []
+        for board in all_boards:
+            if board['name'] not in target_boards:
+                continue
+            # Fetch lists for this board
+            lurl = (f"https://api.trello.com/1/boards/{board['id']}/lists"
+                    f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
+                    f"&filter=open&fields=name,id")
+            with urllib.request.urlopen(lurl, timeout=10) as resp:
+                lists = json.loads(resp.read())
+
+            board_data = {'name': board['name'], 'url': board['url'], 'lists': []}
+            for lst in lists:
+                curl = (f"https://api.trello.com/1/lists/{lst['id']}/cards"
+                        f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
+                        f"&fields=name,url,due,desc&filter=open")
+                with urllib.request.urlopen(curl, timeout=10) as resp:
+                    cards = json.loads(resp.read())
+                board_data['lists'].append({
+                    'name': lst['name'],
+                    'cards': [{'name': c['name'], 'url': c['url'],
+                               'due': c.get('due'), 'desc': c.get('desc', '')}
+                              for c in cards]
+                })
+            result.append(board_data)
+
+        # Sort by target board order
+        result.sort(key=lambda b: target_boards.index(b['name'])
+                    if b['name'] in target_boards else 99)
+        return jsonify({'boards': result})
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+# ─────────────────────────────────────────────────────────────
+# FIELD VIEW PREVIEW (admin only)
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/field-preview')
+@admin_required
+def field_preview():
+    db = get_db()
+    raw_jobs = db.execute(
+        "SELECT * FROM jobs WHERE status IN ('approved','in_progress','install') ORDER BY updated_at DESC"
+    ).fetchall()
+    jobs = []
+    for job in raw_jobs:
+        docs = db.execute(
+            "SELECT * FROM documents WHERE job_id=? AND doc_type IN ('drawing','photo')"
+            " ORDER BY uploaded_at DESC", (job['id'],)
+        ).fetchall()
+        jobs.append({
+            'id': job['id'], 'name': job['name'],
+            'location': job['location'], 'status': job['status'],
+            'drawings': [d for d in docs if d['doc_type'] == 'drawing'],
+            'photos':   [d for d in docs if d['doc_type'] == 'photo'],
+        })
+    return render_template('field.html', jobs=jobs, preview_mode=True)
+
+
+# ─────────────────────────────────────────────────────────────
+# ERROR PAGES
+# ─────────────────────────────────────────────────────────────
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('error.html', error='Access Denied',
+                           message="You don't have permission to view this page."), 403
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('error.html', error='Page Not Found',
+                           message="The page you're looking for doesn't exist."), 404
+
+
+# ─────────────────────────────────────────────────────────────
+# STARTUP
+# ─────────────────────────────────────────────────────────────
+
+with app.app_context():
+    init_db()
+
+if __name__ == '__main__':
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+
+                       + welding_cost + powder_cost
+                       + hardware + supplies + galvanizing
+                       + wall_mount_cost + clamp_cost)
+    other_total     = equipment + permits + vendor + misc
+    base_total      = travel_cost + labor_cost + materials_total + other_total
+    markup_amount   = base_total * (markup_pct / 100)
+    sell_price      = base_total + markup_amount
+
+    result = {
+        'job_name': job_name, 'client': client, 'location': location,
+        'quote_num': quote_num, 'client_email': client_email, 'client_phone': client_phone,
+        'total_sqft': round(total_sqft, 1), 'structs': structs,
+        'fabric_rate': fabric_rate_input,
+        'fabric_cost': fabric_cost, 'superior_amount': superior_amount,
+        'steel_cost': steel_cost, 'welding_cost': welding_cost,
+        'powder_cost': powder_cost,
+        'all_cy': round(all_cy, 2), 'concrete_cost': concrete_cost,
+        'hip_frames_cost': hip_frames_cost, 'cant_frames_cost': cant_frames_cost,
+        'purlin_cost': purlin_cost,
+        'hardware': hardware, 'supplies': supplies, 'galvanizing': galvanizing,
+        'wall_mount_cost': wall_mount_cost, 'clamp_cost': clamp_cost,
+        'materials_total': materials_total,
+        'miles': miles, 'lodging': lodging, 'travel_cost': travel_cost,
+        'crew_count': crew_count, 'install_days': install_days,
+        'daily_crew': daily_crew, 'labor_cost': labor_cost,
+        'equipment': equipment, 'permits': permits, 'vendor': vendor, 'misc': misc,
+        'other_total': other_total,
+        'base_total': base_total,
+        'markup_pct': markup_pct, 'markup_amount': markup_amount,
+        'sell_price': sell_price,
+        'pole_detail': pole_detail,
+    }
+    return render_template('estimate_result.html', result=result)
+
+
+# ─────────────────────────────────────────────────────────────
+# PRICING
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/pricing')
+@admin_required
+def pricing():
+    db = get_db()
+    rows = db.execute("SELECT * FROM pricing ORDER BY category, sort_order").fetchall()
+    return render_template('pricing.html', pricing=rows)
+
+@app.route('/pricing/update', methods=['POST'])
+@admin_required
+def update_pricing():
+    db = get_db()
+    for key, val in request.form.items():
+        if key.startswith('price_'):
+            pid = int(key.split('_')[1])
+            try:
+                db.execute("UPDATE pricing SET price=? WHERE id=?", (float(val), pid))
+            except (ValueError, TypeError):
+                pass
+    db.commit()
+    flash('Prices updated.', 'success')
+    return redirect(url_for('pricing'))
+
+
+# ─────────────────────────────────────────────────────────────
+# ADMIN — USER MANAGEMENT
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    db = get_db()
+    users = db.execute(
+        "SELECT id,username,name,role,must_change_password FROM users ORDER BY role,name"
+    ).fetchall()
+    return render_template('admin_users.html', users=users)
+
+@app.route('/admin/users/<int:user_id>/reset', methods=['POST'])
+@admin_required
+def reset_user(user_id):
+    temp_pw = 'SA-' + secrets.token_hex(3).upper()
+    db = get_db()
+    user = db.execute("SELECT username FROM users WHERE id=?", (user_id,)).fetchone()
+    if not user:
+        abort(404)
+    db.execute("UPDATE users SET password_hash=?, must_change_password=1 WHERE id=?",
+               (generate_password_hash(temp_pw), user_id))
+    db.commit()
+    flash(f'Password for {user["username"]} reset to: {temp_pw}  — send this to them.', 'success')
+    return redirect(url_for('admin_users'))
+
+
+# ─────────────────────────────────────────────────────────────
+# TRELLO API PROXY
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/api/trello')
+@admin_required
+def trello_data():
+    api_key = os.environ.get('TRELLO_API_KEY', '')
+    token   = os.environ.get('TRELLO_TOKEN', '')
+    if not api_key or not token:
+        return jsonify({'error': 'not_configured'})
+
+    target_boards = ['Shade America', 'Installation', 'Sewing Shop']
+    try:
+        url = (f'https://api.trello.com/1/members/me/boards'
+               f'?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}'
+               f'&fields=name,id,url&filter=open')
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            all_boards = json.loads(resp.read())
+
+        result = []
+        for board in all_boards:
+            if board['name'] not in target_boards:
+                continue
+            lurl = (f"https://api.trello.com/1/boards/{board['id']}/lists"
+                    f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
+                    f"&filter=open&fields=name,id")
+            with urllib.request.urlopen(lurl, timeout=10) as resp:
+                lists = json.loads(resp.read())
+
+            board_data = {'name': board['name'], 'url': board['url'], 'lists': []}
+            for lst in lists:
+                curl = (f"https://api.trello.com/1/lists/{lst['id']}/cards"
+                        f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
+                        f"&fields=name,url,due,desc&filter=open")
+                with urllib.request.urlopen(curl, timeout=10) as resp:
+                    cards = json.loads(resp.read())
+                board_data['lists'].append({
+                    'name': lst['name'],
+                    'cards': [{'name': c['name'], 'url': c['url'],
+                               'due': c.get('due'), 'desc': c.get('desc', '')}
+                              for c in cards]
+                })
+            result.append(board_data)
+
+        result.sort(key=lambda b: target_boards.index(b['name'])
+                    if b['name'] in target_boards else 99)
+        return jsonify({'boards': result})
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+# ─────────────────────────────────────────────────────────────
+# FIELD VIEW PREVIEW (admin only)
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/field-preview')
+@admin_required
+def field_preview():
+    db = get_db()
+    raw_jobs = db.execute(
+        "SELECT * FROM jobs WHERE status IN ('approved','in_progress','install') ORDER BY updated_at DESC"
+    ).fetchall()
+    jobs = []
+    for job in raw_jobs:
+        docs = db.execute(
+            "SELECT * FROM documents WHERE job_id=? AND doc_type IN ('drawing','photo')"
+            " ORDER BY uploaded_at DESC", (job['id'],)
+        ).fetchall()
+        jobs.append({
+            'id': job['id'], 'name': job['name'],
+            'location': job['location'], 'status': job['status'],
+            'drawings': [d for d in docs if d['doc_type'] == 'drawing'],
+            'photos':   [d for d in docs if d['doc_type'] == 'photo'],
+        })
+    return render_template('field.html', jobs=jobs, preview_mode=True)
 
 
 # ─────────────────────────────────────────────────────────────

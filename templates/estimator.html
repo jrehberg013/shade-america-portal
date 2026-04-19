@@ -12,6 +12,15 @@
 </select>
 {% endmacro %}
 
+{% macro od_tubing_select(name) %}
+<select name="{{ name }}" class="od-tubing-sel">
+  <option value="">-- Size --</option>
+  {% for t in od_tubing_names %}
+  <option value="{{ t }}">{{ t.replace(' 24ft','') }}</option>
+  {% endfor %}
+</select>
+{% endmacro %}
+
 {% macro tubing_select(name) %}
 <select name="{{ name }}" class="tubing-sel">
   <option value="">-- Size --</option>
@@ -21,11 +30,20 @@
 </select>
 {% endmacro %}
 
+{% macro purlin_tubing_select(name) %}
+<select name="{{ name }}" class="purlin-tubing-sel">
+  <option value="">-- Size --</option>
+  {% for t in purlin_tubing_names %}
+  <option value="{{ t }}">{{ t }}</option>
+  {% endfor %}
+</select>
+{% endmacro %}
+
 <form method="POST" action="{{ url_for('calculate') }}" id="estimatorForm">
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 1. JOB INFORMATION                                        -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 1. JOB INFORMATION                                        -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Job Information</h3></div>
   <div class="form-row">
@@ -64,9 +82,9 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 2. STRUCTURE TYPES & SIZES                                -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 2. STRUCTURE TYPES & SIZES                                -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Structure Types &amp; Sizes</h3></div>
   <div class="est-table-wrap">
@@ -109,9 +127,9 @@
   <input type="hidden" name="struct_count" id="struct_count" value="1">
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 3. SAIL POLES                                             -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 3. SAIL POLES                                             -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header">
     <h3>Sail Poles</h3>
@@ -170,19 +188,18 @@
   <input type="hidden" name="sail_count" id="sail_count" value="1">
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 4. HIP & CANOPY POLES                                     -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 4. HIP & CANOPY POLES                                     -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header">
     <h3>Hip &amp; Canopy Poles</h3>
-    <div class="struct-ref-badge">Structure Ref: {{ struct_ref_select('hip_struct_ref') }}</div>
   </div>
   <div class="est-table-wrap">
   <table class="est-table">
     <thead>
       <tr>
-        <th>#</th><th>Pipe Size</th><th>Length (ft)</th><th>Qty</th>
+        <th>#</th><th>Struct #</th><th>Pipe Size</th><th>Length (ft)</th><th>Qty</th>
         <th>Footer Ø (ft)</th><th>Footer Depth (ft)</th>
         <th>Pipe Total $</th><th>CY Each</th><th></th>
       </tr>
@@ -190,6 +207,7 @@
     <tbody id="hipRows">
       <tr class="est-row" id="hip_0">
         <td class="row-num">1</td>
+        <td>{{ struct_ref_select('hip_sref_0') }}</td>
         <td><select name="hip_size_0">
           <option value="">-- Size --</option>
           {% for s in pipe_sizes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
@@ -205,7 +223,7 @@
     </tbody>
     <tfoot>
       <tr class="subtotal-row">
-        <td colspan="6"><strong>Hip/Canopy Subtotal</strong></td>
+        <td colspan="7"><strong>Hip/Canopy Subtotal</strong></td>
         <td><strong id="hip_total_steel">$0.00</strong></td>
         <td><strong id="hip_total_cy">0 CY</strong></td>
         <td></td>
@@ -213,23 +231,22 @@
     </tfoot>
   </table>
   </div>
-  <button type="button" class="btn btn-sm btn-outline" onclick="estAddPoleRow('hip','hipRows',false)">+ Add Row</button>
+  <button type="button" class="btn btn-sm btn-outline" onclick="estAddHipPoleRow()">+ Add Row</button>
   <input type="hidden" name="hip_count" id="hip_count" value="1">
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 5. CANTILEVER POSTS (TUBING)                              -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 5. CANTILEVER POSTS (HSS)                                 -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header">
     <h3>Cantilever Posts</h3>
-    <div class="struct-ref-badge">Structure Ref: {{ struct_ref_select('cpost_struct_ref') }}</div>
   </div>
   <div class="est-table-wrap">
   <table class="est-table">
     <thead>
       <tr>
-        <th>#</th><th>HSS Profile</th><th>Wall Thick.</th><th>Length (ft)</th><th>Qty</th>
+        <th>#</th><th>Struct #</th><th>HSS Profile</th><th>Wall Thick.</th><th>Length (ft)</th><th>Qty</th>
         <th>Footer Ø (ft)</th><th>Footer Depth (ft)</th>
         <th>Tubing Total $</th><th>CY Each</th><th></th>
       </tr>
@@ -237,6 +254,7 @@
     <tbody id="cpostRows">
       <tr class="est-row" id="cpost_0">
         <td class="row-num">1</td>
+        <td>{{ struct_ref_select('cpost_sref_0') }}</td>
         <td><select name="cpost_profile_0">
           {% for p in hss_profiles %}<option value="{{ p }}">{{ p }} HSS</option>{% endfor %}
         </select></td>
@@ -254,7 +272,7 @@
     </tbody>
     <tfoot>
       <tr class="subtotal-row">
-        <td colspan="7"><strong>Cant. Posts Subtotal</strong></td>
+        <td colspan="8"><strong>Cant. Posts Subtotal</strong></td>
         <td><strong id="cpost_total_steel">$0.00</strong></td>
         <td><strong id="cpost_total_cy">0 CY</strong></td>
         <td></td>
@@ -266,25 +284,25 @@
   <input type="hidden" name="cpost_count" id="cpost_count" value="1">
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 6. CANTILEVER BEAMS (TUBING)                              -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 6. CANTILEVER BEAMS (HSS)                                 -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header">
     <h3>Cantilever Beams</h3>
-    <div class="struct-ref-badge">Structure Ref: {{ struct_ref_select('cbeam_struct_ref') }}</div>
   </div>
   <div class="est-table-wrap">
   <table class="est-table">
     <thead>
       <tr>
-        <th>#</th><th>HSS Profile</th><th>Wall Thick.</th><th>Length (ft)</th><th>Qty</th>
+        <th>#</th><th>Struct #</th><th>HSS Profile</th><th>Wall Thick.</th><th>Length (ft)</th><th>Qty</th>
         <th>Tubing Total $</th><th></th>
       </tr>
     </thead>
     <tbody id="cbeamRows">
       <tr class="est-row" id="cbeam_0">
         <td class="row-num">1</td>
+        <td>{{ struct_ref_select('cbeam_sref_0') }}</td>
         <td><select name="cbeam_profile_0">
           {% for p in hss_profiles %}<option value="{{ p }}">{{ p }} HSS</option>{% endfor %}
         </select></td>
@@ -299,7 +317,7 @@
     </tbody>
     <tfoot>
       <tr class="subtotal-row">
-        <td colspan="5"><strong>Cant. Beams Subtotal</strong></td>
+        <td colspan="6"><strong>Cant. Beams Subtotal</strong></td>
         <td><strong id="cbeam_total_steel">$0.00</strong></td>
         <td></td>
       </tr>
@@ -310,200 +328,57 @@
   <input type="hidden" name="cbeam_count" id="cbeam_count" value="1">
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 7. HIP UPPER FRAMES — Pipe System                         -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 7. HIP UPPER FRAMES — Pipe System (dynamic)               -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Hip Upper Frames — Pipe System</h3></div>
-  <div class="est-section-hint">Prices auto-filled from Pricing page. Use Hip Calc tab to determine sizes.</div>
-  {% for i in range(5) %}
-  <div class="upper-frame-block">
-    <div class="upper-frame-header">
-      Hip Upper Frame #{{ i+1 }} &nbsp;—&nbsp; Structure #:
-      {{ struct_ref_select('hf_struct_' ~ i) }}
-    </div>
-    <div class="est-table-wrap">
-    <table class="est-table frame-table">
-      <thead><tr><th>Component</th><th>Size</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
-      <tbody>
-        <tr>
-          <td>Elbows</td><td>—</td>
-          <td><input type="number" name="hf_elbows_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="hf_elbows_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="hf_elbows_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Y's</td><td>—</td>
-          <td><input type="number" name="hf_ys_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="hf_ys_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="hf_ys_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Ridge (1 pc)</td>
-          <td>{{ tubing_select('hf_ridge_size_' ~ i) }}</td>
-          <td><input type="number" name="hf_ridge_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="hf_ridge_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="hf_ridge_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Rafters</td>
-          <td>{{ tubing_select('hf_rafters_size_' ~ i) }}</td>
-          <td><input type="number" name="hf_rafters_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="hf_rafters_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="hf_rafters_total_{{ i }}">$0.00</td>
-        </tr>
-      </tbody>
-      <tfoot>
-        <tr><td colspan="4"><strong>Frame #{{ i+1 }} Subtotal</strong></td>
-          <td><strong id="hf_frame_total_{{ i }}">$0.00</strong></td></tr>
-      </tfoot>
-    </table>
-    </div>
-  </div>
-  {% endfor %}
+  <div class="est-section-hint">Prices auto-filled from Pricing page. Use Hip Calc tab to determine sizes. Sizes limited to 3", 4", 5" OD Galv.</div>
+  <div id="hfFrames"></div>
+  <button type="button" class="btn btn-sm btn-outline" onclick="estAddHipFrame()">+ Add Hip Frame</button>
+  <input type="hidden" name="hf_frame_count" id="hf_frame_count" value="0">
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 8. CANTILEVER UPPER FRAMES — Pipe System                  -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 8. CANTILEVER UPPER FRAMES — Pipe System (dynamic)        -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Cantilever Upper Frames — Pipe System</h3></div>
   <div class="est-section-hint">Prices auto-filled from Pricing page.</div>
-  {% for i in range(5) %}
-  <div class="upper-frame-block">
-    <div class="upper-frame-header">
-      Cantilever Upper Frame #{{ i+1 }} &nbsp;—&nbsp; Structure #:
-      {{ struct_ref_select('cf_struct_' ~ i) }}
-    </div>
-    <div class="est-table-wrap">
-    <table class="est-table frame-table">
-      <thead><tr><th>Component</th><th>Size</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
-      <tbody>
-        <tr>
-          <td>Elbows</td><td>—</td>
-          <td><input type="number" name="cf_elbows_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="cf_elbows_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="cf_elbows_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Y's</td><td>—</td>
-          <td><input type="number" name="cf_ys_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="cf_ys_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="cf_ys_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Ridge (1 pc)</td>
-          <td>{{ tubing_select('cf_ridge_size_' ~ i) }}</td>
-          <td><input type="number" name="cf_ridge_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="cf_ridge_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="cf_ridge_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Rafters</td>
-          <td>{{ tubing_select('cf_rafters_size_' ~ i) }}</td>
-          <td><input type="number" name="cf_rafters_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="cf_rafters_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="cf_rafters_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Adapters</td><td>—</td>
-          <td><input type="number" name="cf_adapters_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="cf_adapters_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="cf_adapters_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Swivel Cross</td><td>—</td>
-          <td><input type="number" name="cf_swivel_cross_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="cf_swivel_cross_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="cf_swivel_cross_total_{{ i }}">$0.00</td>
-        </tr>
-      </tbody>
-      <tfoot>
-        <tr><td colspan="4"><strong>Frame #{{ i+1 }} Subtotal</strong></td>
-          <td><strong id="cf_frame_total_{{ i }}">$0.00</strong></td></tr>
-      </tfoot>
-    </table>
-    </div>
-  </div>
-  {% endfor %}
+  <div id="cfFrames"></div>
+  <button type="button" class="btn btn-sm btn-outline" onclick="estAddCantFrame()">+ Add Cantilever Frame</button>
+  <input type="hidden" name="cf_frame_count" id="cf_frame_count" value="0">
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 9. CANOPY / CANTILEVER PURLIN SYSTEM                      -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 9. CANOPY / CANTILEVER PURLIN SYSTEM (dynamic)            -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Canopy / Cantilever Purlin System</h3></div>
-  <div class="est-section-hint">Tubing/fitting prices auto-filled from Pricing page. Enter manual price for Domes.</div>
-  {% for i in range(5) %}
-  <div class="upper-frame-block">
-    <div class="upper-frame-header">
-      Purlin Frame #{{ i+1 }} &nbsp;—&nbsp; Structure #:
-      {{ struct_ref_select('pf_struct_' ~ i) }}
-    </div>
-    <div class="est-table-wrap">
-    <table class="est-table frame-table">
-      <thead><tr><th>Component</th><th>Size</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
-      <tbody>
-        <tr>
-          <td>Domes</td><td>—</td>
-          <td><input type="number" name="pf_domes_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td><input type="number" name="pf_domes_price_{{ i }}" value="0" min="0" step="0.01"
-                     style="width:90px" placeholder="$/ea"></td>
-          <td class="frame-total" id="pf_domes_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Purlins Along Length</td>
-          <td>{{ tubing_select('pf_purlin_len_size_' ~ i) }}</td>
-          <td><input type="number" name="pf_purlin_len_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="pf_purlin_len_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="pf_purlin_len_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Purlins Along Width</td>
-          <td>{{ tubing_select('pf_purlin_wid_size_' ~ i) }}</td>
-          <td><input type="number" name="pf_purlin_wid_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="pf_purlin_wid_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="pf_purlin_wid_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Hoops</td>
-          <td>{{ tubing_select('pf_hoops_size_' ~ i) }}</td>
-          <td><input type="number" name="pf_hoops_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="pf_hoops_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="pf_hoops_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Adapters</td><td>—</td>
-          <td><input type="number" name="pf_adapters_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="pf_adapters_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="pf_adapters_total_{{ i }}">$0.00</td>
-        </tr>
-        <tr>
-          <td>Swivel Cross</td><td>—</td>
-          <td><input type="number" name="pf_swivel_cross_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
-          <td class="auto-price" id="pf_swivel_cross_uprice_{{ i }}">—</td>
-          <td class="frame-total" id="pf_swivel_cross_total_{{ i }}">$0.00</td>
-        </tr>
-      </tbody>
-      <tfoot>
-        <tr><td colspan="4"><strong>Purlin Frame #{{ i+1 }} Subtotal</strong></td>
-          <td><strong id="pf_frame_total_{{ i }}">$0.00</strong></td></tr>
-      </tfoot>
-    </table>
-    </div>
-  </div>
-  {% endfor %}
+  <div class="est-section-hint">Enter per-dome quantities. Dome count multiplies all components. Tubing is 1.9" Steel only.</div>
+  <div id="pfFrames"></div>
+  <button type="button" class="btn btn-sm btn-outline" onclick="estAddPurlinFrame()">+ Add Purlin Frame</button>
+  <input type="hidden" name="pf_frame_count" id="pf_frame_count" value="0">
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 10. TRAVEL & FUEL                                         -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 10. TRAVEL & FUEL                                         -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Travel &amp; Fuel</h3></div>
-  <div class="form-row">
+  <div class="form-row" style="align-items:flex-end">
+    <div class="form-group">
+      <label>Location (pick city to auto-fill miles)</label>
+      <select id="location_picker" onchange="applyLocationMiles(this.value)" style="min-width:220px">
+        <option value="">— Select City —</option>
+        {% for city in location_cities %}
+        <option value="{{ city }}">{{ city }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="form-group">
       <label>Miles from St. Augustine, FL</label>
-      <input type="number" name="miles" value="0" min="0" step="1">
+      <input type="number" name="miles" id="miles_input" value="0" min="0" step="1">
     </div>
     <div class="form-group">
       <label>Fuel Cost per Mile ($)</label>
@@ -520,9 +395,9 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 11. CREW & LABOR                                          -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 11. CREW & LABOR                                          -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Crew &amp; Labor</h3></div>
   <div class="est-section-hint">Daily crew cost is pulled from Pricing page rates.</div>
@@ -540,9 +415,9 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 12. OTHER COSTS                                           -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 12. OTHER COSTS                                           -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Materials &amp; Other Costs</h3></div>
   <div class="form-row">
@@ -579,9 +454,9 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- 13. ESTIMATE SUMMARY & MARKUP                             -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<\!-- ══════════════════════════════════════════════════════════ -->
+<\!-- 13. ESTIMATE SUMMARY & MARKUP                             -->
+<\!-- ══════════════════════════════════════════════════════════ -->
 <div class="card summary-card">
   <div class="card-header"><h3>Estimate Summary</h3></div>
   <div class="summary-grid">
@@ -614,58 +489,51 @@
 </form>
 
 <style>
-/* ─── Estimator layout ─── */
-.est-table-wrap { overflow-x: auto; }
-.est-table { width:100%; border-collapse:collapse; font-size:.85rem; margin-bottom:.5rem; min-width:500px; }
-.est-table th { background:#f5f7fa; padding:.4rem .5rem; text-align:left; font-size:.75rem;
-                font-weight:600; color:#888; white-space:nowrap; border-bottom:2px solid #e8eaed; }
-.est-table td { padding:.35rem .5rem; border-bottom:1px solid #f0f2f4; vertical-align:middle; white-space:nowrap; }
-.est-table input[type=number], .est-table select {
-    padding:.3rem .4rem; border:1px solid #ddd; border-radius:5px;
-    font-size:.85rem; background:#fff; width:100%; box-sizing:border-box; }
-.est-table .row-num { color:#aaa; font-size:.75rem; width:22px; text-align:center; }
-.est-section-hint { font-size:.8rem; color:#888; margin-bottom:.75rem; }
-.sqft-display { font-weight:600; color:#2e75b6; white-space:nowrap; }
-.pole-cost { font-weight:500; color:#2a7a2a; font-size:.82rem; }
-.pole-cy   { font-weight:500; color:#7a4a00; font-size:.82rem; }
-.auto-price { font-size:.82rem; color:#888; }
-.live-cost  { color:#1a5c9e; font-size:.9rem; }
-
-/* Card header row for struct ref */
-.card-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem; }
-.struct-ref-badge { font-size:.82rem; color:#666; display:flex; align-items:center; gap:.35rem; }
-
-/* Fabric bar */
-.fabric-bar { display:flex; align-items:center; flex-wrap:wrap; gap:1rem; margin-top:.75rem; }
-.fabric-calc-box { font-size:.88rem; display:flex; align-items:center; gap:.4rem;
-                   background:#f0f6ff; padding:.5rem .75rem; border-radius:6px; border:1px solid #cde; }
-
-/* Upper frames */
-.upper-frame-block { border:1px solid #e8eaed; border-radius:8px; padding:1rem; margin-bottom:1rem; }
-.upper-frame-header { font-size:.85rem; font-weight:600; color:#555; margin-bottom:.75rem;
-                      display:flex; align-items:center; flex-wrap:wrap; gap:.4rem; }
-.frame-table { max-width:560px; }
-.frame-total { font-weight:500; white-space:nowrap; }
-.tubing-sel { min-width:140px; font-size:.8rem; }
-
-/* Subtotal row */
-.subtotal-row td { background:#f9f9f9; font-size:.82rem; padding:.4rem .5rem; }
-
-/* Summary card */
-.summary-card { border:2px solid #2e75b6; }
-.summary-grid { display:flex; flex-direction:column; gap:0; margin-bottom:1rem; }
-.summary-row { display:flex; justify-content:space-between; padding:.4rem .1rem;
-               border-bottom:1px solid #f0f2f4; font-size:.88rem; }
-.summary-row span:last-child { font-weight:500; min-width:90px; text-align:right; }
-.summary-total { font-weight:700; font-size:.95rem; border-top:2px solid #ddd; border-bottom:none; margin-top:.25rem; }
-.summary-total span:last-child { color:#2e75b6; }
-.markup-row { display:flex; align-items:center; gap:.75rem; padding:.75rem 0; flex-wrap:wrap; }
-.markup-label { font-size:.88rem; font-weight:600; color:#555; }
-.markup-eq { font-size:.88rem; color:#555; }
-.sell-price-box { display:flex; justify-content:space-between; align-items:center;
-                  background:#1a3f6e; color:#fff; padding:1rem 1.25rem; border-radius:8px;
-                  font-size:1.1rem; font-weight:700; }
-.sell-price-box span:last-child { font-size:1.4rem; }
+.est-table-wrap{overflow-x:auto;}
+.est-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-bottom:.5rem;min-width:500px;}
+.est-table th{background:#f5f7fa;padding:.4rem .5rem;text-align:left;font-size:.75rem;
+              font-weight:600;color:#888;white-space:nowrap;border-bottom:2px solid #e8eaed;}
+.est-table td{padding:.35rem .5rem;border-bottom:1px solid #f0f2f4;vertical-align:middle;white-space:nowrap;}
+.est-table input[type=number],.est-table select{
+    padding:.3rem .4rem;border:1px solid #ddd;border-radius:5px;
+    font-size:.85rem;background:#fff;width:100%;box-sizing:border-box;}
+.est-table .row-num{color:#aaa;font-size:.75rem;width:22px;text-align:center;}
+.est-section-hint{font-size:.8rem;color:#888;margin-bottom:.75rem;}
+.sqft-display{font-weight:600;color:#2e75b6;white-space:nowrap;}
+.pole-cost{font-weight:500;color:#2a7a2a;font-size:.82rem;}
+.pole-cy  {font-weight:500;color:#7a4a00;font-size:.82rem;}
+.auto-price{font-size:.82rem;color:#888;}
+.live-cost {color:#1a5c9e;font-size:.9rem;}
+.card-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;}
+.struct-ref-badge{font-size:.82rem;color:#666;display:flex;align-items:center;gap:.35rem;}
+.fabric-bar{display:flex;align-items:center;flex-wrap:wrap;gap:1rem;margin-top:.75rem;}
+.fabric-calc-box{font-size:.88rem;display:flex;align-items:center;gap:.4rem;
+                 background:#f0f6ff;padding:.5rem .75rem;border-radius:6px;border:1px solid #cde;}
+.upper-frame-block{border:1px solid #e8eaed;border-radius:8px;padding:1rem;margin-bottom:1rem;position:relative;}
+.upper-frame-header{font-size:.85rem;font-weight:600;color:#555;margin-bottom:.75rem;
+                    display:flex;align-items:center;flex-wrap:wrap;gap:.4rem;}
+.frame-remove-btn{margin-left:auto;background:none;border:none;color:#c0392b;cursor:pointer;
+                  font-size:.8rem;padding:.2rem .5rem;border-radius:4px;}
+.frame-remove-btn:hover{background:#fdf0f0;}
+.frame-table{max-width:600px;}
+.frame-total{font-weight:500;white-space:nowrap;}
+.tubing-sel,.od-tubing-sel,.purlin-tubing-sel{min-width:140px;font-size:.8rem;}
+.subtotal-row td{background:#f9f9f9;font-size:.82rem;padding:.4rem .5rem;}
+.summary-card{border:2px solid #2e75b6;}
+.summary-grid{display:flex;flex-direction:column;gap:0;margin-bottom:1rem;}
+.summary-row{display:flex;justify-content:space-between;padding:.4rem .1rem;
+             border-bottom:1px solid #f0f2f4;font-size:.88rem;}
+.summary-row span:last-child{font-weight:500;min-width:90px;text-align:right;}
+.summary-total{font-weight:700;font-size:.95rem;border-top:2px solid #ddd;border-bottom:none;margin-top:.25rem;}
+.summary-total span:last-child{color:#2e75b6;}
+.markup-row{display:flex;align-items:center;gap:.75rem;padding:.75rem 0;flex-wrap:wrap;}
+.markup-label{font-size:.88rem;font-weight:600;color:#555;}
+.markup-eq{font-size:.88rem;color:#555;}
+.sell-price-box{display:flex;justify-content:space-between;align-items:center;
+                background:#1a3f6e;color:#fff;padding:1rem 1.25rem;border-radius:8px;
+                font-size:1.1rem;font-weight:700;}
+.sell-price-box span:last-child{font-size:1.4rem;}
+.dome-multiplier-row td:first-child{font-weight:700;color:#1a5c9e;}
 </style>
 
 <script>
@@ -673,18 +541,14 @@
    PRICING DATA & CONSTANTS
 ═══════════════════════════════════════════════════════ */
 const PRICING = {{ pricing_json|safe }};
+const LOCATION_MILES = {{ location_miles_json|safe }};
 const CONCRETE_RATE = PRICING['Price per CY'] || 200;
 const WELD_RATE     = PRICING['Welding Rate']  || 95;
 
 const FITTING_KEYS = {
     elbows: 'Elbow', ys: 'Y Fitting',
-    adapters: 'Adapter', swivel_cross: 'Swivel Cross'
-};
-
-const FRAME_CONFIG = {
-    hf: { fittings:['elbows','ys'],            tubing:['ridge','rafters'],               manual:[] },
-    cf: { fittings:['elbows','ys','adapters','swivel_cross'], tubing:['ridge','rafters'], manual:[] },
-    pf: { fittings:['adapters','swivel_cross'], tubing:['purlin_len','purlin_wid','hoops'], manual:['domes'] }
+    adapters: 'Adapter', swivel_cross: 'Swivel Cross',
+    post_purlin_adapter: 'Post/Purlin Adapter Slip In'
 };
 
 const POWDER_MAP = {
@@ -693,22 +557,33 @@ const POWDER_MAP = {
     '5" OD Galv Tubing': '5" OD Galv',
 };
 
-let sectionTotals = { sail:{steel:0,cy:0,welds:0}, hip:{steel:0,cy:0},
-                      cpost:{steel:0,cy:0,qty:0},   cbeam:{steel:0,qty:0} };
+let sectionTotals = {sail:{steel:0,cy:0,welds:0}, hip:{steel:0,cy:0},
+                     cpost:{steel:0,cy:0,qty:0},   cbeam:{steel:0,qty:0}};
+
+/* ═══════════════════════════════════════════════════════
+   LOCATION LOOKUP
+═══════════════════════════════════════════════════════ */
+function applyLocationMiles(city) {
+    const mi = LOCATION_MILES[city];
+    if (mi \!== undefined) {
+        document.getElementById('miles_input').value = mi;
+        estUpdateAll();
+    }
+}
 
 /* ═══════════════════════════════════════════════════════
    PRICING HELPERS
 ═══════════════════════════════════════════════════════ */
 function getPipeCostPerPole(size, lengthFt) {
-    if (!size || !lengthFt) return 0;
+    if (\!size || \!lengthFt) return 0;
     const len = parseFloat(lengthFt) || 0;
     if (len <= 0) return 0;
     let best = null;
     for (const [key, price] of Object.entries(PRICING)) {
-        if (!price || price <= 0) continue;
-        if (!key.startsWith(size + ' ')) continue;
+        if (\!price || price <= 0) continue;
+        if (\!key.startsWith(size + ' ')) continue;
         const m = key.match(/(\d+)ft$/);
-        if (!m) continue;
+        if (\!m) continue;
         const stickLen = parseInt(m[1]);
         const cost = Math.ceil(len / stickLen) * price;
         if (best === null || cost < best) best = cost;
@@ -719,13 +594,12 @@ function getPipeCostPerPole(size, lengthFt) {
 function getCYperPole(footerDia, footerDepth) {
     const d = parseFloat(footerDia) || 0;
     const h = parseFloat(footerDepth) || 0;
-    if (!d || !h) return 0;
+    if (\!d || \!h) return 0;
     return Math.PI * Math.pow(d / 2, 2) * h / 27;
 }
 
 function getPowderRate(size) {
-    if (!size) return 0;
-    // HSS: '4x4 HSS 1/4"' → look up '4x4 HSS'
+    if (\!size) return 0;
     if (/^\d+x\d+ HSS/.test(size)) {
         const profile = size.split(' ').slice(0,2).join(' ');
         return PRICING[profile] || 0;
@@ -737,18 +611,47 @@ const $fmt = v => '$' + v.toLocaleString('en-US', {minimumFractionDigits:2, maxi
 const $set  = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
 
 /* ═══════════════════════════════════════════════════════
+   OPTION BUILDERS
+═══════════════════════════════════════════════════════ */
+const PIPE_OPTS = `<option value="">-- Size --</option>
+  <option value='5" SCH40'>5" SCH40</option>
+  <option value='6" SCH40'>6" SCH40</option>
+  <option value='8" SCH40'>8" SCH40</option>
+  <option value='3" OD Galv Tubing'>3" OD Galv</option>
+  <option value='4" OD Galv Tubing'>4" OD Galv</option>
+  <option value='5" OD Galv Tubing'>5" OD Galv</option>`;
+
+const OD_TUBING_OPTS = `<option value="">-- Size --</option>
+  <option value='3" OD Galv Tubing 24ft'>3" OD Galv</option>
+  <option value='4" OD Galv Tubing 24ft'>4" OD Galv</option>
+  <option value='5" OD Galv Tubing 24ft'>5" OD Galv</option>`;
+
+const TUBING_OPTS = `<option value="">-- Size --</option>
+  <option value='2 1/2" OD Tubing 24ft'>2 1/2" OD</option>
+  <option value='2 7/8" OD Tubing 24ft'>2 7/8" OD</option>
+  <option value='3 1/2" OD Tubing 24ft'>3 1/2" OD</option>
+  <option value='5" OD Tubing 24ft'>5" OD</option>`;
+
+const PURLIN_OPTS = `<option value="">-- Size --</option>
+  <option value='1.9" Steel Tubing 16ft'>1.9" Steel (16ft)</option>
+  <option value='1.9" Steel Tubing 24ft'>1.9" Steel (24ft)</option>`;
+
+const ATTACH_OPTS = `<option value="All Thread">All Thread</option><option value="Weld Lug">Weld Lug</option>`;
+const HSS_PROFILE_OPTS = `<option value="4x4">4x4 HSS</option><option value="4x6">4x6 HSS</option><option value="4x8">4x8 HSS</option>`;
+const HSS_WALL_OPTS = `<option value='1/4"'>1/4"</option><option value='3/16"'>3/16"</option>`;
+const SREF_OPTS = '<option value="">—</option>' + Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+
+/* ═══════════════════════════════════════════════════════
    STRUCTURE ROWS
 ═══════════════════════════════════════════════════════ */
 let structIdx = 1;
-
 function estAddStructRow() {
     const i = structIdx++;
     const tbody = document.getElementById('structRows');
     const tr = document.createElement('tr');
-    tr.className = 'struct-row';
-    tr.id = 'struct_' + i;
+    tr.className = 'struct-row'; tr.id = 'struct_' + i;
     tr.innerHTML = `
-      <td class="row-num">${estCountRows('structRows') + 1}</td>
+      <td class="row-num">${estCountRows('structRows')+1}</td>
       <td><select name="struct_type_${i}">
         <option value="">-- Type --</option>
         <option value="sail">Sail (3-sided)</option>
@@ -762,54 +665,27 @@ function estAddStructRow() {
       <td><span class="sqft-display" id="sqft_${i}" data-sqft="0">—</span></td>
       <td><button type="button" class="btn btn-sm btn-danger" onclick="estRemoveStruct('struct_${i}')">✕</button></td>`;
     tbody.appendChild(tr);
-    estUpdateCount('struct', 'structRows');
-    estRenumber('structRows');
+    estUpdateCount('struct','structRows'); estRenumber('structRows');
 }
-
 function estRemoveStruct(id) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-    estUpdateCount('struct', 'structRows');
-    estRenumber('structRows');
-    estUpdateAll();
+    const el = document.getElementById(id); if (el) el.remove();
+    estUpdateCount('struct','structRows'); estRenumber('structRows'); estUpdateAll();
 }
 
 /* ═══════════════════════════════════════════════════════
    POLE ROWS
 ═══════════════════════════════════════════════════════ */
-const poleIdx = { sail:1, hip:1, cpost:1, cbeam:1 };
-
-const PIPE_OPTS = `<option value="">-- Size --</option>
-  <option value='5" SCH40'>5" SCH40</option>
-  <option value='6" SCH40'>6" SCH40</option>
-  <option value='8" SCH40'>8" SCH40</option>
-  <option value='3" OD Galv Tubing'>3" OD Galv</option>
-  <option value='4" OD Galv Tubing'>4" OD Galv</option>
-  <option value='5" OD Galv Tubing'>5" OD Galv</option>`;
-
-const ATTACH_OPTS = `<option value="All Thread">All Thread</option>
-  <option value="Weld Lug">Weld Lug</option>`;
-
-const HSS_PROFILE_OPTS = `<option value="4x4">4x4 HSS</option>
-  <option value="4x6">4x6 HSS</option>
-  <option value="4x8">4x8 HSS</option>`;
-
-const HSS_WALL_OPTS = `<option value='1/4"'>1/4"</option><option value='3/16"'>3/16"</option>`;
+const poleIdx = {sail:1, hip:1, cpost:1, cbeam:1};
 
 function estAddPoleRow(prefix, containerId, hasAttach) {
     const i = poleIdx[prefix]++;
     const tbody = document.getElementById(containerId);
     const tr = document.createElement('tr');
-    tr.className = 'est-row';
-    tr.id = prefix + '_' + i;
-    const attachCol = hasAttach
-        ? `<td><select name="${prefix}_attach_${i}">${ATTACH_OPTS}</select></td>`
-        : '';
-    const cyCol = (prefix !== 'cbeam')
-        ? `<td><span class="pole-cy">—</span></td>`
-        : '';
+    tr.className = 'est-row'; tr.id = prefix + '_' + i;
+    const attachCol = hasAttach ? `<td><select name="${prefix}_attach_${i}">${ATTACH_OPTS}</select></td>` : '';
+    const cyCol = `<td><span class="pole-cy">—</span></td>`;
     tr.innerHTML = `
-      <td class="row-num">${estCountRows(containerId) + 1}</td>
+      <td class="row-num">${estCountRows(containerId)+1}</td>
       <td><select name="${prefix}_size_${i}">${PIPE_OPTS}</select></td>
       <td><input type="number" name="${prefix}_len_${i}" placeholder="ft" min="0" step="0.5"></td>
       <td><input type="number" name="${prefix}_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
@@ -821,18 +697,38 @@ function estAddPoleRow(prefix, containerId, hasAttach) {
       <td><button type="button" class="btn btn-sm btn-danger"
           onclick="estRemoveRow('${prefix}_${i}','${containerId}','${prefix}')">✕</button></td>`;
     tbody.appendChild(tr);
-    estUpdateCount(prefix, containerId);
-    estRenumber(containerId);
+    estUpdateCount(prefix, containerId); estRenumber(containerId);
+}
+
+function estAddHipPoleRow() {
+    const i = poleIdx['hip']++;
+    const tbody = document.getElementById('hipRows');
+    const tr = document.createElement('tr');
+    tr.className = 'est-row'; tr.id = 'hip_' + i;
+    tr.innerHTML = `
+      <td class="row-num">${estCountRows('hipRows')+1}</td>
+      <td><select name="hip_sref_${i}" style="width:70px;font-size:.8rem">${SREF_OPTS}</select></td>
+      <td><select name="hip_size_${i}">${PIPE_OPTS}</select></td>
+      <td><input type="number" name="hip_len_${i}" placeholder="ft" min="0" step="0.5"></td>
+      <td><input type="number" name="hip_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
+      <td><input type="number" name="hip_footer_dia_${i}" value="0" min="0" step="0.25" style="width:70px"></td>
+      <td><input type="number" name="hip_footer_depth_${i}" value="0" min="0" step="0.5" style="width:70px"></td>
+      <td><span class="pole-cost">—</span></td>
+      <td><span class="pole-cy">—</span></td>
+      <td><button type="button" class="btn btn-sm btn-danger"
+          onclick="estRemoveRow('hip_${i}','hipRows','hip')">✕</button></td>`;
+    tbody.appendChild(tr);
+    estUpdateCount('hip','hipRows'); estRenumber('hipRows');
 }
 
 function estAddCpostRow() {
     const i = poleIdx['cpost']++;
     const tbody = document.getElementById('cpostRows');
     const tr = document.createElement('tr');
-    tr.className = 'est-row';
-    tr.id = 'cpost_' + i;
+    tr.className = 'est-row'; tr.id = 'cpost_' + i;
     tr.innerHTML = `
-      <td class="row-num">${estCountRows('cpostRows') + 1}</td>
+      <td class="row-num">${estCountRows('cpostRows')+1}</td>
+      <td><select name="cpost_sref_${i}" style="width:70px;font-size:.8rem">${SREF_OPTS}</select></td>
       <td><select name="cpost_profile_${i}">${HSS_PROFILE_OPTS}</select></td>
       <td><select name="cpost_wall_${i}">${HSS_WALL_OPTS}</select></td>
       <td><input type="number" name="cpost_len_${i}" placeholder="ft" min="0" step="0.5"></td>
@@ -844,18 +740,17 @@ function estAddCpostRow() {
       <td><button type="button" class="btn btn-sm btn-danger"
           onclick="estRemoveRow('cpost_${i}','cpostRows','cpost')">✕</button></td>`;
     tbody.appendChild(tr);
-    estUpdateCount('cpost', 'cpostRows');
-    estRenumber('cpostRows');
+    estUpdateCount('cpost','cpostRows'); estRenumber('cpostRows');
 }
 
 function estAddCbeamRow() {
     const i = poleIdx['cbeam']++;
     const tbody = document.getElementById('cbeamRows');
     const tr = document.createElement('tr');
-    tr.className = 'est-row';
-    tr.id = 'cbeam_' + i;
+    tr.className = 'est-row'; tr.id = 'cbeam_' + i;
     tr.innerHTML = `
-      <td class="row-num">${estCountRows('cbeamRows') + 1}</td>
+      <td class="row-num">${estCountRows('cbeamRows')+1}</td>
+      <td><select name="cbeam_sref_${i}" style="width:70px;font-size:.8rem">${SREF_OPTS}</select></td>
       <td><select name="cbeam_profile_${i}">${HSS_PROFILE_OPTS}</select></td>
       <td><select name="cbeam_wall_${i}">${HSS_WALL_OPTS}</select></td>
       <td><input type="number" name="cbeam_len_${i}" placeholder="ft" min="0" step="0.5"></td>
@@ -864,16 +759,216 @@ function estAddCbeamRow() {
       <td><button type="button" class="btn btn-sm btn-danger"
           onclick="estRemoveRow('cbeam_${i}','cbeamRows','cbeam')">✕</button></td>`;
     tbody.appendChild(tr);
-    estUpdateCount('cbeam', 'cbeamRows');
-    estRenumber('cbeamRows');
+    estUpdateCount('cbeam','cbeamRows'); estRenumber('cbeamRows');
 }
 
 function estRemoveRow(id, containerId, prefix) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-    estUpdateCount(prefix, containerId);
-    estRenumber(containerId);
+    const el = document.getElementById(id); if (el) el.remove();
+    estUpdateCount(prefix, containerId); estRenumber(containerId); estUpdateAll();
+}
+
+/* ═══════════════════════════════════════════════════════
+   DYNAMIC FRAME BLOCKS
+═══════════════════════════════════════════════════════ */
+let hfIdx=0, cfIdx=0, pfIdx=0;
+
+function estAddHipFrame() {
+    const i = hfIdx++;
+    const container = document.getElementById('hfFrames');
+    const div = document.createElement('div');
+    div.className = 'upper-frame-block'; div.id = 'hf_block_' + i;
+    div.innerHTML = `
+      <div class="upper-frame-header">
+        Hip Upper Frame #${i+1} &nbsp;—&nbsp; Structure #:
+        <select name="hf_struct_${i}" style="width:70px;font-size:.8rem">${SREF_OPTS}</select>
+        <button type="button" class="frame-remove-btn" onclick="removeFrameBlock('hf_block_${i}','hf_frame_count')">Remove ✕</button>
+      </div>
+      <div class="est-table-wrap">
+      <table class="est-table frame-table">
+        <thead><tr><th>Component</th><th>Size</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Elbows</td><td>—</td>
+            <td><input type="number" name="hf_elbows_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('hf',${i})"></td>
+            <td class="auto-price" id="hf_elbows_uprice_${i}">—</td>
+            <td class="frame-total" id="hf_elbows_total_${i}">$0.00</td>
+          </tr>
+          <tr>
+            <td>Y's</td><td>—</td>
+            <td><input type="number" name="hf_ys_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('hf',${i})"></td>
+            <td class="auto-price" id="hf_ys_uprice_${i}">—</td>
+            <td class="frame-total" id="hf_ys_total_${i}">$0.00</td>
+          </tr>
+          <tr>
+            <td>Ridge (1 pc)</td>
+            <td><select name="hf_ridge_size_${i}" class="od-tubing-sel" onchange="estCalcFrameSection('hf',${i})">${OD_TUBING_OPTS}</select></td>
+            <td><input type="number" name="hf_ridge_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('hf',${i})"></td>
+            <td class="auto-price" id="hf_ridge_uprice_${i}">—</td>
+            <td class="frame-total" id="hf_ridge_total_${i}">$0.00</td>
+          </tr>
+          <tr>
+            <td>Rafters</td>
+            <td><select name="hf_rafters_size_${i}" class="od-tubing-sel" onchange="estCalcFrameSection('hf',${i})">${OD_TUBING_OPTS}</select></td>
+            <td><input type="number" name="hf_rafters_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('hf',${i})"></td>
+            <td class="auto-price" id="hf_rafters_uprice_${i}">—</td>
+            <td class="frame-total" id="hf_rafters_total_${i}">$0.00</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="4"><strong>Frame #${i+1} Subtotal</strong></td>
+            <td><strong id="hf_frame_total_${i}">$0.00</strong></td></tr>
+        </tfoot>
+      </table>
+      </div>`;
+    container.appendChild(div);
+    updateFrameCount('hf_frame_count', document.getElementById('hfFrames').children.length);
+    estCalcFrameSection('hf', i);
+}
+
+function estAddCantFrame() {
+    const i = cfIdx++;
+    const container = document.getElementById('cfFrames');
+    const div = document.createElement('div');
+    div.className = 'upper-frame-block'; div.id = 'cf_block_' + i;
+    div.innerHTML = `
+      <div class="upper-frame-header">
+        Cantilever Upper Frame #${i+1} &nbsp;—&nbsp; Structure #:
+        <select name="cf_struct_${i}" style="width:70px;font-size:.8rem">${SREF_OPTS}</select>
+        <button type="button" class="frame-remove-btn" onclick="removeFrameBlock('cf_block_${i}','cf_frame_count')">Remove ✕</button>
+      </div>
+      <div class="est-table-wrap">
+      <table class="est-table frame-table">
+        <thead><tr><th>Component</th><th>Size</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+        <tbody>
+          <tr><td>Elbows</td><td>—</td>
+            <td><input type="number" name="cf_elbows_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('cf',${i})"></td>
+            <td class="auto-price" id="cf_elbows_uprice_${i}">—</td>
+            <td class="frame-total" id="cf_elbows_total_${i}">$0.00</td></tr>
+          <tr><td>Y's</td><td>—</td>
+            <td><input type="number" name="cf_ys_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('cf',${i})"></td>
+            <td class="auto-price" id="cf_ys_uprice_${i}">—</td>
+            <td class="frame-total" id="cf_ys_total_${i}">$0.00</td></tr>
+          <tr>
+            <td>Ridge (1 pc)</td>
+            <td><select name="cf_ridge_size_${i}" class="tubing-sel" onchange="estCalcFrameSection('cf',${i})">${TUBING_OPTS}</select></td>
+            <td><input type="number" name="cf_ridge_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('cf',${i})"></td>
+            <td class="auto-price" id="cf_ridge_uprice_${i}">—</td>
+            <td class="frame-total" id="cf_ridge_total_${i}">$0.00</td></tr>
+          <tr>
+            <td>Rafters</td>
+            <td><select name="cf_rafters_size_${i}" class="tubing-sel" onchange="estCalcFrameSection('cf',${i})">${TUBING_OPTS}</select></td>
+            <td><input type="number" name="cf_rafters_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('cf',${i})"></td>
+            <td class="auto-price" id="cf_rafters_uprice_${i}">—</td>
+            <td class="frame-total" id="cf_rafters_total_${i}">$0.00</td></tr>
+          <tr><td>Adapters</td><td>—</td>
+            <td><input type="number" name="cf_adapters_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('cf',${i})"></td>
+            <td class="auto-price" id="cf_adapters_uprice_${i}">—</td>
+            <td class="frame-total" id="cf_adapters_total_${i}">$0.00</td></tr>
+          <tr><td>Swivel Cross</td><td>—</td>
+            <td><input type="number" name="cf_swivel_cross_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('cf',${i})"></td>
+            <td class="auto-price" id="cf_swivel_cross_uprice_${i}">—</td>
+            <td class="frame-total" id="cf_swivel_cross_total_${i}">$0.00</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="4"><strong>Frame #${i+1} Subtotal</strong></td>
+            <td><strong id="cf_frame_total_${i}">$0.00</strong></td></tr>
+        </tfoot>
+      </table>
+      </div>`;
+    container.appendChild(div);
+    updateFrameCount('cf_frame_count', document.getElementById('cfFrames').children.length);
+    estCalcFrameSection('cf', i);
+}
+
+function estAddPurlinFrame() {
+    const i = pfIdx++;
+    const container = document.getElementById('pfFrames');
+    const div = document.createElement('div');
+    div.className = 'upper-frame-block'; div.id = 'pf_block_' + i;
+    div.innerHTML = `
+      <div class="upper-frame-header">
+        Purlin Frame #${i+1} &nbsp;—&nbsp; Structure #:
+        <select name="pf_struct_${i}" style="width:70px;font-size:.8rem">${SREF_OPTS}</select>
+        <button type="button" class="frame-remove-btn" onclick="removeFrameBlock('pf_block_${i}','pf_frame_count')">Remove ✕</button>
+      </div>
+      <div class="est-table-wrap">
+      <table class="est-table frame-table">
+        <thead><tr><th>Component</th><th>Size</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+        <tbody>
+          <tr class="dome-multiplier-row">
+            <td>Domes (× multiplier)</td><td>—</td>
+            <td><input type="number" name="pf_domes_qty_${i}" value="1" min="1" style="width:70px" oninput="estCalcFrameSection('pf',${i})"></td>
+            <td><input type="number" name="pf_domes_price_${i}" value="0" min="0" step="0.01"
+                       style="width:90px" placeholder="$/dome" oninput="estCalcFrameSection('pf',${i})"></td>
+            <td class="frame-total" id="pf_domes_total_${i}">$0.00</td>
+          </tr>
+          <tr>
+            <td>Purlins Along Length</td>
+            <td><select name="pf_purlin_len_size_${i}" class="purlin-tubing-sel" onchange="estCalcFrameSection('pf',${i})">${PURLIN_OPTS}</select></td>
+            <td><input type="number" name="pf_purlin_len_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('pf',${i})"></td>
+            <td class="auto-price" id="pf_purlin_len_uprice_${i}">—</td>
+            <td class="frame-total" id="pf_purlin_len_total_${i}">$0.00</td>
+          </tr>
+          <tr>
+            <td>Purlins Along Width</td>
+            <td><select name="pf_purlin_wid_size_${i}" class="purlin-tubing-sel" onchange="estCalcFrameSection('pf',${i})">${PURLIN_OPTS}</select></td>
+            <td><input type="number" name="pf_purlin_wid_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('pf',${i})"></td>
+            <td class="auto-price" id="pf_purlin_wid_uprice_${i}">—</td>
+            <td class="frame-total" id="pf_purlin_wid_total_${i}">$0.00</td>
+          </tr>
+          <tr>
+            <td>Hoops</td>
+            <td><select name="pf_hoops_size_${i}" class="purlin-tubing-sel" onchange="estCalcFrameSection('pf',${i})">${PURLIN_OPTS}</select></td>
+            <td><input type="number" name="pf_hoops_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('pf',${i})"></td>
+            <td class="auto-price" id="pf_hoops_uprice_${i}">—</td>
+            <td class="frame-total" id="pf_hoops_total_${i}">$0.00</td>
+          </tr>
+          <tr>
+            <td>Adapters</td><td>—</td>
+            <td><input type="number" name="pf_adapters_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('pf',${i})"></td>
+            <td class="auto-price" id="pf_adapters_uprice_${i}">—</td>
+            <td class="frame-total" id="pf_adapters_total_${i}">$0.00</td>
+          </tr>
+          <tr>
+            <td>Swivel Cross</td><td>—</td>
+            <td><input type="number" name="pf_swivel_cross_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('pf',${i})"></td>
+            <td class="auto-price" id="pf_swivel_cross_uprice_${i}">—</td>
+            <td class="frame-total" id="pf_swivel_cross_total_${i}">$0.00</td>
+          </tr>
+          <tr>
+            <td>Post/Purlin Adapter Slip In</td><td>—</td>
+            <td><input type="number" name="pf_post_purlin_adapter_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('pf',${i})"></td>
+            <td class="auto-price" id="pf_post_purlin_adapter_uprice_${i}">—</td>
+            <td class="frame-total" id="pf_post_purlin_adapter_total_${i}">$0.00</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3"><strong>Purlin Frame #${i+1} Subtotal</strong>
+              <span style="font-size:.75rem;color:#888;font-weight:400"> (dome qty × per-dome cost)</span></td>
+            <td></td>
+            <td><strong id="pf_frame_total_${i}">$0.00</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+      </div>`;
+    container.appendChild(div);
+    updateFrameCount('pf_frame_count', document.getElementById('pfFrames').children.length);
+    estCalcFrameSection('pf', i);
+}
+
+function removeFrameBlock(blockId, countId) {
+    const el = document.getElementById(blockId);
+    if (\!el) return;
+    const container = el.parentElement;
+    el.remove();
+    if (container) updateFrameCount(countId, container.children.length);
     estUpdateAll();
+}
+
+function updateFrameCount(countId, n) {
+    const el = document.getElementById(countId);
+    if (el) el.value = n;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -881,27 +976,22 @@ function estRemoveRow(id, containerId, prefix) {
 ═══════════════════════════════════════════════════════ */
 function estCountRows(containerId) {
     const tb = document.getElementById(containerId);
-    return tb ? tb.querySelectorAll('.est-row, .struct-row').length : 0;
+    return tb ? tb.querySelectorAll('.est-row,.struct-row').length : 0;
 }
-
 function estUpdateCount(prefix, containerId) {
-    const tb = document.getElementById(containerId);
-    if (!tb) return;
+    const tb = document.getElementById(containerId); if (\!tb) return;
     const inp = document.getElementById(prefix + '_count');
-    if (inp) inp.value = tb.querySelectorAll('.est-row, .struct-row').length;
+    if (inp) inp.value = tb.querySelectorAll('.est-row,.struct-row').length;
 }
-
 function estRenumber(containerId) {
-    const tb = document.getElementById(containerId);
-    if (!tb) return;
+    const tb = document.getElementById(containerId); if (\!tb) return;
     tb.querySelectorAll('.row-num').forEach((el, i) => { el.textContent = i + 1; });
 }
 
 /* ═══════════════════════════════════════════════════════
-   LIVE CALCULATIONS — called via form 'input'/'change'
+   LIVE CALCULATIONS
 ═══════════════════════════════════════════════════════ */
 function estUpdateAll() {
-    // Structures sqft
     let totalSqft = 0;
     document.querySelectorAll('#structRows .struct-row').forEach(row => {
         const type = row.querySelector('select[name^="struct_type_"]')?.value || '';
@@ -914,11 +1004,9 @@ function estUpdateAll() {
             const s = (s1+s2+s3)/2;
             const a = s*(s-s1)*(s-s2)*(s-s3);
             area = a > 0 ? Math.sqrt(a) * qty : 0;
-        } else if (s1 && s2) {
-            area = s1 * s2 * qty;
-        }
+        } else if (s1 && s2) { area = s1 * s2 * qty; }
         const el = row.querySelector('.sqft-display');
-        if (el) { el.textContent = area > 0 ? area.toFixed(0) + ' sqft' : '—'; el.dataset.sqft = area; }
+        if (el) { el.textContent = area > 0 ? area.toFixed(0)+' sqft' : '—'; el.dataset.sqft = area; }
         totalSqft += area;
     });
     const fabricRate = parseFloat(document.getElementById('fabric_rate_input')?.value) || 0;
@@ -926,28 +1014,31 @@ function estUpdateAll() {
     $set('total_sqft_lbl', totalSqft.toFixed(0));
     $set('fabric_cost_lbl', $fmt(fabricCost));
 
-    // Pole sections
     estCalcPoleSection('sail', true, true);
     estCalcPoleSection('hip',  false, true);
     estCalcHSSSection('cpost', true);
     estCalcHSSSection('cbeam', false);
 
-    // Frame sections
-    for (let i = 0; i < 5; i++) {
-        estCalcFrameSection('hf', i);
-        estCalcFrameSection('cf', i);
-        estCalcFrameSection('pf', i);
-    }
+    // Frame sections — iterate over actual DOM blocks
+    document.querySelectorAll('#hfFrames .upper-frame-block').forEach(block => {
+        const m = block.id.match(/hf_block_(\d+)/);
+        if (m) estCalcFrameSection('hf', parseInt(m[1]));
+    });
+    document.querySelectorAll('#cfFrames .upper-frame-block').forEach(block => {
+        const m = block.id.match(/cf_block_(\d+)/);
+        if (m) estCalcFrameSection('cf', parseInt(m[1]));
+    });
+    document.querySelectorAll('#pfFrames .upper-frame-block').forEach(block => {
+        const m = block.id.match(/pf_block_(\d+)/);
+        if (m) estCalcFrameSection('pf', parseInt(m[1]));
+    });
 
-    // Summary
     estUpdateSummary(totalSqft, fabricCost);
 }
 
 function estCalcPoleSection(prefix, hasAttach, hasFooters) {
-    const tbody = document.getElementById(prefix + 'Rows');
-    if (!tbody) return;
-    let steel = 0, cy = 0, welds = 0;
-
+    const tbody = document.getElementById(prefix + 'Rows'); if (\!tbody) return;
+    let steel=0, cy=0, welds=0;
     tbody.querySelectorAll('.est-row').forEach(row => {
         const size   = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
         const len    = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
@@ -955,30 +1046,23 @@ function estCalcPoleSection(prefix, hasAttach, hasFooters) {
         const attach = hasAttach ? (row.querySelector(`select[name^="${prefix}_attach_"]`)?.value || '') : '';
         const fdia   = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_dia_"]`)?.value) || 0) : 0;
         const fdep   = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_depth_"]`)?.value) || 0) : 0;
-
         const rowCost = size && len && qty > 0 ? getPipeCostPerPole(size, len) * qty : 0;
         const rowCY   = getCYperPole(fdia, fdep);
-
         const costEl = row.querySelector('.pole-cost');
         const cyEl   = row.querySelector('.pole-cy');
         if (costEl) costEl.textContent = rowCost > 0 ? $fmt(rowCost) : '—';
         if (cyEl)   cyEl.textContent   = rowCY > 0   ? rowCY.toFixed(3) + ' CY' : '—';
-
-        steel += rowCost;
-        cy    += rowCY * qty;
+        steel += rowCost; cy += rowCY * qty;
         if (attach === 'Weld Lug') welds += qty;
     });
-
-    sectionTotals[prefix] = { steel, cy, welds };
+    sectionTotals[prefix] = {steel, cy, welds};
     $set(prefix + '_total_steel', $fmt(steel));
     if (hasFooters) $set(prefix + '_total_cy', cy.toFixed(3) + ' CY');
 }
 
 function estCalcHSSSection(prefix, hasFooters) {
-    const tbody = document.getElementById(prefix + 'Rows');
-    if (!tbody) return;
-    let steel = 0, cy = 0, qty_total = 0;
-
+    const tbody = document.getElementById(prefix + 'Rows'); if (\!tbody) return;
+    let steel=0, cy=0, qty_total=0;
     tbody.querySelectorAll('.est-row').forEach(row => {
         const profile = row.querySelector(`select[name^="${prefix}_profile_"]`)?.value || '';
         const wall    = row.querySelector(`select[name^="${prefix}_wall_"]`)?.value   || '';
@@ -987,30 +1071,70 @@ function estCalcHSSSection(prefix, hasFooters) {
         const qty     = parseInt(row.querySelector(`input[name^="${prefix}_qty_"]`)?.value)   || 0;
         const fdia    = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_dia_"]`)?.value) || 0) : 0;
         const fdep    = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_depth_"]`)?.value) || 0) : 0;
-
         const rowCost = size && len && qty > 0 ? getPipeCostPerPole(size, len) * qty : 0;
         const rowCY   = getCYperPole(fdia, fdep);
-
         const costEl = row.querySelector('.pole-cost');
         const cyEl   = row.querySelector('.pole-cy');
         if (costEl) costEl.textContent = rowCost > 0 ? $fmt(rowCost) : '—';
         if (cyEl)   cyEl.textContent   = rowCY > 0   ? rowCY.toFixed(3) + ' CY' : '—';
-
-        steel     += rowCost;
-        cy        += rowCY * qty;
-        qty_total += qty;
+        steel += rowCost; cy += rowCY * qty; qty_total += qty;
     });
-
-    sectionTotals[prefix] = { steel, cy, qty: qty_total };
+    sectionTotals[prefix] = {steel, cy, qty: qty_total};
     $set(prefix + '_total_steel', $fmt(steel));
     if (hasFooters) $set(prefix + '_total_cy', cy.toFixed(3) + ' CY');
 }
 
 function estCalcFrameSection(prefix, idx) {
-    const cfg = FRAME_CONFIG[prefix];
-    let total = 0;
+    // For purlin frames: dome qty is the multiplier for all per-dome components
+    if (prefix === 'pf') {
+        const domeQty   = parseFloat(document.querySelector(`[name="pf_domes_qty_${idx}"]`)?.value) || 1;
+        const domePrice = parseFloat(document.querySelector(`[name="pf_domes_price_${idx}"]`)?.value) || 0;
 
-    cfg.fittings.forEach(comp => {
+        // Per-dome component costs (fittings)
+        const fittingComps = ['adapters','swivel_cross','post_purlin_adapter'];
+        let perDome = domePrice;
+        fittingComps.forEach(comp => {
+            const qty   = parseFloat(document.querySelector(`[name="pf_${comp}_qty_${idx}"]`)?.value) || 0;
+            const price = PRICING[FITTING_KEYS[comp]] || 0;
+            const line  = qty * price;
+            perDome += line;
+            $set(`pf_${comp}_uprice_${idx}`, price > 0 ? $fmt(price) : '—');
+            $set(`pf_${comp}_total_${idx}`, $fmt(line));
+        });
+
+        // Per-dome tubing costs
+        const tubingComps = ['purlin_len','purlin_wid','hoops'];
+        tubingComps.forEach(comp => {
+            const size  = document.querySelector(`[name="pf_${comp}_size_${idx}"]`)?.value || '';
+            const qty   = parseFloat(document.querySelector(`[name="pf_${comp}_qty_${idx}"]`)?.value) || 0;
+            const price = PRICING[size] || 0;
+            const line  = qty * price;
+            perDome += line;
+            $set(`pf_${comp}_uprice_${idx}`, size && price > 0 ? $fmt(price) : (size ? '(not priced)' : '—'));
+            $set(`pf_${comp}_total_${idx}`, $fmt(line));
+        });
+
+        // Show domes row total (dome cost portion only)
+        $set(`pf_domes_total_${idx}`, $fmt(domeQty * domePrice));
+
+        // Frame total = dome qty × per-dome total
+        const frameTotal = domeQty * perDome;
+        $set(`pf_frame_total_${idx}`, $fmt(frameTotal));
+        return;
+    }
+
+    // Hip and cantilever frames (hf, cf)
+    const fittingMap = {
+        hf: ['elbows','ys'],
+        cf: ['elbows','ys','adapters','swivel_cross']
+    };
+    const tubingMap = {
+        hf: ['ridge','rafters'],
+        cf: ['ridge','rafters']
+    };
+
+    let total = 0;
+    (fittingMap[prefix] || []).forEach(comp => {
         const qty   = parseFloat(document.querySelector(`[name="${prefix}_${comp}_qty_${idx}"]`)?.value) || 0;
         const price = PRICING[FITTING_KEYS[comp]] || 0;
         const line  = qty * price;
@@ -1018,8 +1142,7 @@ function estCalcFrameSection(prefix, idx) {
         $set(`${prefix}_${comp}_uprice_${idx}`, price > 0 ? $fmt(price) : '—');
         $set(`${prefix}_${comp}_total_${idx}`, $fmt(line));
     });
-
-    cfg.tubing.forEach(comp => {
+    (tubingMap[prefix] || []).forEach(comp => {
         const size  = document.querySelector(`[name="${prefix}_${comp}_size_${idx}"]`)?.value || '';
         const qty   = parseFloat(document.querySelector(`[name="${prefix}_${comp}_qty_${idx}"]`)?.value) || 0;
         const price = PRICING[size] || 0;
@@ -1028,42 +1151,23 @@ function estCalcFrameSection(prefix, idx) {
         $set(`${prefix}_${comp}_uprice_${idx}`, size && price > 0 ? $fmt(price) : (size ? '(not priced)' : '—'));
         $set(`${prefix}_${comp}_total_${idx}`, $fmt(line));
     });
-
-    cfg.manual.forEach(comp => {
-        const qty   = parseFloat(document.querySelector(`[name="${prefix}_${comp}_qty_${idx}"]`)?.value) || 0;
-        const price = parseFloat(document.querySelector(`[name="${prefix}_${comp}_price_${idx}"]`)?.value) || 0;
-        const line  = qty * price;
-        total += line;
-        $set(`${prefix}_${comp}_total_${idx}`, $fmt(line));
-    });
-
     $set(`${prefix}_frame_total_${idx}`, $fmt(total));
 }
 
 function estUpdateSummary(totalSqft, fabricCost) {
     const fabricRate = parseFloat(document.getElementById('fabric_rate_input')?.value) || 0;
-
-    // Steel totals
-    const steelCost = (sectionTotals.sail?.steel  || 0)
-                    + (sectionTotals.hip?.steel   || 0)
-                    + (sectionTotals.cpost?.steel || 0)
-                    + (sectionTotals.cbeam?.steel || 0);
-
-    // Concrete
-    const totalCY = (sectionTotals.sail?.cy || 0) + (sectionTotals.hip?.cy || 0) + (sectionTotals.cpost?.cy || 0);
+    const steelCost  = (sectionTotals.sail?.steel || 0)+(sectionTotals.hip?.steel || 0)
+                      +(sectionTotals.cpost?.steel || 0)+(sectionTotals.cbeam?.steel || 0);
+    const totalCY    = (sectionTotals.sail?.cy || 0)+(sectionTotals.hip?.cy || 0)+(sectionTotals.cpost?.cy || 0);
     const concreteCost = totalCY * CONCRETE_RATE * 1.10;
-
-    // Welding: weld lugs from sail + cpost qty + cbeam qty
-    const weldLugs  = sectionTotals.sail?.welds || 0;
-    const cpostQty  = sectionTotals.cpost?.qty  || 0;
-    const cbeamQty  = sectionTotals.cbeam?.qty  || 0;
+    const weldLugs   = sectionTotals.sail?.welds || 0;
+    const cpostQty   = sectionTotals.cpost?.qty  || 0;
+    const cbeamQty   = sectionTotals.cbeam?.qty  || 0;
     const weldingCost = (weldLugs + cpostQty + cbeamQty) * WELD_RATE;
 
-    // Powder (approximate)
     let powderCost = 0;
     ['sail','hip'].forEach(prefix => {
-        const tbody = document.getElementById(prefix + 'Rows');
-        if (!tbody) return;
+        const tbody = document.getElementById(prefix+'Rows'); if (\!tbody) return;
         tbody.querySelectorAll('.est-row').forEach(row => {
             const size = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
             const len  = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
@@ -1072,8 +1176,7 @@ function estUpdateSummary(totalSqft, fabricCost) {
         });
     });
     ['cpost','cbeam'].forEach(prefix => {
-        const tbody = document.getElementById(prefix + 'Rows');
-        if (!tbody) return;
+        const tbody = document.getElementById(prefix+'Rows'); if (\!tbody) return;
         tbody.querySelectorAll('.est-row').forEach(row => {
             const profile = row.querySelector(`select[name^="${prefix}_profile_"]`)?.value || '';
             const wall    = row.querySelector(`select[name^="${prefix}_wall_"]`)?.value   || '';
@@ -1084,57 +1187,45 @@ function estUpdateSummary(totalSqft, fabricCost) {
         });
     });
 
-    // Frame totals
-    let hipFrames = 0, cantFrames = 0, purlinFrames = 0;
-    for (let i = 0; i < 5; i++) {
-        hipFrames    += parseFloat((document.getElementById(`hf_frame_total_${i}`)?.textContent||'').replace(/[$,]/g,'')) || 0;
-        cantFrames   += parseFloat((document.getElementById(`cf_frame_total_${i}`)?.textContent||'').replace(/[$,]/g,'')) || 0;
-        purlinFrames += parseFloat((document.getElementById(`pf_frame_total_${i}`)?.textContent||'').replace(/[$,]/g,'')) || 0;
-    }
+    // Sum all frame totals from DOM
+    let hipFrames=0, cantFrames=0, purlinFrames=0;
+    document.querySelectorAll('#hfFrames [id^="hf_frame_total_"]').forEach(el =>
+        { hipFrames += parseFloat(el.textContent.replace(/[$,]/g,'')) || 0; });
+    document.querySelectorAll('#cfFrames [id^="cf_frame_total_"]').forEach(el =>
+        { cantFrames += parseFloat(el.textContent.replace(/[$,]/g,'')) || 0; });
+    document.querySelectorAll('#pfFrames [id^="pf_frame_total_"]').forEach(el =>
+        { purlinFrames += parseFloat(el.textContent.replace(/[$,]/g,'')) || 0; });
 
-    // Wall mounts & clamps
     const wallMountQty  = parseFloat(document.querySelector('[name=wall_mount_qty]')?.value) || 0;
     const clampQty      = parseFloat(document.querySelector('[name=clamp_qty]')?.value) || 0;
     const wallMountCost = wallMountQty * (PRICING['Wall Mount'] || 0);
     const clampCost     = clampQty * (PRICING['Clamp'] || 0);
-
-    // Manual costs
-    const superiorAmt = parseFloat(document.querySelector('[name=superior_amount]')?.value) || 0;
-    const hardware    = parseFloat(document.querySelector('[name=hardware]')?.value)    || 0;
-    const supplies    = parseFloat(document.querySelector('[name=supplies]')?.value)    || 0;
-    const galvanizing = parseFloat(document.querySelector('[name=galvanizing]')?.value) || 0;
-    const equipment   = parseFloat(document.querySelector('[name=equipment]')?.value)   || 0;
-    const permits     = parseFloat(document.querySelector('[name=permits]')?.value)     || 0;
-    const vendor      = parseFloat(document.querySelector('[name=vendor]')?.value)      || 0;
-    const misc        = parseFloat(document.querySelector('[name=misc]')?.value)        || 0;
-
-    // Labor
-    const crewCount  = parseInt(document.querySelector('[name=crew_count]')?.value)    || 1;
-    const installDays = parseInt(document.querySelector('[name=install_days]')?.value) || 1;
+    const superiorAmt   = parseFloat(document.querySelector('[name=superior_amount]')?.value) || 0;
+    const hardware      = parseFloat(document.querySelector('[name=hardware]')?.value) || 0;
+    const supplies      = parseFloat(document.querySelector('[name=supplies]')?.value) || 0;
+    const galvanizing   = parseFloat(document.querySelector('[name=galvanizing]')?.value) || 0;
+    const equipment     = parseFloat(document.querySelector('[name=equipment]')?.value) || 0;
+    const permits       = parseFloat(document.querySelector('[name=permits]')?.value) || 0;
+    const vendor        = parseFloat(document.querySelector('[name=vendor]')?.value) || 0;
+    const misc          = parseFloat(document.querySelector('[name=misc]')?.value) || 0;
+    const crewCount     = parseInt(document.querySelector('[name=crew_count]')?.value) || 1;
+    const installDays   = parseInt(document.querySelector('[name=install_days]')?.value) || 1;
     let dailyCrew = 0;
-    for (let i = 1; i <= crewCount; i++) dailyCrew += PRICING[`Rate - Person ${i}`] || 0;
+    for (let i=1; i<=crewCount; i++) dailyCrew += PRICING[`Rate - Person ${i}`] || 0;
     const laborCost = dailyCrew * installDays;
-
-    // Travel
-    const miles      = parseFloat(document.querySelector('[name=miles]')?.value)       || 0;
-    const fuelRate   = parseFloat(document.querySelector('[name=fuel_rate]')?.value)   || 0;
-    const roundTrips = parseInt(document.querySelector('[name=round_trips]')?.value)   || 1;
-    const lodging    = parseFloat(document.querySelector('[name=lodging]')?.value)     || 0;
-    const travelCost = miles * 2 * roundTrips * fuelRate + lodging;
-
-    const otherCost = equipment + permits + vendor + misc;
-
-    const allFabricAndMaterials = superiorAmt + fabricCost + steelCost + concreteCost
-                                + weldingCost + powderCost
-                                + hipFrames + cantFrames + purlinFrames
-                                + hardware + supplies + galvanizing
-                                + wallMountCost + clampCost;
-
-    const baseTotal   = allFabricAndMaterials + laborCost + travelCost + otherCost;
+    const miles       = parseFloat(document.querySelector('[name=miles]')?.value) || 0;
+    const fuelRate    = parseFloat(document.querySelector('[name=fuel_rate]')?.value) || 0;
+    const roundTrips  = parseInt(document.querySelector('[name=round_trips]')?.value) || 1;
+    const lodging     = parseFloat(document.querySelector('[name=lodging]')?.value) || 0;
+    const travelCost  = miles * 2 * roundTrips * fuelRate + lodging;
+    const otherCost   = equipment + permits + vendor + misc;
+    const baseTotal   = superiorAmt + fabricCost + steelCost + concreteCost + weldingCost + powderCost
+                       + hipFrames + cantFrames + purlinFrames
+                       + hardware + supplies + galvanizing + wallMountCost + clampCost
+                       + laborCost + travelCost + otherCost;
     const markupPct   = parseFloat(document.getElementById('markup_pct_input')?.value) || 0;
     const markupAmt   = baseTotal * markupPct / 100;
     const sellPrice   = baseTotal + markupAmt;
-
     $set('sum_fabric',     $fmt(fabricCost));
     $set('sum_steel',      $fmt(steelCost));
     $set('sum_concrete',   $fmt(concreteCost));
@@ -1157,7 +1248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('estimatorForm');
     form.addEventListener('input',  estUpdateAll);
     form.addEventListener('change', estUpdateAll);
-    estUpdateAll();  // initial pass to populate prices from pricing sheet
+    estUpdateAll();
 });
 </script>
 {% endblock %}

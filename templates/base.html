@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Shade America{% endblock %} | Shade America</title>
+    <title>{% block title %}Shade America{% endblock %} | Shade America Team Portal</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -13,7 +13,7 @@
 <nav class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <div class="logo">
-            <span class="logo-text">Shade America</span>
+            <span class="logo-text">Shade America Team Portal</span>
         </div>
     </div>
     <div class="nav-user">
@@ -41,6 +41,8 @@
         {% if current_user.role == 'admin' %}
         <li><a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint == 'admin_users' }}">
             <span class="nav-label">Users</span></a></li>
+        <li><a href="{{ url_for('field_preview') }}" class="{{ 'active' if request.endpoint == 'field_preview' }}">
+            <span class="nav-label">Field Preview</span></a></li>
         {% endif %}
         {% endif %}
     </ul>
