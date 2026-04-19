@@ -204,7 +204,7 @@
       <tr>
         <td><a href="{{ url_for('serve_form', form_id=form.id) }}" target="_blank">📄 {{ form.name }}</a></td>
         <td style="font-size:.82rem;color:#888">{{ (form.file_size / 1024)|round(1) }} KB</td>
-        <td style="font-size:.82rem;color:#888">{{ form.uploaded_at[:10] if form.uploaded_at else '—' }}</td>
+        <td style="font-size:.82rem;color:#888">{{ (form.uploaded_at|string)[:10] if form.uploaded_at else '—' }}</td>
         <td>
           <form method="POST" action="{{ url_for('forms_delete', form_id=form.id) }}"
                 onsubmit="return confirm('Delete {{ form.name }}?')" style="display:inline">
