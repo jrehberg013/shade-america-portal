@@ -239,9 +239,33 @@ def init_db():
             ('crew','Rate - Person 4',      450,  '$/day',   4),
             ('crew','Rate - Person 5',      400,  '$/day',   5),
             ('travel','Fuel Cost per Mile', 0.40, '$/mile',  1),
+            ('tubing','2 1/2" OD Tubing 24ft',  0, '$/stick', 1),
+            ('tubing','2 7/8" OD Tubing 24ft',  0, '$/stick', 2),
+            ('tubing','3 1/2" OD Tubing 24ft',  0, '$/stick', 3),
+            ('tubing','5" OD Tubing 24ft',       0, '$/stick', 4),
+            ('fittings','Elbow',        0, '$/ea', 1),
+            ('fittings','Y Fitting',    0, '$/ea', 2),
+            ('fittings','Adapter',      0, '$/ea', 3),
+            ('fittings','Swivel Cross', 0, '$/ea', 4),
         ]
         for row in pricing_data:
             db.execute("INSERT INTO pricing (category,name,price,unit,sort_order) VALUES (?,?,?,?,?)", row)
+
+    # Add new pricing items if missing (for existing databases)
+    new_items = [
+        ('tubing','2 1/2" OD Tubing 24ft',  0, '$/stick', 1),
+        ('tubing','2 7/8" OD Tubing 24ft',  0, '$/stick', 2),
+        ('tubing','3 1/2" OD Tubing 24ft',  0, '$/stick', 3),
+        ('tubing','5" OD Tubing 24ft',       0, '$/stick', 4),
+        ('fittings','Elbow',        0, '$/ea', 1),
+        ('fittings','Y Fitting',    0, '$/ea', 2),
+        ('fittings','Adapter',      0, '$/ea', 3),
+        ('fittings','Swivel Cross', 0, '$/ea', 4),
+    ]
+    for cat, name, price, unit, sort in new_items:
+        if not db.execute("SELECT id FROM pricing WHERE category=? AND name=?", (cat, name)).fetchone():
+            db.execute("INSERT INTO pricing (category,name,price,unit,sort_order) VALUES (?,?,?,?,?)",
+                       (cat, name, price, unit, sort))
 
     db.commit()
     db.close()
@@ -561,6 +585,10 @@ def pipe_cost_calc(size, length_ft, qty, pm):
     return (best_cost or 0) * qty, best_unit
 
 def get_powder_rate(size, pm):
+    # Handle combined HSS size like '4x4 HSS 1/4"'
+    for prefix in ['4x4', '4x6', '4x8']:
+        if size.startswith(prefix + ' HSS'):
+            return pm.get(f'{prefix} HSS', 0)
     key_map = {
         '5" SCH40': '5" SCH40', '6" SCH40': '6" SCH40', '8" SCH40': '8" SCH40',
         '3" OD Galv Tubing': '3" OD Galv', '4" OD Galv Tubing': '4" OD Galv',
@@ -584,30 +612,22 @@ def parse_pole_rows(prefix, f):
 @app.route('/estimator')
 @admin_required
 def estimator():
-    pipe_opts_sail = """<option value="">-- Size --</option>
-        <option value='5" SCH40'>5" SCH40</option>
-        <option value='6" SCH40'>6" SCH40</option>
-        <option value='8" SCH40'>8" SCH40</option>
-        <option value='3" OD Galv Tubing'>3" OD Galv</option>
-        <option value='4" OD Galv Tubing'>4" OD Galv</option>
-        <option value='5" OD Galv Tubing'>5" OD Galv</option>"""
-    pipe_opts_hip = pipe_opts_sail
-    attach_opts = """<option value="All Thread">All Thread</option>
-        <option value="Weld Lug">Weld Lug</option>
-        <option value="Wall Mount">Wall Mount</option>
-        <option value="Drive Post">Drive Post</option>
-        <option value="Surface Mount">Surface Mount</option>"""
-    hss_profile_opts = """<option value="4x4">4x4 HSS</option>
-        <option value="4x6">4x6 HSS</option>
-        <option value="4x8">4x8 HSS</option>"""
-    hss_wall_opts = """<option value='1/4"'>1/4"</option>
-        <option value='3/16"'>3/16"</option>"""
+    db = get_db()
+    pm = get_pricing_map(db)
+    fabric_rate = pm.get('Fabric per Sq Ft', 3.25)
+    pipe_sizes   = ['5" SCH40', '6" SCH40', '8" SCH40',
+                    '3" OD Galv Tubing', '4" OD Galv Tubing', '5" OD Galv Tubing']
+    hss_profiles = ['4x4', '4x6', '4x8']
+    hss_walls    = ['1/4"', '3/16"']
+    tubing_names = ['2 1/2" OD Tubing 24ft', '2 7/8" OD Tubing 24ft',
+                    '3 1/2" OD Tubing 24ft', '5" OD Tubing 24ft']
     return render_template('estimator.html',
-                           pipe_opts_sail=pipe_opts_sail,
-                           pipe_opts_hip=pipe_opts_hip,
-                           attach_opts=attach_opts,
-                           hss_profile_opts=hss_profile_opts,
-                           hss_wall_opts=hss_wall_opts)
+                           pricing_json=json.dumps(pm),
+                           fabric_rate=fabric_rate,
+                           pipe_sizes=pipe_sizes,
+                           hss_profiles=hss_profiles,
+                           hss_walls=hss_walls,
+                           tubing_names=tubing_names)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -779,9 +799,13 @@ def calculate():
 
     job_name        = f.get('job_name', '')
     client          = f.get('client', '')
+    client_email    = f.get('client_email', '')
+    client_phone    = f.get('client_phone', '')
     location        = f.get('location', '')
+    quote_num       = f.get('quote_num', '')
     markup_pct      = float(f.get('markup_pct', 50) or 50)
     superior_amount = float(f.get('superior_amount', 0) or 0)
+    fabric_rate_input = float(f.get('fabric_rate', pm.get('Fabric per Sq Ft', 3.25)) or 3.25)
 
     # ── Structures & Fabric ──
     n_structs  = int(f.get('struct_count', 0) or 0)
@@ -806,8 +830,7 @@ def calculate():
         total_sqft += sqft_total
         structs.append({'type': stype, 's1': s1, 's2': s2, 's3': s3,
                         'qty': qty, 'sqft': round(sqft_total, 1)})
-    fabric_rate = pm.get('Fabric per Sq Ft', 3.25)
-    fabric_cost = total_sqft * fabric_rate
+    fabric_cost = total_sqft * fabric_rate_input
 
     # ── Poles helper ──
     def _poles(prefix, has_attach=False, has_wall=False):
@@ -874,18 +897,41 @@ def calculate():
     wall_mount_cost = wall_mount_qty * pm.get('Wall Mount', 0)
     clamp_cost      = clamp_qty * pm.get('Clamp', 0)
 
-    # Upper frames
-    def _frames(prefix):
+    # Upper frames — prices come from pricing sheet, not form input
+    _fitting_keys = {
+        'elbows': 'Elbow', 'ys': 'Y Fitting',
+        'adapters': 'Adapter', 'swivel_cross': 'Swivel Cross',
+    }
+
+    def _upper_frames(prefix, fitting_comps, tubing_comps, manual_comps=None):
+        manual_comps = manual_comps or []
         total = 0.0
         for i in range(5):
-            for comp in ['elbows', 'ys', 'ridge', 'rafters']:
+            for comp in fitting_comps:
+                qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
+                price = pm.get(_fitting_keys.get(comp, comp), 0)
+                total += qty * price
+            for comp in tubing_comps:
+                size  = f.get(f'{prefix}_{comp}_size_{i}', '')
+                qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
+                price = pm.get(size, 0)
+                total += qty * price
+            for comp in manual_comps:
                 qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
                 price = float(f.get(f'{prefix}_{comp}_price_{i}', 0) or 0)
                 total += qty * price
         return total
 
-    hip_frames_cost  = _frames('hf')
-    cant_frames_cost = _frames('cf')
+    hip_frames_cost  = _upper_frames('hf',
+                           fitting_comps=['elbows', 'ys'],
+                           tubing_comps=['ridge', 'rafters'])
+    cant_frames_cost = _upper_frames('cf',
+                           fitting_comps=['elbows', 'ys', 'adapters', 'swivel_cross'],
+                           tubing_comps=['ridge', 'rafters'])
+    purlin_cost      = _upper_frames('pf',
+                           fitting_comps=['adapters', 'swivel_cross'],
+                           tubing_comps=['purlin_len', 'purlin_wid', 'hoops'],
+                           manual_comps=['domes'])
 
     # Travel
     miles       = float(f.get('miles', 0) or 0)
@@ -911,7 +957,7 @@ def calculate():
 
     # Totals
     materials_total = (superior_amount + fabric_cost + steel_cost + concrete_cost
-                       + hip_frames_cost + cant_frames_cost
+                       + hip_frames_cost + cant_frames_cost + purlin_cost
                        + welding_cost + powder_cost
                        + hardware + supplies + galvanizing
                        + wall_mount_cost + clamp_cost)
@@ -922,12 +968,15 @@ def calculate():
 
     result = {
         'job_name': job_name, 'client': client, 'location': location,
+        'quote_num': quote_num, 'client_email': client_email, 'client_phone': client_phone,
         'total_sqft': round(total_sqft, 1), 'structs': structs,
+        'fabric_rate': fabric_rate_input,
         'fabric_cost': fabric_cost, 'superior_amount': superior_amount,
         'steel_cost': steel_cost, 'welding_cost': welding_cost,
         'powder_cost': powder_cost,
         'all_cy': round(all_cy, 2), 'concrete_cost': concrete_cost,
         'hip_frames_cost': hip_frames_cost, 'cant_frames_cost': cant_frames_cost,
+        'purlin_cost': purlin_cost,
         'hardware': hardware, 'supplies': supplies, 'galvanizing': galvanizing,
         'wall_mount_cost': wall_mount_cost, 'clamp_cost': clamp_cost,
         'materials_total': materials_total,

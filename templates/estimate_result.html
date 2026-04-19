@@ -7,8 +7,16 @@
   <div class="card">
     <div class="card-header card-header-row">
       <div>
+        {% if result.quote_num %}<p class="text-muted" style="font-size:.8rem;margin-bottom:.2rem">Quote #{{ result.quote_num }}</p>{% endif %}
         <h2>{{ result.job_name or 'Estimate' }}</h2>
         {% if result.client %}<p class="text-muted">{{ result.client }}</p>{% endif %}
+        {% if result.client_email or result.client_phone %}
+        <p class="text-muted" style="font-size:.8rem">
+          {% if result.client_email %}{{ result.client_email }}{% endif %}
+          {% if result.client_email and result.client_phone %} &nbsp;·&nbsp; {% endif %}
+          {% if result.client_phone %}{{ result.client_phone }}{% endif %}
+        </p>
+        {% endif %}
         {% if result.location %}<p class="text-muted" style="font-size:.8rem">{{ result.location }}</p>{% endif %}
       </div>
       <a href="{{ url_for('estimator') }}" class="btn btn-outline btn-sm">← New Estimate</a>
@@ -40,7 +48,7 @@
         <tr><td>Superior Quote</td><td class="td-right">${{ "{:,.2f}".format(result.superior_amount) }}</td></tr>
         {% endif %}
         {% if result.fabric_cost > 0 %}
-        <tr><td>Fabric / Shade Material ({{ result.total_sqft }} sqft)</td><td class="td-right">${{ "{:,.2f}".format(result.fabric_cost) }}</td></tr>
+        <tr><td>Fabric / Shade Material ({{ result.total_sqft }} sqft × ${{ "%.2f"|format(result.fabric_rate) }}/sqft)</td><td class="td-right">${{ "{:,.2f}".format(result.fabric_cost) }}</td></tr>
         {% endif %}
         {% if result.steel_cost > 0 %}
         <tr><td>Steel / Pipe / Structural</td><td class="td-right">${{ "{:,.2f}".format(result.steel_cost) }}</td></tr>
@@ -59,6 +67,9 @@
         {% endif %}
         {% if result.cant_frames_cost > 0 %}
         <tr><td>Cantilever Upper Frames (Pipe)</td><td class="td-right">${{ "{:,.2f}".format(result.cant_frames_cost) }}</td></tr>
+        {% endif %}
+        {% if result.purlin_cost > 0 %}
+        <tr><td>Canopy / Cantilever Purlin System</td><td class="td-right">${{ "{:,.2f}".format(result.purlin_cost) }}</td></tr>
         {% endif %}
         {% if result.hardware > 0 %}
         <tr><td>Hardware / Fasteners</td><td class="td-right">${{ "{:,.2f}".format(result.hardware) }}</td></tr>
