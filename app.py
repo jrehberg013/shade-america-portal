@@ -1147,7 +1147,7 @@ def trello_data():
 
     target_boards = ['Shade America', 'Installation', 'Sewing Shop']
 
-    # Lists to EXCLUDE per board (case-insensitive match)
+    # Lists to EXCLUDE per board (case-insensitive)
     EXCLUDED_LISTS = {
         'Shade America': [
             'design',
@@ -1156,7 +1156,7 @@ def trello_data():
             'money received/projects done',
         ],
     }
-    # Lists to INCLUDE per board — if set, only these lists are shown
+    # Lists to INCLUDE per board — only these shown when defined
     ALLOWED_LISTS = {
         'Installation': [
             'planning',
@@ -1176,6 +1176,13 @@ def trello_data():
         if board_name in EXCLUDED_LISTS:
             return ln not in [x.lower() for x in EXCLUDED_LISTS[board_name]]
         return True
+
+    def _card_name(c):
+        n = (c.get('name') or '').strip()
+        if n:
+            return n
+        desc = (c.get('desc') or '').strip()
+        return desc[:60] if desc else 'Card ' + c.get('shortLink', '?')
 
     try:
         # Fetch all boards for the authenticated member
@@ -1205,15 +1212,6 @@ def trello_data():
                         f"&fields=name,shortLink,url,due,desc&filter=open")
                 with urllib.request.urlopen(curl, timeout=10) as resp:
                     cards = json.loads(resp.read())
-
-                def _card_name(c):
-                    n = (c.get('name') or '').strip()
-                    if n:
-                        return n
-                    # Fall back to desc first 60 chars, then short link
-                    desc = (c.get('desc') or '').strip()
-                    return desc[:60] if desc else f"Card {c.get('shortLink','?')}"
-
                 board_data['lists'].append({
                     'name': lst['name'],
                     'cards': [{'name': _card_name(c), 'url': c['url'],
@@ -1230,6 +1228,38 @@ def trello_data():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+
+
+# ─────────────────────────────────────────────────────────────
+# TRELLO DEBUG — list raw board/list names
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/api/trello/lists')
+@admin_required
+def trello_list_names():
+    api_key = os.environ.get('TRELLO_API_KEY', '')
+    token   = os.environ.get('TRELLO_TOKEN', '')
+    if not api_key or not token:
+        return jsonify({'error': 'not_configured'})
+    try:
+        url = (f'https://api.trello.com/1/members/me/boards'
+               f'?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}'
+               f'&fields=name,id&filter=open')
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            all_boards = json.loads(resp.read())
+        out = []
+        for board in all_boards:
+            if board['name'] not in ['Shade America', 'Installation', 'Sewing Shop']:
+                continue
+            lurl = (f"https://api.trello.com/1/boards/{board['id']}/lists"
+                    f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
+                    f"&filter=open&fields=name")
+            with urllib.request.urlopen(lurl, timeout=10) as resp:
+                lists = json.loads(resp.read())
+            out.append({'board': board['name'], 'lists': [l['name'] for l in lists]})
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 # ─────────────────────────────────────────────────────────────
 # FIELD VIEW PREVIEW (admin only)
