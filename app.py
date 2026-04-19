@@ -1152,8 +1152,8 @@ def trello_data():
         'Shade America': [
             'design',
             'card template under construction',
-            "estimates and po's",
-            'money received/projects done',
+            "estimates & po's",
+            'money received/ project done',
         ],
     }
     # Lists to INCLUDE per board — only these shown when defined
