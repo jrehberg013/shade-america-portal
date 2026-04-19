@@ -1146,6 +1146,37 @@ def trello_data():
         return jsonify({'error': 'not_configured'})
 
     target_boards = ['Shade America', 'Installation', 'Sewing Shop']
+
+    # Lists to EXCLUDE per board (case-insensitive match)
+    EXCLUDED_LISTS = {
+        'Shade America': [
+            'design',
+            'card template under construction',
+            "estimates and po's",
+            'money received/projects done',
+        ],
+    }
+    # Lists to INCLUDE per board — if set, only these lists are shown
+    ALLOWED_LISTS = {
+        'Installation': [
+            'planning',
+            'welding',
+            'powder coating',
+            'galvanizing',
+            'add to install schedule',
+            'jobs on temp hold',
+            'installed needs attention',
+        ],
+    }
+
+    def _keep_list(board_name, list_name):
+        ln = list_name.strip().lower()
+        if board_name in ALLOWED_LISTS:
+            return ln in [x.lower() for x in ALLOWED_LISTS[board_name]]
+        if board_name in EXCLUDED_LISTS:
+            return ln not in [x.lower() for x in EXCLUDED_LISTS[board_name]]
+        return True
+
     try:
         # Fetch all boards for the authenticated member
         url = (f'https://api.trello.com/1/members/me/boards'
@@ -1167,14 +1198,25 @@ def trello_data():
 
             board_data = {'name': board['name'], 'url': board['url'], 'lists': []}
             for lst in lists:
+                if not _keep_list(board['name'], lst['name']):
+                    continue
                 curl = (f"https://api.trello.com/1/lists/{lst['id']}/cards"
                         f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
-                        f"&fields=name,url,due,desc&filter=open")
+                        f"&fields=name,shortLink,url,due,desc&filter=open")
                 with urllib.request.urlopen(curl, timeout=10) as resp:
                     cards = json.loads(resp.read())
+
+                def _card_name(c):
+                    n = (c.get('name') or '').strip()
+                    if n:
+                        return n
+                    # Fall back to desc first 60 chars, then short link
+                    desc = (c.get('desc') or '').strip()
+                    return desc[:60] if desc else f"Card {c.get('shortLink','?')}"
+
                 board_data['lists'].append({
                     'name': lst['name'],
-                    'cards': [{'name': c['name'], 'url': c['url'],
+                    'cards': [{'name': _card_name(c), 'url': c['url'],
                                'due': c.get('due'), 'desc': c.get('desc', '')}
                               for c in cards]
                 })
