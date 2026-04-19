@@ -7,13 +7,26 @@
     <div class="card-header"><h2>Team Members</h2></div>
     <table class="data-table">
         <thead>
-            <tr><th>Username</th><th>Role</th><th>Must Change PW</th><th>Actions</th></tr>
+            <tr><th>Username</th><th>Name</th><th>Role</th><th>Must Change PW</th><th>Actions</th></tr>
         </thead>
         <tbody>
             {% for user in users %}
             <tr>
                 <td><strong>{{ user.username.title() }}</strong></td>
-                <td><span class="user-role {{ user.role }}">{{ user.role.title() }}</span></td>
+                <td>{{ user.name or '—' }}</td>
+                <td>
+                    {% if user.id != current_user.id %}
+                    <form method="POST" action="{{ url_for('change_user_role', user_id=user.id) }}" style="display:inline">
+                        <select name="role" onchange="this.form.submit()" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px">
+                            <option value="admin"   {% if user.role == 'admin'   %}selected{% endif %}>Admin</option>
+                            <option value="manager" {% if user.role == 'manager' %}selected{% endif %}>Manager</option>
+                            <option value="field"   {% if user.role == 'field'   %}selected{% endif %}>Field</option>
+                        </select>
+                    </form>
+                    {% else %}
+                    <span class="user-role {{ user.role }}">{{ user.role.title() }} (you)</span>
+                    {% endif %}
+                </td>
                 <td>{% if user.must_change_password %}<span class="badge-warn">Yes</span>{% else %}—{% endif %}</td>
                 <td>
                     {% if user.id != current_user.id %}
@@ -22,7 +35,7 @@
                         <button type="submit" class="btn btn-sm btn-outline">Reset PW</button>
                     </form>
                     {% else %}
-                    <span class="text-muted">You</span>
+                    <span class="text-muted">—</span>
                     {% endif %}
                 </td>
             </tr>
@@ -33,15 +46,15 @@
 
 <div class="card" style="margin-top:1.5rem">
     <div class="card-header"><h3>Password Reference</h3></div>
-    <p class="text-muted" style="padding:0 1.5rem 1rem">Temporary passwords for new accounts (share via WhatsApp, then have them change on first login).</p>
+    <p class="text-muted" style="padding:0 1.5rem 1rem">Temporary passwords — share via WhatsApp, users change on first login.</p>
     <table class="data-table">
         <thead><tr><th>User</th><th>Role</th><th>Temp Password</th></tr></thead>
         <tbody>
             <tr><td>james</td><td>admin</td><td><code>SA-James#1</code></td></tr>
-            <tr><td>muller</td><td>admin</td><td><code>SA-Muller#1</code></td></tr>
-            <tr><td>jaco</td><td>admin</td><td><code>SA-Jaco#1</code></td></tr>
-            <tr><td>carrie</td><td>admin</td><td><code>SA-Carrie#1</code></td></tr>
-            <tr><td>stefani</td><td>admin</td><td><code>SA-Stefani#1</code></td></tr>
+            <tr><td>muller</td><td>manager</td><td><code>SA-Muller#1</code></td></tr>
+            <tr><td>jaco</td><td>manager</td><td><code>SA-Jaco#1</code></td></tr>
+            <tr><td>carrie</td><td>manager</td><td><code>SA-Carrie#1</code></td></tr>
+            <tr><td>stefani</td><td>manager</td><td><code>SA-Stefani#1</code></td></tr>
             <tr><td>field (all field workers)</td><td>field</td><td><code>SunShade24!</code></td></tr>
         </tbody>
     </table>

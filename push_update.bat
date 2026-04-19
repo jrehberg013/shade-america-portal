@@ -16,9 +16,9 @@ if "%GIT%"=="" (
 )
 
 echo Using git at: %GIT%
-echo Committing changes...
-"%GIT%" add templates/estimator.html app.py
-"%GIT%" commit -m "Estimator: fix HTML/JS escaping, auto first frames, Superior Quote # field"
+echo Committing all changes...
+"%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/forms.html
+"%GIT%" commit -m "Add Superior Footers, manager role, Forms tab, role assignment, email estimate, Hyperbolic/Umbrella"
 echo Pushing to GitHub...
 "%GIT%" push origin main
 echo Done!

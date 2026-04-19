@@ -179,4 +179,45 @@
     document.addEventListener('DOMContentLoaded',loadTrello);
 })();
 </script>
+
+{% if current_user.role == 'admin' %}
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- MANAGE FORMS (admin only)                                  -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-header" style="margin-top:2rem">
+    <h2>Manage Forms</h2>
+</div>
+<div class="card">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+    <h3>Company Forms (PDFs for Field Crew)</h3>
+    <form method="POST" action="{{ url_for('forms_upload') }}" enctype="multipart/form-data" style="display:flex;gap:.5rem;align-items:center">
+      <input type="file" name="file" accept=".pdf" required style="font-size:.82rem">
+      <button type="submit" class="btn btn-primary btn-sm">Upload PDF</button>
+    </form>
+  </div>
+  {% set all_forms = [] %}
+  {% if forms %}
+  <table class="data-table" style="margin:0">
+    <thead><tr><th>File Name</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
+    <tbody>
+      {% for form in forms %}
+      <tr>
+        <td><a href="{{ url_for('serve_form', form_id=form.id) }}" target="_blank">📄 {{ form.name }}</a></td>
+        <td style="font-size:.82rem;color:#888">{{ (form.file_size / 1024)|round(1) }} KB</td>
+        <td style="font-size:.82rem;color:#888">{{ form.uploaded_at[:10] if form.uploaded_at else '—' }}</td>
+        <td>
+          <form method="POST" action="{{ url_for('forms_delete', form_id=form.id) }}"
+                onsubmit="return confirm('Delete {{ form.name }}?')" style="display:inline">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="padding:1rem;color:#aaa;font-size:.88rem">No forms uploaded yet. Use the button above to add PDFs for the field crew.</p>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

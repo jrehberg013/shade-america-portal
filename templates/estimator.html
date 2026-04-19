@@ -83,6 +83,53 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
+<!-- 2. SUPERIOR FOOTERS                                        -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-header"><h3>Superior Footers</h3></div>
+  <div class="est-section-hint">Footer concrete for Superior-supplied structures. Uses same $/CY rate as other footers.</div>
+  <div class="est-table-wrap">
+  <table class="est-table" id="supFooterTable">
+    <thead>
+      <tr>
+        <th>#</th><th>Struct #</th><th>Qty</th>
+        <th>Footer &Oslash; (ft)</th><th>Footer Depth (ft)</th>
+        <th>CY Each</th><th>Total CY</th><th></th>
+      </tr>
+    </thead>
+    <tbody id="supFooterRows">
+      <tr class="est-row" id="supf_0">
+        <td class="row-num">1</td>
+        <td><select name="supf_sref_0" style="width:70px;font-size:.8rem">
+          <option value="">&#8212;</option>
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+          <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+          <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+          <option value="10">10</option>
+        </select></td>
+        <td><input type="number" name="sup_footer_qty_0" value="1" min="1" style="width:60px" oninput="calcSupFooterRow(0)"></td>
+        <td><input type="number" name="sup_footer_dia_0" value="0" min="0" step="0.25" style="width:80px" oninput="calcSupFooterRow(0)"></td>
+        <td><input type="number" name="sup_footer_depth_0" value="0" min="0" step="0.5" style="width:80px" oninput="calcSupFooterRow(0)"></td>
+        <td><span id="supf_cy_ea_0">0.00</span></td>
+        <td><span id="supf_cy_tot_0">0.00</span></td>
+        <td><button type="button" class="btn btn-sm btn-danger" onclick="removeSupFooterRow('supf_0')">&#10005;</button></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr class="subtotal-row">
+        <td colspan="6"><strong>Superior Footers Total CY</strong></td>
+        <td><strong id="supf_total_cy">0.00 CY</strong></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline" onclick="addSupFooterRow()">+ Add Row</button>
+  <input type="hidden" name="sup_footer_count" id="sup_footer_count" value="1">
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════ -->
 <!-- 2. STRUCTURE TYPES & SIZES                                -->
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
@@ -104,6 +151,8 @@
           <option value="sail">Sail (3-sided)</option>
           <option value="hip">Hip / Canopy</option>
           <option value="cantilever">Cantilever</option>
+          <option value="hyperbolic">Hyperbolic</option>
+          <option value="umbrella">Umbrella</option>
         </select></td>
         <td><input type="number" name="struct_s1_0" placeholder="ft" min="0" step="0.5"></td>
         <td><input type="number" name="struct_s2_0" placeholder="ft" min="0" step="0.5"></td>
@@ -460,6 +509,8 @@
 <div class="card summary-card">
   <div class="card-header"><h3>Estimate Summary</h3></div>
   <div class="summary-grid">
+    <div class="summary-row"><span>Superior Frame</span><span id="sum_superior">$0.00</span></div>
+    <div class="summary-row"><span>Superior Footers (concrete)</span><span id="sum_sup_footers">$0.00</span></div>
     <div class="summary-row"><span>Fabric / Shade Material</span><span id="sum_fabric">$0.00</span></div>
     <div class="summary-row"><span>Steel / Structural</span><span id="sum_steel">$0.00</span></div>
     <div class="summary-row"><span>Concrete (est.)</span><span id="sum_concrete">$0.00</span></div>
@@ -476,6 +527,9 @@
     <label class="markup-label">Markup %</label>
     <input type="number" name="markup_pct" id="markup_pct_input" value="50" min="0" max="500" step="1" style="width:80px">
     <span class="markup-eq">→ Markup Amount: <strong id="sum_markup_amt">$0.00</strong></span>
+  </div>
+  <div id="email-estimate-bar" style="margin-top:.75rem;display:flex;justify-content:flex-end">
+    <button type="button" class="btn btn-outline btn-sm" onclick="emailEstimate()">&#9993; Email Estimate</button>
   </div>
   <div class="sell-price-box">
     <span>ESTIMATED SELL PRICE</span>
@@ -657,6 +711,8 @@ function estAddStructRow() {
         <option value="sail">Sail (3-sided)</option>
         <option value="hip">Hip / Canopy</option>
         <option value="cantilever">Cantilever</option>
+        <option value="hyperbolic">Hyperbolic</option>
+        <option value="umbrella">Umbrella</option>
       </select></td>
       <td><input type="number" name="struct_s1_${i}" placeholder="ft" min="0" step="0.5"></td>
       <td><input type="number" name="struct_s2_${i}" placeholder="ft" min="0" step="0.5"></td>
@@ -1201,6 +1257,8 @@ function estUpdateSummary(totalSqft, fabricCost) {
     const wallMountCost = wallMountQty * (PRICING['Wall Mount'] || 0);
     const clampCost     = clampQty * (PRICING['Clamp'] || 0);
     const superiorAmt   = parseFloat(document.querySelector('[name=superior_amount]')?.value) || 0;
+    const supFooterCY   = updateSupFooterTotal();
+    const supFooterCost = supFooterCY * CONCRETE_RATE * 1.10;
     const hardware      = parseFloat(document.querySelector('[name=hardware]')?.value) || 0;
     const supplies      = parseFloat(document.querySelector('[name=supplies]')?.value) || 0;
     const galvanizing   = parseFloat(document.querySelector('[name=galvanizing]')?.value) || 0;
@@ -1219,14 +1277,16 @@ function estUpdateSummary(totalSqft, fabricCost) {
     const lodging     = parseFloat(document.querySelector('[name=lodging]')?.value) || 0;
     const travelCost  = miles * 2 * roundTrips * fuelRate + lodging;
     const otherCost   = equipment + permits + vendor + misc;
-    const baseTotal   = superiorAmt + fabricCost + steelCost + concreteCost + weldingCost + powderCost
+    const baseTotal   = superiorAmt + supFooterCost + fabricCost + steelCost + concreteCost + weldingCost + powderCost
                        + hipFrames + cantFrames + purlinFrames
                        + hardware + supplies + galvanizing + wallMountCost + clampCost
                        + laborCost + travelCost + otherCost;
     const markupPct   = parseFloat(document.getElementById('markup_pct_input')?.value) || 0;
     const markupAmt   = baseTotal * markupPct / 100;
     const sellPrice   = baseTotal + markupAmt;
-    $set('sum_fabric',     $fmt(fabricCost));
+    $set('sum_superior',    $fmt(superiorAmt));
+    $set('sum_sup_footers', $fmt(supFooterCost));
+    $set('sum_fabric',      $fmt(fabricCost));
     $set('sum_steel',      $fmt(steelCost));
     $set('sum_concrete',   $fmt(concreteCost));
     $set('sum_welding',    $fmt(weldingCost));
@@ -1239,6 +1299,99 @@ function estUpdateSummary(totalSqft, fabricCost) {
     $set('sum_base_total', $fmt(baseTotal));
     $set('sum_markup_amt', $fmt(markupAmt));
     $set('sum_sell_price', $fmt(sellPrice));
+}
+
+/* ═══════════════════════════════════════════════════════
+   SUPERIOR FOOTERS
+═══════════════════════════════════════════════════════ */
+let supfIdx = 1;
+
+function calcSupFooterRow(i) {
+    const qty   = parseFloat(document.querySelector(`[name="sup_footer_qty_${i}"]`)?.value) || 0;
+    const dia   = parseFloat(document.querySelector(`[name="sup_footer_dia_${i}"]`)?.value) || 0;
+    const depth = parseFloat(document.querySelector(`[name="sup_footer_depth_${i}"]`)?.value) || 0;
+    const cyEa  = (dia && depth) ? Math.PI * Math.pow(dia/2, 2) * depth / 27 : 0;
+    const cyTot = cyEa * qty;
+    const eaEl  = document.getElementById(`supf_cy_ea_${i}`);
+    const totEl = document.getElementById(`supf_cy_tot_${i}`);
+    if (eaEl)  eaEl.textContent  = cyEa.toFixed(3);
+    if (totEl) totEl.textContent = cyTot.toFixed(3);
+    updateSupFooterTotal();
+    estUpdateAll();
+}
+
+function updateSupFooterTotal() {
+    let total = 0;
+    document.querySelectorAll('#supFooterRows .est-row').forEach(row => {
+        const id = row.id.replace('supf_', '');
+        const tot = parseFloat(document.getElementById(`supf_cy_tot_${id}`)?.textContent) || 0;
+        total += tot;
+    });
+    const el = document.getElementById('supf_total_cy');
+    if (el) el.textContent = total.toFixed(3) + ' CY';
+    return total;
+}
+
+function addSupFooterRow() {
+    const i = supfIdx++;
+    const tbody = document.getElementById('supFooterRows');
+    const tr = document.createElement('tr');
+    tr.className = 'est-row'; tr.id = 'supf_' + i;
+    tr.innerHTML = `
+      <td class="row-num">${estCountRows('supFooterRows')+1}</td>
+      <td><select name="supf_sref_${i}" style="width:70px;font-size:.8rem">${SREF_OPTS}</select></td>
+      <td><input type="number" name="sup_footer_qty_${i}" value="1" min="1" style="width:60px" oninput="calcSupFooterRow(${i})"></td>
+      <td><input type="number" name="sup_footer_dia_${i}" value="0" min="0" step="0.25" style="width:80px" oninput="calcSupFooterRow(${i})"></td>
+      <td><input type="number" name="sup_footer_depth_${i}" value="0" min="0" step="0.5" style="width:80px" oninput="calcSupFooterRow(${i})"></td>
+      <td><span id="supf_cy_ea_${i}">0.00</span></td>
+      <td><span id="supf_cy_tot_${i}">0.00</span></td>
+      <td><button type="button" class="btn btn-sm btn-danger" onclick="removeSupFooterRow('supf_${i}')">&#10005;</button></td>`;
+    tbody.appendChild(tr);
+    estRenumber('supFooterRows');
+    const cnt = document.getElementById('sup_footer_count');
+    if (cnt) cnt.value = supfIdx;
+}
+
+function removeSupFooterRow(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+    estRenumber('supFooterRows');
+    const cnt = document.getElementById('sup_footer_count');
+    if (cnt) cnt.value = document.querySelectorAll('#supFooterRows .est-row').length;
+    updateSupFooterTotal();
+    estUpdateAll();
+}
+
+function emailEstimate() {
+    const job    = document.querySelector('[name=job_name]')?.value || 'Estimate';
+    const client = document.querySelector('[name=client]')?.value || '';
+    const sell   = document.getElementById('sum_sell_price')?.textContent || '$0.00';
+    const base   = document.getElementById('sum_base_total')?.textContent || '$0.00';
+    const markup = document.getElementById('sum_markup_amt')?.textContent || '$0.00';
+    const lines  = [
+        'Shade America — Estimate',
+        '─────────────────────────',
+        `Job: ${job}`,
+        client ? `Client: ${client}` : '',
+        '',
+        `Superior Frame:      ${document.getElementById('sum_superior')?.textContent || '$0.00'}`,
+        `Superior Footers:    ${document.getElementById('sum_sup_footers')?.textContent || '$0.00'}`,
+        `Fabric:              ${document.getElementById('sum_fabric')?.textContent || '$0.00'}`,
+        `Steel/Structural:    ${document.getElementById('sum_steel')?.textContent || '$0.00'}`,
+        `Concrete:            ${document.getElementById('sum_concrete')?.textContent || '$0.00'}`,
+        `Upper Frames/Purlin: ${document.getElementById('sum_frames')?.textContent || '$0.00'}`,
+        `Labor:               ${document.getElementById('sum_labor')?.textContent || '$0.00'}`,
+        `Travel & Fuel:       ${document.getElementById('sum_travel')?.textContent || '$0.00'}`,
+        `Other Costs:         ${document.getElementById('sum_other')?.textContent || '$0.00'}`,
+        '',
+        `─────────────────────────`,
+        `Total Before Markup: ${base}`,
+        `Markup:              ${markup}`,
+        `SELL PRICE:          ${sell}`,
+    ].filter(l => l !== null).join('\n');
+    const subject = encodeURIComponent(`Shade America Estimate — ${job}`);
+    const body    = encodeURIComponent(lines);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
 }
 
 /* ═══════════════════════════════════════════════════════

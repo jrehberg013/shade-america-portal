@@ -27,6 +27,8 @@
         {% if current_user.role == 'field' %}
         <li><a href="{{ url_for('field') }}" class="{{ 'active' if request.endpoint == 'field' }}">
             <span class="nav-label">My Jobs</span></a></li>
+        <li><a href="{{ url_for('forms_list') }}" class="{{ 'active' if request.endpoint == 'forms_list' }}">
+            <span class="nav-label">Forms</span></a></li>
         {% else %}
         <li><a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
             <span class="nav-label">Dashboard</span></a></li>

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Forms{% endblock %}
+{% block page_title %}Company Forms{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header"><h3>Available Forms</h3></div>
+  {% if forms %}
+  <div class="field-doc-list" style="padding:1rem">
+    {% for form in forms %}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .5rem;border-bottom:1px solid #f0f2f4;">
+      <a href="{{ url_for('serve_form', form_id=form.id) }}" target="_blank" class="field-doc-link" style="font-size:.95rem">
+        📄 {{ form.name }}
+      </a>
+      <span style="font-size:.78rem;color:#aaa">{{ (form.file_size / 1024)|round(1) }} KB</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:2rem">
+    <div class="empty-icon">📂</div>
+    <p>No forms available yet.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

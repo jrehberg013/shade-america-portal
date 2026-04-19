@@ -165,6 +165,15 @@ def init_db():
                 unit TEXT,
                 sort_order INTEGER DEFAULT 0
             )""",
+            """CREATE TABLE IF NOT EXISTS forms (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                file_data BYTEA,
+                mime_type TEXT DEFAULT 'application/pdf',
+                file_size INTEGER,
+                uploaded_by INTEGER,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
         ]
         for stmt in statements:
             cur.execute(stmt)
@@ -216,6 +225,15 @@ def init_db():
                 unit TEXT,
                 sort_order INTEGER DEFAULT 0
             );
+            CREATE TABLE IF NOT EXISTS forms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                file_data BLOB,
+                mime_type TEXT DEFAULT 'application/pdf',
+                file_size INTEGER,
+                uploaded_by INTEGER,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
         conn.commit()
         db = _DB(conn)
@@ -223,10 +241,10 @@ def init_db():
     # Seed users
     users = [
         ('james',   'SA-James#1',   'James',   'admin', 1),
-        ('muller',  'SA-Muller#1',  'Muller',  'admin', 1),
-        ('jaco',    'SA-Jaco#1',    'Jaco',    'admin', 1),
-        ('carrie',  'SA-Carrie#1',  'Carrie',  'admin', 1),
-        ('stefani', 'SA-Stefani#1', 'Stefani', 'admin', 1),
+        ('muller',  'SA-Muller#1',  'Muller',  'manager', 1),
+        ('jaco',    'SA-Jaco#1',    'Jaco',    'manager', 1),
+        ('carrie',  'SA-Carrie#1',  'Carrie',  'manager', 1),
+        ('stefani', 'SA-Stefani#1', 'Stefani', 'manager', 1),
         ('field',   'SunShade24!',  'Field Team', 'field', 0),
     ]
     for uname, pwd, name, role, must_change in users:
@@ -343,6 +361,17 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def manager_required(f):
+    """Allows admin and manager roles."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        if session.get('role') not in ('admin', 'manager'):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -416,7 +445,7 @@ def change_password():
 # ─────────────────────────────────────────────────────────────
 
 @app.route('/dashboard')
-@admin_required
+@manager_required
 def dashboard():
     db = get_db()
     all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
@@ -428,7 +457,8 @@ def dashboard():
         'in_progress': len(jobs_by_status['in_progress']),
         'completed':   len(jobs_by_status['completed']),
     }
-    return render_template('dashboard.html', jobs_by_status=jobs_by_status, stats=stats)
+    forms = db.execute("SELECT id, name, file_size, uploaded_at FROM forms ORDER BY name").fetchall()
+    return render_template('dashboard.html', jobs_by_status=jobs_by_status, stats=stats, forms=forms)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -436,14 +466,14 @@ def dashboard():
 # ─────────────────────────────────────────────────────────────
 
 @app.route('/jobs')
-@admin_required
+@manager_required
 def jobs():
     db = get_db()
     all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
     return render_template('jobs.html', jobs=all_jobs)
 
 @app.route('/jobs/new', methods=['GET', 'POST'])
-@admin_required
+@manager_required
 def new_job():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
@@ -484,7 +514,7 @@ def job_detail(job_id):
     job = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
     if not job:
         abort(404)
-    is_admin = session.get('role') == 'admin'
+    is_admin = session.get('role') in ('admin', 'manager')
     docs = db.execute(
         "SELECT * FROM documents WHERE job_id=? ORDER BY uploaded_at DESC", (job_id,)
     ).fetchall()
@@ -493,7 +523,7 @@ def job_detail(job_id):
     return render_template('job_detail.html', job=job, documents=docs, is_admin=is_admin)
 
 @app.route('/jobs/<int:job_id>/status', methods=['POST'])
-@admin_required
+@manager_required
 def update_status(job_id):
     status = request.form.get('status')
     if status in ['quoted', 'approved', 'in_progress', 'install', 'completed']:
@@ -821,7 +851,7 @@ def hip_calc_compute(A1, D1, F1, col_size, rafter_dia, qty=1, glides='No Glides'
     return profile, sq, rect
 
 @app.route('/hip-calc', methods=['GET', 'POST'])
-@admin_required
+@manager_required
 def hip_calc():
     col_options = [
         'Ø3.5" 11-Ga', 'Ø5.0" 11-Ga', 'Ø5.0" 7-Ga', 'Ø5.5" Sch-40',
@@ -858,7 +888,7 @@ def hip_calc():
                            inputs=inputs, result=result)
 
 @app.route('/estimator/calculate', methods=['POST'])
-@admin_required
+@manager_required
 def calculate():
     db = get_db()
     pm = get_pricing_map(db)
@@ -953,10 +983,21 @@ def calculate():
             rate = get_powder_rate(row['size'], pm)
             powder_cost += rate * row['length'] * row['qty']
 
-    # Concrete
+    # Concrete — regular footers
     all_cy        = sum(r['cy'] for r in sail_poles + hip_poles + cant_posts)
     concrete_rate = pm.get('Price per CY', 200)
     concrete_cost = all_cy * concrete_rate * 1.10
+
+    # Superior Footers
+    sup_footer_count = int(f.get('sup_footer_count', 1) or 1)
+    sup_footer_cy    = 0.0
+    for i in range(sup_footer_count):
+        qty   = int(f.get(f'sup_footer_qty_{i}', 0) or 0)
+        dia   = float(f.get(f'sup_footer_dia_{i}', 0) or 0)
+        depth = float(f.get(f'sup_footer_depth_{i}', 0) or 0)
+        if qty and dia and depth:
+            sup_footer_cy += math.pi * (dia/2)**2 * depth / 27 * qty
+    sup_footer_cost = sup_footer_cy * concrete_rate * 1.10
 
     # Hardware extras
     wall_mount_qty  = int(f.get('wall_mount_qty', 0) or 0)
@@ -1042,6 +1083,7 @@ def calculate():
 
     # Totals
     materials_total = (superior_amount + fabric_cost + steel_cost + concrete_cost
+                       + sup_footer_cost
                        + hip_frames_cost + cant_frames_cost + purlin_cost
                        + welding_cost + powder_cost
                        + hardware + supplies + galvanizing
@@ -1057,6 +1099,7 @@ def calculate():
         'total_sqft': round(total_sqft, 1), 'structs': structs,
         'fabric_rate': fabric_rate_input,
         'fabric_cost': fabric_cost, 'superior_amount': superior_amount,
+        'sup_footer_cy': round(sup_footer_cy, 2), 'sup_footer_cost': sup_footer_cost,
         'steel_cost': steel_cost, 'welding_cost': welding_cost,
         'powder_cost': powder_cost,
         'all_cy': round(all_cy, 2), 'concrete_cost': concrete_cost,
@@ -1083,7 +1126,7 @@ def calculate():
 # ─────────────────────────────────────────────────────────────
 
 @app.route('/pricing')
-@admin_required
+@manager_required
 def pricing():
     db = get_db()
     rows = db.execute("SELECT * FROM pricing ORDER BY category, sort_order").fetchall()
@@ -1113,10 +1156,25 @@ def update_pricing():
 @admin_required
 def admin_users():
     db = get_db()
-    users = db.execute(
-        "SELECT id,username,name,role,must_change_password FROM users ORDER BY role,name"
-    ).fetchall()
+    users = db.execute("SELECT * FROM users ORDER BY role, username").fetchall()
     return render_template('admin_users.html', users=users)
+
+@app.route('/admin/users/<int:user_id>/role', methods=['POST'])
+@admin_required
+def change_user_role(user_id):
+    new_role = request.form.get('role', '')
+    if new_role not in ('admin', 'manager', 'field'):
+        flash('Invalid role.', 'error')
+        return redirect(url_for('admin_users'))
+    if user_id == session['user_id']:
+        flash('You cannot change your own role.', 'error')
+        return redirect(url_for('admin_users'))
+    db = get_db()
+    db.execute("UPDATE users SET role=?  WHERE id=?", (new_role, user_id))
+    db.commit()
+    flash('Role updated.', 'success')
+    return redirect(url_for('admin_users'))
+
 
 @app.route('/admin/users/<int:user_id>/reset', methods=['POST'])
 @admin_required
@@ -1132,6 +1190,65 @@ def reset_user(user_id):
     flash(f'Password for {user["username"]} reset to: {temp_pw}  — send this to them.', 'success')
     return redirect(url_for('admin_users'))
 
+
+
+# ─────────────────────────────────────────────────────────────
+# FORMS (company-wide PDFs for field crew)
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/forms')
+@login_required
+def forms_list():
+    db = get_db()
+    forms = db.execute("SELECT id, name, file_size, uploaded_at FROM forms ORDER BY name").fetchall()
+    return render_template('forms.html', forms=forms)
+
+@app.route('/forms/upload', methods=['POST'])
+@admin_required
+def forms_upload():
+    file = request.files.get('file')
+    if not file or not file.filename:
+        flash('No file selected.', 'error')
+        return redirect(url_for('dashboard'))
+    if not file.filename.lower().endswith('.pdf'):
+        flash('Only PDF files are allowed.', 'error')
+        return redirect(url_for('dashboard'))
+    file_data = file.read()
+    if len(file_data) > MAX_FILE_MB * 1024 * 1024:
+        flash(f'File too large (max {MAX_FILE_MB} MB).', 'error')
+        return redirect(url_for('dashboard'))
+    db = get_db()
+    name = secure_filename(file.filename)
+    db.execute(
+        "INSERT INTO forms (name, file_data, mime_type, file_size, uploaded_by) VALUES (?,?,?,?,?)",
+        (name, _bin(file_data), 'application/pdf', len(file_data), session['user_id'])
+    )
+    db.commit()
+    flash(f'Form "{name}" uploaded.', 'success')
+    return redirect(url_for('dashboard'))
+
+@app.route('/forms/<int:form_id>')
+@login_required
+def serve_form(form_id):
+    db = get_db()
+    form = db.execute("SELECT * FROM forms WHERE id=?", (form_id,)).fetchone()
+    if not form:
+        abort(404)
+    return send_file(
+        io.BytesIO(bytes(form['file_data'])),
+        mimetype='application/pdf',
+        as_attachment=False,
+        download_name=form['name']
+    )
+
+@app.route('/forms/<int:form_id>/delete', methods=['POST'])
+@admin_required
+def forms_delete(form_id):
+    db = get_db()
+    db.execute("DELETE FROM forms WHERE id=?", (form_id,))
+    db.commit()
+    flash('Form deleted.', 'success')
+    return redirect(url_for('dashboard'))
 
 # ─────────────────────────────────────────────────────────────
 # TRELLO API PROXY
