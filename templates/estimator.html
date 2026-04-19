@@ -41,19 +41,15 @@
 
 <form method="POST" action="{{ url_for('calculate') }}" id="estimatorForm">
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 1. JOB INFORMATION                                        -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 1. JOB INFORMATION                                        -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Job Information</h3></div>
   <div class="form-row">
     <div class="form-group">
       <label>Job Name / Description</label>
       <input type="text" name="job_name" placeholder="e.g. Smith Residence">
-    </div>
-    <div class="form-group">
-      <label>Quote #</label>
-      <input type="text" name="quote_num" placeholder="e.g. Q-2024-001">
     </div>
     <div class="form-group">
       <label>Customer / Client</label>
@@ -79,12 +75,16 @@
       <label>Superior Quote ($)</label>
       <input type="number" name="superior_amount" value="0" min="0" step="0.01">
     </div>
+    <div class="form-group" style="max-width:200px">
+      <label>Superior Quote #</label>
+      <input type="text" name="quote_num" placeholder="e.g. Q-2024-001">
+    </div>
   </div>
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 2. STRUCTURE TYPES & SIZES                                -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 2. STRUCTURE TYPES & SIZES                                -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Structure Types &amp; Sizes</h3></div>
   <div class="est-table-wrap">
@@ -127,9 +127,9 @@
   <input type="hidden" name="struct_count" id="struct_count" value="1">
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 3. SAIL POLES                                             -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 3. SAIL POLES                                             -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header">
     <h3>Sail Poles</h3>
@@ -188,9 +188,9 @@
   <input type="hidden" name="sail_count" id="sail_count" value="1">
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 4. HIP & CANOPY POLES                                     -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 4. HIP & CANOPY POLES                                     -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header">
     <h3>Hip &amp; Canopy Poles</h3>
@@ -235,9 +235,9 @@
   <input type="hidden" name="hip_count" id="hip_count" value="1">
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 5. CANTILEVER POSTS (HSS)                                 -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 5. CANTILEVER POSTS (HSS)                                 -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header">
     <h3>Cantilever Posts</h3>
@@ -284,9 +284,9 @@
   <input type="hidden" name="cpost_count" id="cpost_count" value="1">
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 6. CANTILEVER BEAMS (HSS)                                 -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 6. CANTILEVER BEAMS (HSS)                                 -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header">
     <h3>Cantilever Beams</h3>
@@ -328,9 +328,9 @@
   <input type="hidden" name="cbeam_count" id="cbeam_count" value="1">
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 7. HIP UPPER FRAMES — Pipe System (dynamic)               -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 7. HIP UPPER FRAMES — Pipe System (dynamic)               -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Hip Upper Frames — Pipe System</h3></div>
   <div class="est-section-hint">Prices auto-filled from Pricing page. Use Hip Calc tab to determine sizes. Sizes limited to 3", 4", 5" OD Galv.</div>
@@ -339,9 +339,9 @@
   <input type="hidden" name="hf_frame_count" id="hf_frame_count" value="0">
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 8. CANTILEVER UPPER FRAMES — Pipe System (dynamic)        -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 8. CANTILEVER UPPER FRAMES — Pipe System (dynamic)        -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Cantilever Upper Frames — Pipe System</h3></div>
   <div class="est-section-hint">Prices auto-filled from Pricing page.</div>
@@ -350,9 +350,9 @@
   <input type="hidden" name="cf_frame_count" id="cf_frame_count" value="0">
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 9. CANOPY / CANTILEVER PURLIN SYSTEM (dynamic)            -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 9. CANOPY / CANTILEVER PURLIN SYSTEM (dynamic)            -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Canopy / Cantilever Purlin System</h3></div>
   <div class="est-section-hint">Enter per-dome quantities. Dome count multiplies all components. Tubing is 1.9" Steel only.</div>
@@ -361,9 +361,9 @@
   <input type="hidden" name="pf_frame_count" id="pf_frame_count" value="0">
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 10. TRAVEL & FUEL                                         -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 10. TRAVEL & FUEL                                         -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Travel &amp; Fuel</h3></div>
   <div class="form-row" style="align-items:flex-end">
@@ -395,9 +395,9 @@
   </div>
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 11. CREW & LABOR                                          -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 11. CREW & LABOR                                          -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Crew &amp; Labor</h3></div>
   <div class="est-section-hint">Daily crew cost is pulled from Pricing page rates.</div>
@@ -415,9 +415,9 @@
   </div>
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 12. OTHER COSTS                                           -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 12. OTHER COSTS                                           -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Materials &amp; Other Costs</h3></div>
   <div class="form-row">
@@ -454,9 +454,9 @@
   </div>
 </div>
 
-<\!-- ══════════════════════════════════════════════════════════ -->
-<\!-- 13. ESTIMATE SUMMARY & MARKUP                             -->
-<\!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 13. ESTIMATE SUMMARY & MARKUP                             -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card summary-card">
   <div class="card-header"><h3>Estimate Summary</h3></div>
   <div class="summary-grid">
@@ -565,7 +565,7 @@ let sectionTotals = {sail:{steel:0,cy:0,welds:0}, hip:{steel:0,cy:0},
 ═══════════════════════════════════════════════════════ */
 function applyLocationMiles(city) {
     const mi = LOCATION_MILES[city];
-    if (mi \!== undefined) {
+    if (mi !== undefined) {
         document.getElementById('miles_input').value = mi;
         estUpdateAll();
     }
@@ -575,15 +575,15 @@ function applyLocationMiles(city) {
    PRICING HELPERS
 ═══════════════════════════════════════════════════════ */
 function getPipeCostPerPole(size, lengthFt) {
-    if (\!size || \!lengthFt) return 0;
+    if (!size || !lengthFt) return 0;
     const len = parseFloat(lengthFt) || 0;
     if (len <= 0) return 0;
     let best = null;
     for (const [key, price] of Object.entries(PRICING)) {
-        if (\!price || price <= 0) continue;
-        if (\!key.startsWith(size + ' ')) continue;
+        if (!price || price <= 0) continue;
+        if (!key.startsWith(size + ' ')) continue;
         const m = key.match(/(\d+)ft$/);
-        if (\!m) continue;
+        if (!m) continue;
         const stickLen = parseInt(m[1]);
         const cost = Math.ceil(len / stickLen) * price;
         if (best === null || cost < best) best = cost;
@@ -594,12 +594,12 @@ function getPipeCostPerPole(size, lengthFt) {
 function getCYperPole(footerDia, footerDepth) {
     const d = parseFloat(footerDia) || 0;
     const h = parseFloat(footerDepth) || 0;
-    if (\!d || \!h) return 0;
+    if (!d || !h) return 0;
     return Math.PI * Math.pow(d / 2, 2) * h / 27;
 }
 
 function getPowderRate(size) {
-    if (\!size) return 0;
+    if (!size) return 0;
     if (/^\d+x\d+ HSS/.test(size)) {
         const profile = size.split(' ').slice(0,2).join(' ');
         return PRICING[profile] || 0;
@@ -959,7 +959,7 @@ function estAddPurlinFrame() {
 
 function removeFrameBlock(blockId, countId) {
     const el = document.getElementById(blockId);
-    if (\!el) return;
+    if (!el) return;
     const container = el.parentElement;
     el.remove();
     if (container) updateFrameCount(countId, container.children.length);
@@ -979,12 +979,12 @@ function estCountRows(containerId) {
     return tb ? tb.querySelectorAll('.est-row,.struct-row').length : 0;
 }
 function estUpdateCount(prefix, containerId) {
-    const tb = document.getElementById(containerId); if (\!tb) return;
+    const tb = document.getElementById(containerId); if (!tb) return;
     const inp = document.getElementById(prefix + '_count');
     if (inp) inp.value = tb.querySelectorAll('.est-row,.struct-row').length;
 }
 function estRenumber(containerId) {
-    const tb = document.getElementById(containerId); if (\!tb) return;
+    const tb = document.getElementById(containerId); if (!tb) return;
     tb.querySelectorAll('.row-num').forEach((el, i) => { el.textContent = i + 1; });
 }
 
@@ -1037,7 +1037,7 @@ function estUpdateAll() {
 }
 
 function estCalcPoleSection(prefix, hasAttach, hasFooters) {
-    const tbody = document.getElementById(prefix + 'Rows'); if (\!tbody) return;
+    const tbody = document.getElementById(prefix + 'Rows'); if (!tbody) return;
     let steel=0, cy=0, welds=0;
     tbody.querySelectorAll('.est-row').forEach(row => {
         const size   = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
@@ -1061,7 +1061,7 @@ function estCalcPoleSection(prefix, hasAttach, hasFooters) {
 }
 
 function estCalcHSSSection(prefix, hasFooters) {
-    const tbody = document.getElementById(prefix + 'Rows'); if (\!tbody) return;
+    const tbody = document.getElementById(prefix + 'Rows'); if (!tbody) return;
     let steel=0, cy=0, qty_total=0;
     tbody.querySelectorAll('.est-row').forEach(row => {
         const profile = row.querySelector(`select[name^="${prefix}_profile_"]`)?.value || '';
@@ -1167,7 +1167,7 @@ function estUpdateSummary(totalSqft, fabricCost) {
 
     let powderCost = 0;
     ['sail','hip'].forEach(prefix => {
-        const tbody = document.getElementById(prefix+'Rows'); if (\!tbody) return;
+        const tbody = document.getElementById(prefix+'Rows'); if (!tbody) return;
         tbody.querySelectorAll('.est-row').forEach(row => {
             const size = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
             const len  = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
@@ -1176,7 +1176,7 @@ function estUpdateSummary(totalSqft, fabricCost) {
         });
     });
     ['cpost','cbeam'].forEach(prefix => {
-        const tbody = document.getElementById(prefix+'Rows'); if (\!tbody) return;
+        const tbody = document.getElementById(prefix+'Rows'); if (!tbody) return;
         tbody.querySelectorAll('.est-row').forEach(row => {
             const profile = row.querySelector(`select[name^="${prefix}_profile_"]`)?.value || '';
             const wall    = row.querySelector(`select[name^="${prefix}_wall_"]`)?.value   || '';
@@ -1248,6 +1248,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('estimatorForm');
     form.addEventListener('input',  estUpdateAll);
     form.addEventListener('change', estUpdateAll);
+    // Auto-populate first frame for dynamic sections
+    estAddHipFrame();
+    estAddCantFrame();
+    estAddPurlinFrame();
     estUpdateAll();
 });
 </script>
