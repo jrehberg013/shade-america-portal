@@ -91,7 +91,7 @@
       </tr>
     </thead>
     <tbody id="sailRows">
-      <tr class="pole-row" id="sail_0">
+      <tr class="est-row" id="sail_0">
         <td class="row-num">1</td>
         <td><select name="sail_size_0" class="pipe-select">{{ pipe_opts_sail|safe }}</select></td>
         <td><input type="number" name="sail_len_0" placeholder="ft" min="0" step="0.5"></td>
@@ -132,7 +132,7 @@
       </tr>
     </thead>
     <tbody id="hipRows">
-      <tr class="pole-row" id="hip_0">
+      <tr class="est-row" id="hip_0">
         <td class="row-num">1</td>
         <td><select name="hip_size_0" class="pipe-select">{{ pipe_opts_hip|safe }}</select></td>
         <td><input type="number" name="hip_len_0" placeholder="ft" min="0" step="0.5"></td>
@@ -162,7 +162,7 @@
       </tr>
     </thead>
     <tbody id="cpostRows">
-      <tr class="pole-row" id="cpost_0">
+      <tr class="est-row" id="cpost_0">
         <td class="row-num">1</td>
         <td><select name="cpost_profile_0">{{ hss_profile_opts|safe }}</select></td>
         <td><select name="cpost_wall_0">{{ hss_wall_opts|safe }}</select></td>
@@ -190,7 +190,7 @@
       <tr><th>#</th><th>HSS Profile</th><th>Wall Thick.</th><th>Length (ft)</th><th>Qty</th><th></th></tr>
     </thead>
     <tbody id="cbeamRows">
-      <tr class="pole-row" id="cbeam_0">
+      <tr class="est-row" id="cbeam_0">
         <td class="row-num">1</td>
         <td><select name="cbeam_profile_0">{{ hss_profile_opts|safe }}</select></td>
         <td><select name="cbeam_wall_0">{{ hss_wall_opts|safe }}</select></td>
@@ -474,7 +474,7 @@ function addPoleRow(prefix, containerId, hasAttach) {
   const i = poleIdx[prefix]++;
   const tbody = document.getElementById(containerId);
   const tr = document.createElement('tr');
-  tr.className = 'pole-row';
+  tr.className = 'est-row';
   tr.id = prefix + '_' + i;
   const opts = (prefix === 'sail') ? pipeSail : pipeHip;
   const attachCol = hasAttach ? `<td><select name="${prefix}_attach_${i}">${attachOpts}</select></td>` : `<td>—</td>`;
@@ -495,7 +495,7 @@ function addCpostRow() {
   const i = poleIdx['cpost']++;
   const tbody = document.getElementById('cpostRows');
   const tr = document.createElement('tr');
-  tr.className = 'pole-row';
+  tr.className = 'est-row';
   tr.id = 'cpost_' + i;
   tr.innerHTML = `
     <td class="row-num">${i+1}</td>
@@ -514,7 +514,7 @@ function addCbeamRow() {
   const i = poleIdx['cbeam']++;
   const tbody = document.getElementById('cbeamRows');
   const tr = document.createElement('tr');
-  tr.className = 'pole-row';
+  tr.className = 'est-row';
   tr.id = 'cbeam_' + i;
   tr.innerHTML = `
     <td class="row-num">${i+1}</td>
@@ -544,7 +544,7 @@ function renumberRows(containerId) {
 function updateCount(prefix, containerId) {
   const tbody = document.getElementById(containerId);
   if (!tbody) return;
-  const count = tbody.querySelectorAll('.pole-row, .struct-row').length;
+  const count = tbody.querySelectorAll('.est-row, .struct-row').length;
   const inp = document.getElementById(prefix + '_count');
   if (inp) inp.value = count;
 }
