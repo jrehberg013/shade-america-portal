@@ -101,10 +101,10 @@
         <tr class="{{ 'active-row' if r.profile == result.profile }}">
           <td><strong>{{ r.profile }}</strong></td>
           <td>{{ r.rafter }}"</td>
-          <td>{{ (r.rafter / 12) | round(2) }}'</td>
+          <td>{{ r.rafter_ft }}</td>
           <td>{{ r.to_swage }}"</td>
           <td>{{ r.ridge }}"</td>
-          <td>{{ (r.ridge / 12) | round(2) }}'</td>
+          <td>{{ r.ridge_ft }}</td>
           <td>{{ r.ridge_swage }}"</td>
           <td>{{ r.total }}"</td>
           <td>{{ (r.total / 12) | round(2) }}'</td>

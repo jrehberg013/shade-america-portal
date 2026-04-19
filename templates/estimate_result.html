@@ -4,100 +4,160 @@
 
 {% block content %}
 <div class="estimate-result">
-    <div class="card">
-        <div class="card-header card-header-row">
-            <div>
-                <h2>{{ result.job_name or 'Estimate' }}</h2>
-                {% if result.client %}<p class="text-muted">{{ result.client }}</p>{% endif %}
-            </div>
-            <a href="{{ url_for('estimator') }}" class="btn btn-outline btn-sm">← New Estimate</a>
-        </div>
-
-        <!-- Materials Breakdown -->
-        <h3 class="section-label">Materials</h3>
-        <table class="result-table">
-            <tbody>
-                {% if result.steel_cost > 0 %}
-                <tr><td>Steel / Pipe</td><td class="td-right">${{ "{:,.2f}".format(result.steel_cost) }}</td></tr>
-                {% endif %}
-                {% if result.powder_cost > 0 %}
-                <tr><td>Powder Coating</td><td class="td-right">${{ "{:,.2f}".format(result.powder_cost) }}</td></tr>
-                {% endif %}
-                {% if result.welding_cost > 0 %}
-                <tr><td>Welding</td><td class="td-right">${{ "{:,.2f}".format(result.welding_cost) }}</td></tr>
-                {% endif %}
-                {% if result.superior_quote > 0 %}
-                <tr><td>Superior Quote</td><td class="td-right">${{ "{:,.2f}".format(result.superior_quote) }}</td></tr>
-                {% endif %}
-                {% if result.fabric_cost > 0 %}
-                <tr><td>Fabric / Shade Material</td><td class="td-right">${{ "{:,.2f}".format(result.fabric_cost) }}</td></tr>
-                {% endif %}
-                <tr class="subtotal-row"><td><strong>Materials Subtotal</strong></td><td class="td-right"><strong>${{ "{:,.2f}".format(result.materials_total) }}</strong></td></tr>
-            </tbody>
-        </table>
-
-        <!-- Labor -->
-        {% if result.labor_cost > 0 %}
-        <h3 class="section-label">Labor</h3>
-        <table class="result-table">
-            <tbody>
-                <tr><td>{{ result.labor_hours }} hrs × ${{ result.labor_rate }}/hr</td><td class="td-right">${{ "{:,.2f}".format(result.labor_cost) }}</td></tr>
-            </tbody>
-        </table>
-        {% endif %}
-
-        <!-- Totals -->
-        <div class="totals-box">
-            <div class="totals-row">
-                <span>Subtotal</span>
-                <span>${{ "{:,.2f}".format(result.subtotal) }}</span>
-            </div>
-            {% if result.markup_amount > 0 %}
-            <div class="totals-row">
-                <span>Markup ({{ result.markup_pct }}%)</span>
-                <span>${{ "{:,.2f}".format(result.markup_amount) }}</span>
-            </div>
-            {% endif %}
-            {% if result.tax_amount > 0 %}
-            <div class="totals-row">
-                <span>Tax ({{ result.tax_pct }}%)</span>
-                <span>${{ "{:,.2f}".format(result.tax_amount) }}</span>
-            </div>
-            {% endif %}
-            <div class="totals-row totals-final">
-                <span>TOTAL</span>
-                <span>${{ "{:,.2f}".format(result.total) }}</span>
-            </div>
-        </div>
-
-        <!-- Pole Detail -->
-        {% if result.pole_detail %}
-        <details class="pole-detail-toggle">
-            <summary>View Pole Detail</summary>
-            <table class="result-table" style="margin-top:.5rem">
-                <thead>
-                    <tr><th>Section</th><th>Size</th><th>Length</th><th>Qty</th><th>Unit Cost</th><th>Total</th></tr>
-                </thead>
-                <tbody>
-                    {% for row in result.pole_detail %}
-                    <tr>
-                        <td>{{ row.section }}</td>
-                        <td>{{ row.size }}</td>
-                        <td>{{ row.length }} ft</td>
-                        <td>{{ row.qty }}</td>
-                        <td>${{ "{:,.2f}".format(row.unit_cost) }}</td>
-                        <td>${{ "{:,.2f}".format(row.total) }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </details>
-        {% endif %}
-
-        <div class="form-actions" style="margin-top:1.5rem">
-            <a href="{{ url_for('new_job') }}?name={{ result.job_name }}&client={{ result.client }}&estimate={{ result.total }}" class="btn btn-primary">Save as Job</a>
-            <button onclick="window.print()" class="btn btn-outline">🖨 Print</button>
-        </div>
+  <div class="card">
+    <div class="card-header card-header-row">
+      <div>
+        <h2>{{ result.job_name or 'Estimate' }}</h2>
+        {% if result.client %}<p class="text-muted">{{ result.client }}</p>{% endif %}
+        {% if result.location %}<p class="text-muted" style="font-size:.8rem">{{ result.location }}</p>{% endif %}
+      </div>
+      <a href="{{ url_for('estimator') }}" class="btn btn-outline btn-sm">← New Estimate</a>
     </div>
+
+    <!-- Structures -->
+    {% if result.structs %}
+    <h3 class="section-label">Structures ({{ result.total_sqft }} sq ft total)</h3>
+    <table class="result-table">
+      <thead><tr><th>Type</th><th>Dimensions</th><th>Qty</th><th class="td-right">Sq Ft</th></tr></thead>
+      <tbody>
+        {% for s in result.structs %}
+        <tr>
+          <td>{{ s.type|title }}</td>
+          <td>{% if s.type == 'sail' %}{{ s.s1 }}' × {{ s.s2 }}' × {{ s.s3 }}'{% else %}{{ s.s1 }}' × {{ s.s2 }}'{% endif %}</td>
+          <td>{{ s.qty }}</td>
+          <td class="td-right">{{ s.sqft }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Materials -->
+    <h3 class="section-label">Materials &amp; Fabrication</h3>
+    <table class="result-table">
+      <tbody>
+        {% if result.superior_amount > 0 %}
+        <tr><td>Superior Quote</td><td class="td-right">${{ "{:,.2f}".format(result.superior_amount) }}</td></tr>
+        {% endif %}
+        {% if result.fabric_cost > 0 %}
+        <tr><td>Fabric / Shade Material ({{ result.total_sqft }} sqft)</td><td class="td-right">${{ "{:,.2f}".format(result.fabric_cost) }}</td></tr>
+        {% endif %}
+        {% if result.steel_cost > 0 %}
+        <tr><td>Steel / Pipe / Structural</td><td class="td-right">${{ "{:,.2f}".format(result.steel_cost) }}</td></tr>
+        {% endif %}
+        {% if result.concrete_cost > 0 %}
+        <tr><td>Concrete — Footers ({{ result.all_cy }} CY × 110%)</td><td class="td-right">${{ "{:,.2f}".format(result.concrete_cost) }}</td></tr>
+        {% endif %}
+        {% if result.welding_cost > 0 %}
+        <tr><td>Welding</td><td class="td-right">${{ "{:,.2f}".format(result.welding_cost) }}</td></tr>
+        {% endif %}
+        {% if result.powder_cost > 0 %}
+        <tr><td>Powder Coating</td><td class="td-right">${{ "{:,.2f}".format(result.powder_cost) }}</td></tr>
+        {% endif %}
+        {% if result.hip_frames_cost > 0 %}
+        <tr><td>Hip Upper Frames (Pipe)</td><td class="td-right">${{ "{:,.2f}".format(result.hip_frames_cost) }}</td></tr>
+        {% endif %}
+        {% if result.cant_frames_cost > 0 %}
+        <tr><td>Cantilever Upper Frames (Pipe)</td><td class="td-right">${{ "{:,.2f}".format(result.cant_frames_cost) }}</td></tr>
+        {% endif %}
+        {% if result.hardware > 0 %}
+        <tr><td>Hardware / Fasteners</td><td class="td-right">${{ "{:,.2f}".format(result.hardware) }}</td></tr>
+        {% endif %}
+        {% if result.supplies > 0 %}
+        <tr><td>Job Supplies / Consumables</td><td class="td-right">${{ "{:,.2f}".format(result.supplies) }}</td></tr>
+        {% endif %}
+        {% if result.galvanizing > 0 %}
+        <tr><td>Galvanizing</td><td class="td-right">${{ "{:,.2f}".format(result.galvanizing) }}</td></tr>
+        {% endif %}
+        {% if result.wall_mount_cost > 0 %}
+        <tr><td>Wall Mounts</td><td class="td-right">${{ "{:,.2f}".format(result.wall_mount_cost) }}</td></tr>
+        {% endif %}
+        {% if result.clamp_cost > 0 %}
+        <tr><td>Clamps</td><td class="td-right">${{ "{:,.2f}".format(result.clamp_cost) }}</td></tr>
+        {% endif %}
+        <tr class="subtotal-row"><td><strong>Materials Subtotal</strong></td><td class="td-right"><strong>${{ "{:,.2f}".format(result.materials_total) }}</strong></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Labor -->
+    <h3 class="section-label">Crew &amp; Labor</h3>
+    <table class="result-table">
+      <tbody>
+        <tr><td>{{ result.crew_count }}-person crew × {{ result.install_days }} day{% if result.install_days != 1 %}s{% endif %} (${{ "{:,.0f}".format(result.daily_crew) }}/day)</td>
+            <td class="td-right">${{ "{:,.2f}".format(result.labor_cost) }}</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Travel -->
+    {% if result.travel_cost > 0 %}
+    <h3 class="section-label">Travel &amp; Fuel</h3>
+    <table class="result-table">
+      <tbody>
+        {% if result.miles > 0 %}
+        <tr><td>Fuel ({{ result.miles }} mi × 2 × trips)</td><td class="td-right">${{ "{:,.2f}".format(result.travel_cost - result.lodging) }}</td></tr>
+        {% endif %}
+        {% if result.lodging > 0 %}
+        <tr><td>Lodging / Per Diem</td><td class="td-right">${{ "{:,.2f}".format(result.lodging) }}</td></tr>
+        {% endif %}
+        <tr class="subtotal-row"><td><strong>Travel Subtotal</strong></td><td class="td-right"><strong>${{ "{:,.2f}".format(result.travel_cost) }}</strong></td></tr>
+      </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Other -->
+    {% if result.other_total > 0 %}
+    <h3 class="section-label">Other Costs</h3>
+    <table class="result-table">
+      <tbody>
+        {% if result.equipment > 0 %}<tr><td>Equipment Rental</td><td class="td-right">${{ "{:,.2f}".format(result.equipment) }}</td></tr>{% endif %}
+        {% if result.permits > 0 %}<tr><td>Permit Fees</td><td class="td-right">${{ "{:,.2f}".format(result.permits) }}</td></tr>{% endif %}
+        {% if result.vendor > 0 %}<tr><td>Vendor / Sub Cost</td><td class="td-right">${{ "{:,.2f}".format(result.vendor) }}</td></tr>{% endif %}
+        {% if result.misc > 0 %}<tr><td>Miscellaneous</td><td class="td-right">${{ "{:,.2f}".format(result.misc) }}</td></tr>{% endif %}
+        <tr class="subtotal-row"><td><strong>Other Subtotal</strong></td><td class="td-right"><strong>${{ "{:,.2f}".format(result.other_total) }}</strong></td></tr>
+      </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Summary -->
+    <div class="totals-box">
+      <div class="totals-row">
+        <span>Total Cost (Before Markup)</span>
+        <span>${{ "{:,.2f}".format(result.base_total) }}</span>
+      </div>
+      <div class="totals-row">
+        <span>Markup ({{ result.markup_pct }}%)</span>
+        <span>${{ "{:,.2f}".format(result.markup_amount) }}</span>
+      </div>
+      <div class="totals-row totals-final">
+        <span>TOTAL SELL PRICE</span>
+        <span>${{ "{:,.2f}".format(result.sell_price) }}</span>
+      </div>
+    </div>
+
+    <!-- Pole Detail -->
+    {% if result.pole_detail %}
+    <details class="pole-detail-toggle">
+      <summary>View Pipe / Pole Detail</summary>
+      <table class="result-table" style="margin-top:.5rem">
+        <thead><tr><th>Section</th><th>Size</th><th>Length</th><th>Qty</th><th>Unit Cost</th><th>Total</th></tr></thead>
+        <tbody>
+          {% for row in result.pole_detail %}
+          <tr>
+            <td>{{ row.section }}</td><td>{{ row.size }}</td>
+            <td>{{ row.length }} ft</td><td>{{ row.qty }}</td>
+            <td>${{ "{:,.2f}".format(row.unit_cost) }}</td>
+            <td>${{ "{:,.2f}".format(row.total) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endif %}
+
+    <div class="form-actions" style="margin-top:1.5rem">
+      <a href="{{ url_for('new_job') }}?name={{ result.job_name }}&client={{ result.client }}&estimate={{ result.sell_price|round(2) }}" class="btn btn-primary">Save as Job</a>
+      <button onclick="window.print()" class="btn btn-outline">🖨 Print</button>
+    </div>
+  </div>
 </div>
 {% endblock %}

@@ -5,179 +5,570 @@
 {% block content %}
 <form method="POST" action="{{ url_for('calculate') }}" id="estimatorForm">
 
-<!-- Job Info -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 1. JOB INFORMATION                                        -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
-    <div class="card-header"><h3>Job Information</h3></div>
-    <div class="form-row">
-        <div class="form-group">
-            <label>Job Name</label>
-            <input type="text" name="job_name" placeholder="e.g. Smith Residence">
-        </div>
-        <div class="form-group">
-            <label>Client</label>
-            <input type="text" name="client" placeholder="Customer name">
-        </div>
+  <div class="card-header"><h3>Job Information</h3></div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Job Name / Description</label>
+      <input type="text" name="job_name" placeholder="e.g. Smith Residence">
     </div>
-    <div class="form-row">
-        <div class="form-group">
-            <label>Markup %</label>
-            <input type="number" name="markup_pct" value="30" min="0" max="200" step="1">
-        </div>
-        <div class="form-group">
-            <label>Tax %</label>
-            <input type="number" name="tax_pct" value="0" min="0" max="20" step="0.1">
-        </div>
+    <div class="form-group">
+      <label>Customer / Client</label>
+      <input type="text" name="client" placeholder="Customer name">
     </div>
+    <div class="form-group">
+      <label>Location (City, State)</label>
+      <input type="text" name="location" placeholder="e.g. Jacksonville, FL">
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Superior Quote ($)</label>
+      <input type="number" name="superior_amount" value="0" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Markup %</label>
+      <input type="number" name="markup_pct" value="50" min="0" max="300" step="1">
+    </div>
+  </div>
 </div>
 
-<!-- Sail Poles -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 2. STRUCTURE TYPES & SIZES                                -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
-    <div class="card-header"><h3>Sail Poles</h3></div>
-    <div class="est-section-hint">Add each unique pole size used for sail/canopy structures.</div>
-    <div id="sailRows">
-        <div class="pole-row-header">
-            <span>Pipe Size</span>
-            <span>Length (ft)</span>
-            <span>Qty</span>
-            <span>Attachment</span>
-            <span></span>
-        </div>
-        <div class="pole-row" id="sail_0">
-            <select name="sail_size_0" class="pipe-select">
-                <option value="">-- Size --</option>
-                <option value='5" SCH40'>5" SCH40</option>
-                <option value='6" SCH40'>6" SCH40</option>
-                <option value='8" SCH40'>8" SCH40</option>
-            </select>
-            <input type="number" name="sail_len_0" placeholder="ft" min="1" max="40" step="0.5">
-            <input type="number" name="sail_qty_0" placeholder="qty" min="1" max="50">
-            <select name="sail_attach_0">
-                <option value="All Thread">All Thread</option>
-                <option value="Weld Lug">Weld Lug</option>
-                <option value="Wall Mount">Wall Mount</option>
-                <option value="Drive Post">Drive Post</option>
-                <option value="Surface Mount">Surface Mount</option>
-            </select>
-            <button type="button" class="btn btn-sm btn-danger" onclick="removeRow('sail_0')">✕</button>
-        </div>
-    </div>
-    <button type="button" class="btn btn-sm btn-outline" onclick="addRow('sail','sailRows')">+ Add Row</button>
-    <input type="hidden" name="sail_count" id="sail_count" value="1">
+  <div class="card-header"><h3>Structure Types &amp; Sizes</h3></div>
+  <div class="est-section-hint">Sq Ft is auto-calculated and used for fabric cost.</div>
+  <div class="est-table-wrap">
+  <table class="est-table" id="structTable">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Side 1 / Width (ft)</th>
+        <th>Side 2 / Length (ft)</th>
+        <th>Side 3 ft (Sail only)</th>
+        <th>Qty</th>
+        <th>Sq Ft</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="structRows">
+      <tr class="struct-row" id="struct_0">
+        <td><select name="struct_type_0" onchange="calcSqft(0)">
+          <option value="">-- Type --</option>
+          <option value="sail">Sail (3-sided)</option>
+          <option value="hip">Hip / Canopy</option>
+          <option value="cantilever">Cantilever</option>
+        </select></td>
+        <td><input type="number" name="struct_s1_0" placeholder="ft" min="0" step="0.5" oninput="calcSqft(0)"></td>
+        <td><input type="number" name="struct_s2_0" placeholder="ft" min="0" step="0.5" oninput="calcSqft(0)"></td>
+        <td><input type="number" name="struct_s3_0" placeholder="ft" min="0" step="0.5" oninput="calcSqft(0)"></td>
+        <td><input type="number" name="struct_qty_0" value="1" min="1" max="20" style="width:60px" oninput="calcSqft(0)"></td>
+        <td><span id="sqft_0" class="sqft-display">—</span></td>
+        <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow('struct_0','structRows','struct')">✕</button></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline" onclick="addStructRow()">+ Add Structure</button>
+  <input type="hidden" name="struct_count" id="struct_count" value="1">
 </div>
 
-<!-- Hip Poles -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 3. SAIL POLES                                             -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
-    <div class="card-header"><h3>Hip / Canopy Poles</h3></div>
-    <div id="hipRows">
-        <div class="pole-row-header">
-            <span>Pipe Size</span>
-            <span>Length (ft)</span>
-            <span>Qty</span>
-            <span></span>
-        </div>
-        <div class="pole-row" id="hip_0">
-            <select name="hip_size_0" class="pipe-select">
-                <option value="">-- Size --</option>
-                <option value='5" SCH40'>5" SCH40</option>
-                <option value='6" SCH40'>6" SCH40</option>
-                <option value='8" SCH40'>8" SCH40</option>
-                <option value='3" OD Galv Tubing'>3" OD Galv</option>
-                <option value='4" OD Galv Tubing'>4" OD Galv</option>
-                <option value='5" OD Galv Tubing'>5" OD Galv</option>
-            </select>
-            <input type="number" name="hip_len_0" placeholder="ft" min="1" max="40" step="0.5">
-            <input type="number" name="hip_qty_0" placeholder="qty" min="1" max="50">
-            <button type="button" class="btn btn-sm btn-danger" onclick="removeRow('hip_0')">✕</button>
-        </div>
+  <div class="card-header"><h3>Sail Poles</h3></div>
+  <div class="est-table-wrap">
+  <table class="est-table" id="sailTable">
+    <thead>
+      <tr>
+        <th>#</th><th>Pipe Size</th><th>Length (ft)</th><th>Qty</th>
+        <th>Attachment</th><th>Footer Ø (ft)</th><th>Footer Depth (ft)</th><th></th>
+      </tr>
+    </thead>
+    <tbody id="sailRows">
+      <tr class="pole-row" id="sail_0">
+        <td class="row-num">1</td>
+        <td><select name="sail_size_0" class="pipe-select">{{ pipe_opts_sail|safe }}</select></td>
+        <td><input type="number" name="sail_len_0" placeholder="ft" min="0" step="0.5"></td>
+        <td><input type="number" name="sail_qty_0" placeholder="qty" min="1" style="width:60px"></td>
+        <td><select name="sail_attach_0">{{ attach_opts|safe }}</select></td>
+        <td><input type="number" name="sail_footer_dia_0" value="0" min="0" step="0.25" style="width:70px"></td>
+        <td><input type="number" name="sail_footer_depth_0" value="0" min="0" step="0.5" style="width:70px"></td>
+        <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow('sail_0','sailRows','sail')">✕</button></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="form-row" style="margin-top:.75rem">
+    <div class="form-group" style="max-width:200px">
+      <label>Wall Mounts — Qty</label>
+      <input type="number" name="wall_mount_qty" value="0" min="0">
     </div>
-    <button type="button" class="btn btn-sm btn-outline" onclick="addRow('hip','hipRows')">+ Add Row</button>
-    <input type="hidden" name="hip_count" id="hip_count" value="1">
+    <div class="form-group" style="max-width:200px">
+      <label>Clamps — Qty</label>
+      <input type="number" name="clamp_qty" value="0" min="0">
+    </div>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline" onclick="addPoleRow('sail','sailRows',true)">+ Add Row</button>
+  <input type="hidden" name="sail_count" id="sail_count" value="1">
 </div>
 
-<!-- Cantilever -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 4. HIP & CANOPY POLES                                     -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
-    <div class="card-header"><h3>Cantilever Posts</h3></div>
-    <div id="cpostRows">
-        <div class="pole-row-header">
-            <span>HSS Size</span>
-            <span>Length (ft)</span>
-            <span>Qty</span>
-            <span></span>
-        </div>
-        <div class="pole-row" id="cpost_0">
-            <select name="cpost_size_0" class="pipe-select">
-                <option value="">-- Size --</option>
-                <option value="4x4">4x4 HSS</option>
-                <option value="4x6">4x6 HSS</option>
-                <option value="4x8">4x8 HSS</option>
-            </select>
-            <input type="number" name="cpost_len_0" placeholder="ft" min="1" max="40" step="0.5">
-            <input type="number" name="cpost_qty_0" placeholder="qty" min="1" max="50">
-            <button type="button" class="btn btn-sm btn-danger" onclick="removeRow('cpost_0')">✕</button>
-        </div>
-    </div>
-    <button type="button" class="btn btn-sm btn-outline" onclick="addRow('cpost','cpostRows')">+ Add Row</button>
-    <input type="hidden" name="cpost_count" id="cpost_count" value="1">
+  <div class="card-header"><h3>Hip &amp; Canopy Poles</h3></div>
+  <div class="est-table-wrap">
+  <table class="est-table">
+    <thead>
+      <tr>
+        <th>#</th><th>Pipe Size</th><th>Length (ft)</th><th>Qty</th>
+        <th>Footer Ø (ft)</th><th>Footer Depth (ft)</th><th></th>
+      </tr>
+    </thead>
+    <tbody id="hipRows">
+      <tr class="pole-row" id="hip_0">
+        <td class="row-num">1</td>
+        <td><select name="hip_size_0" class="pipe-select">{{ pipe_opts_hip|safe }}</select></td>
+        <td><input type="number" name="hip_len_0" placeholder="ft" min="0" step="0.5"></td>
+        <td><input type="number" name="hip_qty_0" placeholder="qty" min="1" style="width:60px"></td>
+        <td><input type="number" name="hip_footer_dia_0" value="0" min="0" step="0.25" style="width:70px"></td>
+        <td><input type="number" name="hip_footer_depth_0" value="0" min="0" step="0.5" style="width:70px"></td>
+        <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow('hip_0','hipRows','hip')">✕</button></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline" onclick="addPoleRow('hip','hipRows',false)">+ Add Row</button>
+  <input type="hidden" name="hip_count" id="hip_count" value="1">
 </div>
 
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 5. CANTILEVER POSTS                                       -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
-    <div class="card-header"><h3>Cantilever Beams</h3></div>
-    <div id="cbeamRows">
-        <div class="pole-row-header">
-            <span>HSS Size</span>
-            <span>Length (ft)</span>
-            <span>Qty</span>
-            <span></span>
-        </div>
-        <div class="pole-row" id="cbeam_0">
-            <select name="cbeam_size_0" class="pipe-select">
-                <option value="">-- Size --</option>
-                <option value="4x4">4x4 HSS</option>
-                <option value="4x6">4x6 HSS</option>
-                <option value="4x8">4x8 HSS</option>
-            </select>
-            <input type="number" name="cbeam_len_0" placeholder="ft" min="1" max="40" step="0.5">
-            <input type="number" name="cbeam_qty_0" placeholder="qty" min="1" max="50">
-            <button type="button" class="btn btn-sm btn-danger" onclick="removeRow('cbeam_0')">✕</button>
-        </div>
-    </div>
-    <button type="button" class="btn btn-sm btn-outline" onclick="addRow('cbeam','cbeamRows')">+ Add Row</button>
-    <input type="hidden" name="cbeam_count" id="cbeam_count" value="1">
+  <div class="card-header"><h3>Cantilever Posts</h3></div>
+  <div class="est-table-wrap">
+  <table class="est-table">
+    <thead>
+      <tr>
+        <th>#</th><th>HSS Profile</th><th>Wall Thick.</th><th>Length (ft)</th><th>Qty</th>
+        <th>Footer Ø (ft)</th><th>Footer Depth (ft)</th><th></th>
+      </tr>
+    </thead>
+    <tbody id="cpostRows">
+      <tr class="pole-row" id="cpost_0">
+        <td class="row-num">1</td>
+        <td><select name="cpost_profile_0">{{ hss_profile_opts|safe }}</select></td>
+        <td><select name="cpost_wall_0">{{ hss_wall_opts|safe }}</select></td>
+        <td><input type="number" name="cpost_len_0" placeholder="ft" min="0" step="0.5"></td>
+        <td><input type="number" name="cpost_qty_0" placeholder="qty" min="1" style="width:60px"></td>
+        <td><input type="number" name="cpost_footer_dia_0" value="0" min="0" step="0.25" style="width:70px"></td>
+        <td><input type="number" name="cpost_footer_depth_0" value="0" min="0" step="0.5" style="width:70px"></td>
+        <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow('cpost_0','cpostRows','cpost')">✕</button></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline" onclick="addCpostRow()">+ Add Row</button>
+  <input type="hidden" name="cpost_count" id="cpost_count" value="1">
 </div>
 
-<!-- Fabric -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 6. CANTILEVER BEAMS                                       -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
-    <div class="card-header"><h3>Fabric / Shade Material</h3></div>
-    <div class="form-row">
-        <div class="form-group">
-            <label>Fabric Cost ($)</label>
-            <input type="number" name="fabric_cost" value="0" min="0" step="0.01">
-        </div>
-        <div class="form-group">
-            <label>Superior Quote ($) <span class="form-hint">— vendor package quote</span></label>
-            <input type="number" name="superior_quote" value="0" min="0" step="0.01">
-        </div>
-    </div>
+  <div class="card-header"><h3>Cantilever Beams</h3></div>
+  <div class="est-table-wrap">
+  <table class="est-table">
+    <thead>
+      <tr><th>#</th><th>HSS Profile</th><th>Wall Thick.</th><th>Length (ft)</th><th>Qty</th><th></th></tr>
+    </thead>
+    <tbody id="cbeamRows">
+      <tr class="pole-row" id="cbeam_0">
+        <td class="row-num">1</td>
+        <td><select name="cbeam_profile_0">{{ hss_profile_opts|safe }}</select></td>
+        <td><select name="cbeam_wall_0">{{ hss_wall_opts|safe }}</select></td>
+        <td><input type="number" name="cbeam_len_0" placeholder="ft" min="0" step="0.5"></td>
+        <td><input type="number" name="cbeam_qty_0" placeholder="qty" min="1" style="width:60px"></td>
+        <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow('cbeam_0','cbeamRows','cbeam')">✕</button></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline" onclick="addCbeamRow()">+ Add Row</button>
+  <input type="hidden" name="cbeam_count" id="cbeam_count" value="1">
 </div>
 
-<!-- Labor -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 7. HIP UPPER FRAMES (Pipe System)                        -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
-    <div class="card-header"><h3>Labor</h3></div>
-    <div class="form-row">
-        <div class="form-group">
-            <label>Labor Hours</label>
-            <input type="number" name="labor_hours" value="0" min="0" step="0.5">
-        </div>
-        <div class="form-group">
-            <label>Labor Rate ($/hr)</label>
-            <input type="number" name="labor_rate" value="75" min="0" step="1">
-        </div>
+  <div class="card-header"><h3>Hip Upper Frames — Pipe System</h3></div>
+  <div class="est-section-hint">Enter qty and unit price for each component. Use the Hip Calc tab to determine sizes.</div>
+  {% for i in range(5) %}
+  <div class="upper-frame-block">
+    <div class="upper-frame-header">
+      Hip Upper Frame #{{ i+1 }} — Structure #:
+      <select name="hf_struct_{{ i }}" style="width:80px;margin-left:.5rem">
+        <option value="">—</option>
+        {% for n in range(1,11) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+      </select>
     </div>
+    <div class="est-table-wrap">
+    <table class="est-table frame-table">
+      <thead><tr><th>Component</th><th>Qty</th><th>Unit Price ($)</th><th>Total</th></tr></thead>
+      <tbody>
+        <tr><td>Elbows</td>
+          <td><input type="number" name="hf_elbows_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
+          <td><input type="number" name="hf_elbows_price_{{ i }}" value="0" min="0" step="0.01" style="width:90px"></td>
+          <td class="frame-total" id="hf_elbows_total_{{ i }}">$0.00</td></tr>
+        <tr><td>Y's</td>
+          <td><input type="number" name="hf_ys_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
+          <td><input type="number" name="hf_ys_price_{{ i }}" value="0" min="0" step="0.01" style="width:90px"></td>
+          <td class="frame-total" id="hf_ys_total_{{ i }}">$0.00</td></tr>
+        <tr><td>Ridge (1 pc)</td>
+          <td><input type="number" name="hf_ridge_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
+          <td><input type="number" name="hf_ridge_price_{{ i }}" value="0" min="0" step="0.01" style="width:90px"></td>
+          <td class="frame-total" id="hf_ridge_total_{{ i }}">$0.00</td></tr>
+        <tr><td>Rafters (4 pcs)</td>
+          <td><input type="number" name="hf_rafters_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
+          <td><input type="number" name="hf_rafters_price_{{ i }}" value="0" min="0" step="0.01" style="width:90px"></td>
+          <td class="frame-total" id="hf_rafters_total_{{ i }}">$0.00</td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="3"><strong>Frame #{{ i+1 }} Subtotal</strong></td>
+        <td><strong id="hf_frame_total_{{ i }}">$0.00</strong></td></tr></tfoot>
+    </table>
+    </div>
+  </div>
+  {% endfor %}
 </div>
 
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 8. CANTILEVER UPPER FRAMES (Pipe System)                  -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-header"><h3>Cantilever Upper Frames — Pipe System</h3></div>
+  <div class="est-section-hint">Enter qty and unit price for each component.</div>
+  {% for i in range(5) %}
+  <div class="upper-frame-block">
+    <div class="upper-frame-header">
+      Cantilever Upper Frame #{{ i+1 }} — Structure #:
+      <select name="cf_struct_{{ i }}" style="width:80px;margin-left:.5rem">
+        <option value="">—</option>
+        {% for n in range(1,11) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="est-table-wrap">
+    <table class="est-table frame-table">
+      <thead><tr><th>Component</th><th>Qty</th><th>Unit Price ($)</th><th>Total</th></tr></thead>
+      <tbody>
+        <tr><td>Elbows</td>
+          <td><input type="number" name="cf_elbows_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
+          <td><input type="number" name="cf_elbows_price_{{ i }}" value="0" min="0" step="0.01" style="width:90px"></td>
+          <td class="frame-total" id="cf_elbows_total_{{ i }}">$0.00</td></tr>
+        <tr><td>Y's</td>
+          <td><input type="number" name="cf_ys_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
+          <td><input type="number" name="cf_ys_price_{{ i }}" value="0" min="0" step="0.01" style="width:90px"></td>
+          <td class="frame-total" id="cf_ys_total_{{ i }}">$0.00</td></tr>
+        <tr><td>Ridge (1 pc)</td>
+          <td><input type="number" name="cf_ridge_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
+          <td><input type="number" name="cf_ridge_price_{{ i }}" value="0" min="0" step="0.01" style="width:90px"></td>
+          <td class="frame-total" id="cf_ridge_total_{{ i }}">$0.00</td></tr>
+        <tr><td>Rafters (4 pcs)</td>
+          <td><input type="number" name="cf_rafters_qty_{{ i }}" value="0" min="0" style="width:70px"></td>
+          <td><input type="number" name="cf_rafters_price_{{ i }}" value="0" min="0" step="0.01" style="width:90px"></td>
+          <td class="frame-total" id="cf_rafters_total_{{ i }}">$0.00</td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="3"><strong>Frame #{{ i+1 }} Subtotal</strong></td>
+        <td><strong id="cf_frame_total_{{ i }}">$0.00</strong></td></tr></tfoot>
+    </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 9. TRAVEL & FUEL                                          -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-header"><h3>Travel &amp; Fuel</h3></div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Miles from St. Augustine, FL</label>
+      <input type="number" name="miles" value="0" min="0" step="1">
+    </div>
+    <div class="form-group">
+      <label>Fuel Cost per Mile ($)</label>
+      <input type="number" name="fuel_rate" value="0.40" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Number of Round Trips</label>
+      <input type="number" name="round_trips" value="1" min="1" max="20">
+    </div>
+    <div class="form-group">
+      <label>Lodging / Per Diem ($)</label>
+      <input type="number" name="lodging" value="0" min="0" step="0.01">
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 10. CREW & LABOR                                          -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-header"><h3>Crew &amp; Labor</h3></div>
+  <div class="est-section-hint">Daily crew cost is pulled from Pricing page rates.</div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Number of Crew Members</label>
+      <select name="crew_count">
+        {% for n in range(1,9) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Number of Install Days</label>
+      <input type="number" name="install_days" value="1" min="1" max="365">
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- 11. OTHER COSTS                                           -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-header"><h3>Materials &amp; Other Costs</h3></div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Hardware / Fasteners / Misc. ($)</label>
+      <input type="number" name="hardware" value="0" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Job Supplies / Consumables ($)</label>
+      <input type="number" name="supplies" value="0" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Galvanizing Cost ($)</label>
+      <input type="number" name="galvanizing" value="0" min="0" step="0.01">
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Equipment Rental ($)</label>
+      <input type="number" name="equipment" value="0" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Permit Fees ($)</label>
+      <input type="number" name="permits" value="0" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Vendor / Sub Cost ($)</label>
+      <input type="number" name="vendor" value="0" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Miscellaneous ($)</label>
+      <input type="number" name="misc" value="0" min="0" step="0.01">
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SUBMIT                                                    -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="form-actions">
-    <button type="submit" class="btn btn-primary btn-lg">Calculate Estimate →</button>
+  <button type="submit" class="btn btn-primary btn-lg">Calculate Estimate →</button>
 </div>
 
 </form>
+
+<style>
+.est-table-wrap { overflow-x: auto; }
+.est-table { width:100%; border-collapse:collapse; font-size:.85rem; margin-bottom:.75rem; }
+.est-table th { background:#f5f7fa; padding:.4rem .5rem; text-align:left; font-size:.75rem; font-weight:600; color:#888; white-space:nowrap; border-bottom:2px solid #e8eaed; }
+.est-table td { padding:.35rem .5rem; border-bottom:1px solid #f0f2f4; vertical-align:middle; }
+.est-table input[type=number], .est-table select { padding:.3rem .4rem; border:1px solid #ddd; border-radius:5px; font-size:.85rem; background:#fff; width:100%; box-sizing:border-box; }
+.est-table .row-num { color:#aaa; font-size:.75rem; width:24px; text-align:center; }
+.est-section-hint { font-size:.8rem; color:#888; margin-bottom:.75rem; }
+.sqft-display { font-weight:600; color:#2e75b6; white-space:nowrap; }
+.upper-frame-block { border:1px solid #e8eaed; border-radius:8px; padding:1rem; margin-bottom:1rem; }
+.upper-frame-header { font-size:.85rem; font-weight:600; color:#555; margin-bottom:.75rem; display:flex; align-items:center; }
+.frame-table { max-width:500px; }
+.frame-total { font-weight:500; white-space:nowrap; }
+.pipe-select { min-width:140px; }
+</style>
+
+<script>
+// ── Structure rows ──
+let structIdx = 1;
+function addStructRow() {
+  const i = structIdx++;
+  const tbody = document.getElementById('structRows');
+  const tr = document.createElement('tr');
+  tr.className = 'struct-row';
+  tr.id = 'struct_' + i;
+  tr.innerHTML = `
+    <td><select name="struct_type_${i}" onchange="calcSqft(${i})">
+      <option value="">-- Type --</option>
+      <option value="sail">Sail (3-sided)</option>
+      <option value="hip">Hip / Canopy</option>
+      <option value="cantilever">Cantilever</option>
+    </select></td>
+    <td><input type="number" name="struct_s1_${i}" placeholder="ft" min="0" step="0.5" oninput="calcSqft(${i})"></td>
+    <td><input type="number" name="struct_s2_${i}" placeholder="ft" min="0" step="0.5" oninput="calcSqft(${i})"></td>
+    <td><input type="number" name="struct_s3_${i}" placeholder="ft" min="0" step="0.5" oninput="calcSqft(${i})"></td>
+    <td><input type="number" name="struct_qty_${i}" value="1" min="1" max="20" style="width:60px" oninput="calcSqft(${i})"></td>
+    <td><span id="sqft_${i}" class="sqft-display">—</span></td>
+    <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow('struct_${i}','structRows','struct')">✕</button></td>`;
+  tbody.appendChild(tr);
+  updateCount('struct', 'structRows');
+}
+
+function calcSqft(i) {
+  const type = (document.querySelector('[name=struct_type_'+i+']') || {}).value || '';
+  const s1 = parseFloat(document.querySelector('[name=struct_s1_'+i+']')?.value) || 0;
+  const s2 = parseFloat(document.querySelector('[name=struct_s2_'+i+']')?.value) || 0;
+  const s3 = parseFloat(document.querySelector('[name=struct_s3_'+i+']')?.value) || 0;
+  const qty = parseInt(document.querySelector('[name=struct_qty_'+i+']')?.value) || 1;
+  let sqft = 0;
+  if (type === 'sail' && s1 && s2 && s3) {
+    const s = (s1+s2+s3)/2;
+    const area = s*(s-s1)*(s-s2)*(s-s3);
+    sqft = area > 0 ? Math.sqrt(area) * qty : 0;
+  } else if (s1 && s2) {
+    sqft = s1 * s2 * qty;
+  }
+  const el = document.getElementById('sqft_'+i);
+  if (el) el.textContent = sqft > 0 ? sqft.toFixed(0) + ' sqft' : '—';
+}
+
+// ── Pole rows ──
+const poleIdx = { sail:1, hip:1, cpost:1, cbeam:1 };
+
+const pipeSail = `<option value="">-- Size --</option>
+  <option value='5" SCH40'>5" SCH40</option>
+  <option value='6" SCH40'>6" SCH40</option>
+  <option value='8" SCH40'>8" SCH40</option>
+  <option value='3" OD Galv Tubing'>3" OD Galv</option>
+  <option value='4" OD Galv Tubing'>4" OD Galv</option>
+  <option value='5" OD Galv Tubing'>5" OD Galv</option>`;
+
+const pipeHip = pipeSail;
+
+const attachOpts = `<option value="All Thread">All Thread</option>
+  <option value="Weld Lug">Weld Lug</option>
+  <option value="Wall Mount">Wall Mount</option>
+  <option value="Drive Post">Drive Post</option>
+  <option value="Surface Mount">Surface Mount</option>`;
+
+const hssProfileOpts = `<option value="4x4">4x4 HSS</option>
+  <option value="4x6">4x6 HSS</option>
+  <option value="4x8">4x8 HSS</option>`;
+const hssWallOpts = `<option value='1/4"'>1/4"</option><option value='3/16"'>3/16"</option>`;
+
+function addPoleRow(prefix, containerId, hasAttach) {
+  const i = poleIdx[prefix]++;
+  const tbody = document.getElementById(containerId);
+  const tr = document.createElement('tr');
+  tr.className = 'pole-row';
+  tr.id = prefix + '_' + i;
+  const opts = (prefix === 'sail') ? pipeSail : pipeHip;
+  const attachCol = hasAttach ? `<td><select name="${prefix}_attach_${i}">${attachOpts}</select></td>` : `<td>—</td>`;
+  tr.innerHTML = `
+    <td class="row-num">${i+1}</td>
+    <td><select name="${prefix}_size_${i}" class="pipe-select">${opts}</select></td>
+    <td><input type="number" name="${prefix}_len_${i}" placeholder="ft" min="0" step="0.5"></td>
+    <td><input type="number" name="${prefix}_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
+    ${attachCol}
+    <td><input type="number" name="${prefix}_footer_dia_${i}" value="0" min="0" step="0.25" style="width:70px"></td>
+    <td><input type="number" name="${prefix}_footer_depth_${i}" value="0" min="0" step="0.5" style="width:70px"></td>
+    <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow('${prefix}_${i}','${containerId}','${prefix}')">✕</button></td>`;
+  tbody.appendChild(tr);
+  updateCount(prefix, containerId);
+}
+
+function addCpostRow() {
+  const i = poleIdx['cpost']++;
+  const tbody = document.getElementById('cpostRows');
+  const tr = document.createElement('tr');
+  tr.className = 'pole-row';
+  tr.id = 'cpost_' + i;
+  tr.innerHTML = `
+    <td class="row-num">${i+1}</td>
+    <td><select name="cpost_profile_${i}">${hssProfileOpts}</select></td>
+    <td><select name="cpost_wall_${i}">${hssWallOpts}</select></td>
+    <td><input type="number" name="cpost_len_${i}" placeholder="ft" min="0" step="0.5"></td>
+    <td><input type="number" name="cpost_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
+    <td><input type="number" name="cpost_footer_dia_${i}" value="0" min="0" step="0.25" style="width:70px"></td>
+    <td><input type="number" name="cpost_footer_depth_${i}" value="0" min="0" step="0.5" style="width:70px"></td>
+    <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow('cpost_${i}','cpostRows','cpost')">✕</button></td>`;
+  tbody.appendChild(tr);
+  updateCount('cpost', 'cpostRows');
+}
+
+function addCbeamRow() {
+  const i = poleIdx['cbeam']++;
+  const tbody = document.getElementById('cbeamRows');
+  const tr = document.createElement('tr');
+  tr.className = 'pole-row';
+  tr.id = 'cbeam_' + i;
+  tr.innerHTML = `
+    <td class="row-num">${i+1}</td>
+    <td><select name="cbeam_profile_${i}">${hssProfileOpts}</select></td>
+    <td><select name="cbeam_wall_${i}">${hssWallOpts}</select></td>
+    <td><input type="number" name="cbeam_len_${i}" placeholder="ft" min="0" step="0.5"></td>
+    <td><input type="number" name="cbeam_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
+    <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow('cbeam_${i}','cbeamRows','cbeam')">✕</button></td>`;
+  tbody.appendChild(tr);
+  updateCount('cbeam', 'cbeamRows');
+}
+
+function removeRow(id, containerId, prefix) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+  updateCount(prefix, containerId);
+}
+
+function updateCount(prefix, containerId) {
+  const tbody = document.getElementById(containerId);
+  if (!tbody) return;
+  const count = tbody.querySelectorAll('.pole-row, .struct-row').length;
+  const inp = document.getElementById(prefix + '_count');
+  if (inp) inp.value = count;
+}
+
+// ── Upper frame live totals ──
+function frameTotal(prefix, frameIdx) {
+  const comps = ['elbows','ys','ridge','rafters'];
+  let total = 0;
+  comps.forEach(comp => {
+    const qty = parseFloat(document.querySelector(`[name=${prefix}_${comp}_qty_${frameIdx}]`)?.value) || 0;
+    const price = parseFloat(document.querySelector(`[name=${prefix}_${comp}_price_${frameIdx}]`)?.value) || 0;
+    const t = qty * price;
+    total += t;
+    const el = document.getElementById(`${prefix}_${comp}_total_${frameIdx}`);
+    if (el) el.textContent = '$' + t.toFixed(2);
+  });
+  const totEl = document.getElementById(`${prefix}_frame_total_${frameIdx}`);
+  if (totEl) totEl.textContent = '$' + total.toFixed(2);
+}
+
+// Attach live listeners to upper frame inputs
+document.addEventListener('DOMContentLoaded', () => {
+  ['hf','cf'].forEach(prefix => {
+    for (let i = 0; i < 5; i++) {
+      ['elbows','ys','ridge','rafters'].forEach(comp => {
+        ['qty','price'].forEach(field => {
+          const el = document.querySelector(`[name=${prefix}_${comp}_${field}_${i}]`);
+          if (el) el.addEventListener('input', () => frameTotal(prefix, i));
+        });
+      });
+    }
+  });
+});
+</script>
 {% endblock %}

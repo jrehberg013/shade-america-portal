@@ -584,7 +584,30 @@ def parse_pole_rows(prefix, f):
 @app.route('/estimator')
 @admin_required
 def estimator():
-    return render_template('estimator.html')
+    pipe_opts_sail = """<option value="">-- Size --</option>
+        <option value='5" SCH40'>5" SCH40</option>
+        <option value='6" SCH40'>6" SCH40</option>
+        <option value='8" SCH40'>8" SCH40</option>
+        <option value='3" OD Galv Tubing'>3" OD Galv</option>
+        <option value='4" OD Galv Tubing'>4" OD Galv</option>
+        <option value='5" OD Galv Tubing'>5" OD Galv</option>"""
+    pipe_opts_hip = pipe_opts_sail
+    attach_opts = """<option value="All Thread">All Thread</option>
+        <option value="Weld Lug">Weld Lug</option>
+        <option value="Wall Mount">Wall Mount</option>
+        <option value="Drive Post">Drive Post</option>
+        <option value="Surface Mount">Surface Mount</option>"""
+    hss_profile_opts = """<option value="4x4">4x4 HSS</option>
+        <option value="4x6">4x6 HSS</option>
+        <option value="4x8">4x8 HSS</option>"""
+    hss_wall_opts = """<option value='1/4"'>1/4"</option>
+        <option value='3/16"'>3/16"</option>"""
+    return render_template('estimator.html',
+                           pipe_opts_sail=pipe_opts_sail,
+                           pipe_opts_hip=pipe_opts_hip,
+                           attach_opts=attach_opts,
+                           hss_profile_opts=hss_profile_opts,
+                           hss_wall_opts=hss_wall_opts)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -602,6 +625,21 @@ def _fmt_fraction(sixteenths):
         return ''
     g = gcd(int(sixteenths), 16)
     return f'{int(sixteenths)//g}/{16//g}'
+
+def _fmt_ft_in(total_inches):
+    """Convert inches to feet-inches-eighths string, e.g. 19' 7 1/2\" """
+    from math import gcd
+    eighths = round(total_inches * 8)
+    feet = eighths // 96
+    remain = eighths % 96
+    whole_in = remain // 8
+    frac8 = remain % 8
+    if frac8:
+        g = gcd(frac8, 8)
+        frac_str = f' {frac8//g}/{8//g}"'
+    else:
+        frac_str = '"'
+    return f"{feet}' {whole_in}{frac_str}"
 
 def _diagonal_sq(A1, D1):
     """Z2 formula: feet'-whole_inches  fraction" """
@@ -655,8 +693,9 @@ def hip_calc_compute(A1, D1, F1, col_size, rafter_dia, qty=1, glides='No Glides'
         cable_sz = '3/16"' if A1*D1<400 else ('1/4"' if A1*D1<1000 else '5/16"')
         diag    = _diagonal_sq(A1, D1)
         return dict(
-            profile='Square', rafter=rafter, to_swage=swage,
-            ridge=ridge, ridge_swage=rswage, total=total,
+            profile='Square', rafter=rafter, rafter_ft=_fmt_ft_in(rafter),
+            to_swage=swage, ridge=ridge, ridge_ft=_fmt_ft_in(ridge),
+            ridge_swage=rswage, total=total,
             cable_size=cable_sz,
             cable_1=f"{round(A1*2+D1*2+10)}'",
             cable_2=f"{round(A1+D1+10)}' Each",
@@ -679,8 +718,9 @@ def hip_calc_compute(A1, D1, F1, col_size, rafter_dia, qty=1, glides='No Glides'
         cable_sz = '3/16"' if A1*D1<400 else ('1/4"' if A1*D1<1000 else '5/16"')
         diag    = _diagonal_rect(A1, D1)
         return dict(
-            profile='Rectangle', rafter=rafter, to_swage=swage,
-            ridge=ridge, ridge_swage=rswage, total=total,
+            profile='Rectangle', rafter=rafter, rafter_ft=_fmt_ft_in(rafter),
+            to_swage=swage, ridge=ridge, ridge_ft=_fmt_ft_in(ridge),
+            ridge_swage=rswage, total=total,
             cable_size=f'Qty: {c_qty}',
             cable_1=f'{round(perim)*12*B9}" Total',
             cable_2=f'{round(A1+D1+10)*2*12*B9}" Total',
@@ -737,71 +777,168 @@ def calculate():
     pm = get_pricing_map(db)
     f = request.form
 
-    job_name   = f.get('job_name', '')
-    client     = f.get('client', '')
-    markup_pct = float(f.get('markup_pct', 30) or 30)
-    tax_pct    = float(f.get('tax_pct', 0) or 0)
+    job_name        = f.get('job_name', '')
+    client          = f.get('client', '')
+    location        = f.get('location', '')
+    markup_pct      = float(f.get('markup_pct', 50) or 50)
+    superior_amount = float(f.get('superior_amount', 0) or 0)
 
-    sail_rows  = parse_pole_rows('sail', f)
-    hip_rows   = parse_pole_rows('hip', f)
-    cpost_rows = parse_pole_rows('cpost', f)
-    cbeam_rows = parse_pole_rows('cbeam', f)
+    # ── Structures & Fabric ──
+    n_structs  = int(f.get('struct_count', 0) or 0)
+    structs    = []
+    total_sqft = 0.0
+    for i in range(n_structs):
+        stype = f.get(f'struct_type_{i}', '')
+        s1  = float(f.get(f'struct_s1_{i}', 0) or 0)
+        s2  = float(f.get(f'struct_s2_{i}', 0) or 0)
+        s3  = float(f.get(f'struct_s3_{i}', 0) or 0)
+        qty = int(f.get(f'struct_qty_{i}', 1) or 1)
+        if not s1:
+            continue
+        if stype == 'sail' and s2 and s3:
+            s = (s1 + s2 + s3) / 2
+            area_ea = math.sqrt(max(0, s*(s-s1)*(s-s2)*(s-s3)))
+        elif s2:
+            area_ea = s1 * s2
+        else:
+            area_ea = 0
+        sqft_total = area_ea * qty
+        total_sqft += sqft_total
+        structs.append({'type': stype, 's1': s1, 's2': s2, 's3': s3,
+                        'qty': qty, 'sqft': round(sqft_total, 1)})
+    fabric_rate = pm.get('Fabric per Sq Ft', 3.25)
+    fabric_cost = total_sqft * fabric_rate
 
-    pole_detail = []
-    steel_cost = 0
+    # ── Poles helper ──
+    def _poles(prefix, has_attach=False, has_wall=False):
+        n = int(f.get(f'{prefix}_count', 1) or 1)
+        rows = []
+        for i in range(n):
+            if has_wall:
+                profile = f.get(f'{prefix}_profile_{i}', '')
+                wall    = f.get(f'{prefix}_wall_{i}', '1/4"')
+                size    = f'{profile} HSS {wall}' if profile else ''
+            else:
+                size = f.get(f'{prefix}_size_{i}', '')
+            length     = float(f.get(f'{prefix}_len_{i}', 0) or 0)
+            qty        = int(f.get(f'{prefix}_qty_{i}', 0) or 0)
+            attach     = f.get(f'{prefix}_attach_{i}', '') if has_attach else ''
+            footer_dia = float(f.get(f'{prefix}_footer_dia_{i}', 0) or 0)
+            footer_dep = float(f.get(f'{prefix}_footer_depth_{i}', 0) or 0)
+            if size and length and qty:
+                cy = math.pi * (footer_dia/2)**2 * footer_dep / 27 if footer_dia and footer_dep else 0
+                rows.append({'size': size, 'length': length, 'qty': qty,
+                             'attach': attach, 'cy': cy * qty})
+        return rows
+
+    sail_poles  = _poles('sail',  has_attach=True)
+    hip_poles   = _poles('hip')
+    cant_posts  = _poles('cpost', has_wall=True)
+    cant_beams  = _poles('cbeam', has_wall=True)
+
+    # Steel & welding
+    steel_cost     = 0
     weld_lug_count = 0
-
-    for section, rows in [('Sail', sail_rows), ('Hip/Canopy', hip_rows),
-                           ('Cant. Post', cpost_rows), ('Cant. Beam', cbeam_rows)]:
+    pole_detail    = []
+    for section, rows in [('Sail Poles', sail_poles), ('Hip/Canopy', hip_poles),
+                           ('Cant. Posts', cant_posts), ('Cant. Beams', cant_beams)]:
         for row in rows:
-            if not row['size'] or not row['length'] or not row['qty']:
-                continue
             cost, unit_cost = pipe_cost_calc(row['size'], row['length'], row['qty'], pm)
             steel_cost += cost
-            pole_detail.append({
-                'section': section, 'size': row['size'],
-                'length': row['length'], 'qty': row['qty'],
-                'unit_cost': unit_cost, 'total': cost,
-            })
+            pole_detail.append({'section': section, 'size': row['size'],
+                                'length': row['length'], 'qty': row['qty'],
+                                'unit_cost': unit_cost, 'total': cost})
             if row.get('attach') == 'Weld Lug':
-                weld_lug_count += int(row['qty'] or 0)
+                weld_lug_count += row['qty']
 
     weld_rate    = pm.get('Welding Rate', 95)
-    cant_posts   = sum(int(r['qty'] or 0) for r in cpost_rows if r['size'])
-    cant_beams   = sum(int(r['qty'] or 0) for r in cbeam_rows if r['size'])
-    welding_cost = (weld_lug_count + cant_posts + cant_beams) * weld_rate
+    cpost_qty    = sum(r['qty'] for r in cant_posts)
+    cbeam_qty    = sum(r['qty'] for r in cant_beams)
+    welding_cost = (weld_lug_count + cpost_qty + cbeam_qty) * weld_rate
 
+    # Powder
     powder_cost = 0
-    for rows in [sail_rows, hip_rows, cpost_rows, cbeam_rows]:
+    for rows in [sail_poles, hip_poles, cant_posts, cant_beams]:
         for row in rows:
-            if not row['size'] or not row['length'] or not row['qty']:
-                continue
             rate = get_powder_rate(row['size'], pm)
-            powder_cost += rate * float(row['length'] or 0) * int(row['qty'] or 0)
+            powder_cost += rate * row['length'] * row['qty']
 
-    fabric_cost    = float(f.get('fabric_cost', 0) or 0)
-    superior_quote = float(f.get('superior_quote', 0) or 0)
-    labor_hours    = float(f.get('labor_hours', 0) or 0)
-    labor_rate     = float(f.get('labor_rate', 75) or 75)
-    labor_cost     = labor_hours * labor_rate
+    # Concrete
+    all_cy        = sum(r['cy'] for r in sail_poles + hip_poles + cant_posts)
+    concrete_rate = pm.get('Price per CY', 200)
+    concrete_cost = all_cy * concrete_rate * 1.10
 
-    materials_total = steel_cost + welding_cost + powder_cost + fabric_cost + superior_quote
-    subtotal        = materials_total + labor_cost
-    markup_amount   = subtotal * (markup_pct / 100)
-    tax_amount      = (subtotal + markup_amount) * (tax_pct / 100)
-    total           = subtotal + markup_amount + tax_amount
+    # Hardware extras
+    wall_mount_qty  = int(f.get('wall_mount_qty', 0) or 0)
+    clamp_qty       = int(f.get('clamp_qty', 0) or 0)
+    wall_mount_cost = wall_mount_qty * pm.get('Wall Mount', 0)
+    clamp_cost      = clamp_qty * pm.get('Clamp', 0)
+
+    # Upper frames
+    def _frames(prefix):
+        total = 0.0
+        for i in range(5):
+            for comp in ['elbows', 'ys', 'ridge', 'rafters']:
+                qty   = float(f.get(f'{prefix}_{comp}_qty_{i}', 0) or 0)
+                price = float(f.get(f'{prefix}_{comp}_price_{i}', 0) or 0)
+                total += qty * price
+        return total
+
+    hip_frames_cost  = _frames('hf')
+    cant_frames_cost = _frames('cf')
+
+    # Travel
+    miles       = float(f.get('miles', 0) or 0)
+    fuel_rate   = float(f.get('fuel_rate', 0.4) or 0.4)
+    round_trips = int(f.get('round_trips', 1) or 1)
+    lodging     = float(f.get('lodging', 0) or 0)
+    travel_cost = miles * 2 * round_trips * fuel_rate + lodging
+
+    # Crew & Labor
+    crew_count  = int(f.get('crew_count', 1) or 1)
+    install_days = int(f.get('install_days', 1) or 1)
+    daily_crew  = sum(pm.get(f'Rate - Person {i}', 0) for i in range(1, crew_count + 1))
+    labor_cost  = daily_crew * install_days
+
+    # Other costs
+    hardware    = float(f.get('hardware', 0) or 0)
+    supplies    = float(f.get('supplies', 0) or 0)
+    galvanizing = float(f.get('galvanizing', 0) or 0)
+    equipment   = float(f.get('equipment', 0) or 0)
+    permits     = float(f.get('permits', 0) or 0)
+    vendor      = float(f.get('vendor', 0) or 0)
+    misc        = float(f.get('misc', 0) or 0)
+
+    # Totals
+    materials_total = (superior_amount + fabric_cost + steel_cost + concrete_cost
+                       + hip_frames_cost + cant_frames_cost
+                       + welding_cost + powder_cost
+                       + hardware + supplies + galvanizing
+                       + wall_mount_cost + clamp_cost)
+    other_total     = equipment + permits + vendor + misc
+    base_total      = travel_cost + labor_cost + materials_total + other_total
+    markup_amount   = base_total * (markup_pct / 100)
+    sell_price      = base_total + markup_amount
 
     result = {
-        'job_name': job_name, 'client': client,
+        'job_name': job_name, 'client': client, 'location': location,
+        'total_sqft': round(total_sqft, 1), 'structs': structs,
+        'fabric_cost': fabric_cost, 'superior_amount': superior_amount,
         'steel_cost': steel_cost, 'welding_cost': welding_cost,
-        'powder_cost': powder_cost, 'fabric_cost': fabric_cost,
-        'superior_quote': superior_quote,
+        'powder_cost': powder_cost,
+        'all_cy': round(all_cy, 2), 'concrete_cost': concrete_cost,
+        'hip_frames_cost': hip_frames_cost, 'cant_frames_cost': cant_frames_cost,
+        'hardware': hardware, 'supplies': supplies, 'galvanizing': galvanizing,
+        'wall_mount_cost': wall_mount_cost, 'clamp_cost': clamp_cost,
         'materials_total': materials_total,
-        'labor_hours': labor_hours, 'labor_rate': labor_rate, 'labor_cost': labor_cost,
-        'subtotal': subtotal,
+        'miles': miles, 'lodging': lodging, 'travel_cost': travel_cost,
+        'crew_count': crew_count, 'install_days': install_days,
+        'daily_crew': daily_crew, 'labor_cost': labor_cost,
+        'equipment': equipment, 'permits': permits, 'vendor': vendor, 'misc': misc,
+        'other_total': other_total,
+        'base_total': base_total,
         'markup_pct': markup_pct, 'markup_amount': markup_amount,
-        'tax_pct': tax_pct, 'tax_amount': tax_amount,
-        'total': total,
+        'sell_price': sell_price,
         'pole_detail': pole_detail,
     }
     return render_template('estimate_result.html', result=result)
