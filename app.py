@@ -1367,13 +1367,22 @@ def forms_delete(form_id):
     flash('Form deleted.', 'success')
     return redirect(url_for('dashboard'))
 
+# Trello response cache (avoids repeated slow API calls)
+_trello_cache = {'data': None, 'ts': 0}
+_TRELLO_CACHE_TTL = 300  # seconds (5 minutes)
+
 # ─────────────────────────────────────────────────────────────
 # TRELLO API PROXY
 # ─────────────────────────────────────────────────────────────
 
 @app.route('/api/trello')
-@admin_required
+@login_required
 def trello_data():
+    import time as _time
+    # Serve from cache if fresh
+    if _trello_cache['data'] and (_time.time() - _trello_cache['ts']) < _TRELLO_CACHE_TTL:
+        return jsonify(_trello_cache['data'])
+
     api_key = os.environ.get('TRELLO_API_KEY', '')
     token   = os.environ.get('TRELLO_TOKEN', '')
     if not api_key or not token:
@@ -1434,7 +1443,7 @@ def trello_data():
             lurl = (f"https://api.trello.com/1/boards/{board['id']}/lists"
                     f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
                     f"&filter=open&fields=name,id")
-            with urllib.request.urlopen(lurl, timeout=15) as resp:
+            with urllib.request.urlopen(lurl, timeout=8) as resp:
                 lists = json.loads(resp.read())
 
             # One call for ALL cards on this board
@@ -1468,10 +1477,13 @@ def trello_data():
         # Sort by target board order
         result.sort(key=lambda b: target_boards.index(b['name'])
                     if b['name'] in target_boards else 99)
-        return jsonify({'boards': result})
+        payload = {'boards': result}
+        _trello_cache['data'] = payload
+        _trello_cache['ts']   = _time.time()
+        return jsonify(payload)
 
     except Exception as e:
-        return jsonify({'error': str(e)})
+        return jsonify({'error': str(e), 'detail': repr(e)})
 
 
 
@@ -1708,6 +1720,14 @@ def trello_sync(job_id):
     return redirect(url_for('job_detail', job_id=job_id))
 
 
+
+@app.route('/api/trello/refresh')
+@admin_required
+def trello_refresh():
+    _trello_cache['data'] = None
+    _trello_cache['ts']   = 0
+    return jsonify({'ok': True})
+
 # ─────────────────────────────────────────────────────────────
 # TRELLO DEBUG — list raw board/list names
 # ─────────────────────────────────────────────────────────────
@@ -1913,7 +1933,9 @@ with app.app_context():
 try:
     from apscheduler.schedulers.background import BackgroundScheduler
     _scheduler = BackgroundScheduler(daemon=True)
-    _scheduler.add_job(sync_all_trello_jobs, 'interval', minutes=20, id='trello_sync')
+    _scheduler.add_job(sync_all_trello_jobs, 'interval', minutes=20, id='trello_sync', next_run_time=None)
+    import datetime as _dt
+    _scheduler.add_job(sync_all_trello_jobs, 'date', run_date=_dt.datetime.now()+_dt.timedelta(minutes=3), id='trello_sync_first')
     _scheduler.start()
 except Exception:
     pass  # APScheduler not available — sync will be manual only

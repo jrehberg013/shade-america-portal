@@ -146,7 +146,7 @@
             }
             if(data.error){
                 document.getElementById('trello-content').innerHTML=
-                    `<div class="trello-no-cfg">Trello error: ${data.error}</div>`;
+                    `<div class="trello-no-cfg">Trello error: ${data.error}<br><small style="color:#bbb">${data.detail||''}</small></div>`;
                 return;
             }
             trelloData=data.boards;
