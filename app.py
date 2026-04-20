@@ -1420,22 +1420,31 @@ def trello_data():
         for board in all_boards:
             if board['name'] not in target_boards:
                 continue
-            # Fetch lists for this board
+            # Fetch lists AND all cards in just 2 calls per board (not 1 per list)
             lurl = (f"https://api.trello.com/1/boards/{board['id']}/lists"
                     f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
                     f"&filter=open&fields=name,id")
-            with urllib.request.urlopen(lurl, timeout=10) as resp:
+            with urllib.request.urlopen(lurl, timeout=15) as resp:
                 lists = json.loads(resp.read())
+
+            # One call for ALL cards on this board
+            curl = (f"https://api.trello.com/1/boards/{board['id']}/cards"
+                    f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
+                    f"&fields=name,shortLink,url,due,desc,labels,idList&filter=open")
+            with urllib.request.urlopen(curl, timeout=15) as resp:
+                all_cards = json.loads(resp.read())
+
+            # Group cards by list id
+            cards_by_list = {}
+            for c in all_cards:
+                lid = c.get('idList', '')
+                cards_by_list.setdefault(lid, []).append(c)
 
             board_data = {'name': board['name'], 'url': board['url'], 'lists': []}
             for lst in lists:
                 if not _keep_list(board['name'], lst['name']):
                     continue
-                curl = (f"https://api.trello.com/1/lists/{lst['id']}/cards"
-                        f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
-                        f"&fields=name,shortLink,url,due,desc,labels&filter=open")
-                with urllib.request.urlopen(curl, timeout=10) as resp:
-                    cards = json.loads(resp.read())
+                cards = cards_by_list.get(lst['id'], [])
                 board_data['lists'].append({
                     'name': lst['name'],
                     'cards': [{'name': _card_name(c), 'url': c['url'],
