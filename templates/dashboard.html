@@ -234,7 +234,7 @@
         let payload;
         try{ payload=JSON.parse(e.dataTransfer.getData('text/plain')); }
         catch(){ return; }
-        if(\!payload.url) return;
+        if(!payload.url) return;
         const status=col.dataset.status;
         // Show spinner in column
         const spinner=document.createElement('div');
@@ -323,7 +323,7 @@
   <p style="padding:1rem;color:#aaa;font-size:.88rem">No forms uploaded yet. Use the button above to add PDFs for the field crew.</p>
   {% endif %}
 </div>
-<\!-- Configure Stat Cards (admin only) -->
+<!-- Configure Stat Cards (admin only) -->
 <div class="section-header" style="margin-top:2rem">
     <h2>Configure Stat Cards</h2>
 </div>
@@ -378,4 +378,4 @@
 <script>
 function scMove(btn,dir){const row=btn.closest('tr'),tbody=row.parentElement,rows=Array.from(tbody.rows),idx=rows.indexOf(row),t=idx+dir;if(t<0||t>=rows.length)return;if(dir===-1)tbody.insertBefore(row,rows[t]);else tbody.insertBefore(rows[t],row);}
 function scRemove(btn){btn.closest('tr').remove();}
-function scAdd(){const key=document.getElementById('sc-new-key').value,label=document.getElementById('sc-new-label').value.trim();if(\!label){alert('Enter a label.');return;}const tbody=document.getElementById('stat-card-tbody'),tr=document.createElement('tr');tr.dataset.key=key;tr.innerHTML='<td style="text-align:center"><button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer">&#9650;</button><button type="button" onclick="scMove(this,1)" style="background:none;border:none;cursor:pointer">&#9660;</button></td><td><code>'+key+'</code></td><td><input type="text" value="'+label+'" class="sc-label" style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td><td><select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px"><option value="">Default</option><option value="text-blue">Blue</option><option value="text-green">Green</option><option value="text-yellow">Yellow</option><option value="text-grey">Grey</option><option value="text-orange">Orange</option></select></td><td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>';tbody.appendChild(tr
+function scAdd(){const key=document.getElementById('sc-new-key').value,label=document.getElementById('sc-new-label').value.trim();if(!label){alert('Enter a label.');return;}const tbody=document.getElementById('stat-card-tbody'),tr=document.createElement('tr');tr.dataset.key=key;tr.innerHTML='<td style="text-align:center"><button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer">&#9650;</button><button type="button" onclick="scMove(this,1)" style="background:none;border:none;cursor:pointer">&#9660;</button></td><td><code>'+key+'</code></td><td><input type="text" value="'+label+'" class="sc-label" style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td><td><select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px"><option value="">Default</option><option value="text-blue">Blue</option><option value="text-green">Green</option><option value="text-yellow">Yellow</option><option value="text-grey">Grey</option><option value="text-orange">Orange</option></select></td><td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>';tbody.appendChild(tr
