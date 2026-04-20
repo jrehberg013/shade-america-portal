@@ -35,7 +35,7 @@
                     </span>
                 </td>
                 <td>{% if job.estimate_total %}${{ "{:,.0f}".format(job.estimate_total) }}{% else %}—{% endif %}</td>
-                <td>{{ job.created_at[:10] if job.created_at else '—' }}</td>
+                <td>{{ (job.created_at|string)[:10] if job.created_at else '—' }}</td>
                 <td><a href="{{ url_for('job_detail', job_id=job.id) }}" class="btn btn-sm btn-outline">View</a></td>
             </tr>
             {% else %}
