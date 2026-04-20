@@ -1279,6 +1279,16 @@ def create_user():
     return redirect(url_for('admin_users'))
 
 
+
+@app.route('/admin/settings')
+@admin_required
+def admin_settings():
+    db    = get_db()
+    forms = db.execute("SELECT * FROM forms ORDER BY uploaded_at DESC").fetchall()
+    stat_cards = get_stat_cards_config(db)
+    db.close()
+    return render_template('admin_settings.html', forms=forms, stat_cards=stat_cards)
+
 @app.route('/admin/stat-cards', methods=['POST'])
 @admin_required
 def save_stat_cards():

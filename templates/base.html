@@ -43,6 +43,8 @@
         {% if current_user.role == 'admin' %}
         <li><a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint == 'admin_users' }}">
             <span class="nav-label">Users</span></a></li>
+        <li><a href="{{ url_for('admin_settings') }}" class="{{ 'active' if request.endpoint == 'admin_settings' }}">
+            <span class="nav-label">Settings</span></a></li>
         <li><a href="{{ url_for('field_preview') }}" class="{{ 'active' if request.endpoint == 'field_preview' }}">
             <span class="nav-label">Field Preview</span></a></li>
         {% endif %}

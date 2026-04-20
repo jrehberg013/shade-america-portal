@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Admin Settings{% endblock %}
+{% block page_title %}Admin Settings{% endblock %}
+
+{% block content %}
+
+<!-- Manage Forms -->
+<div class="section-header">
+    <h2>Manage Forms</h2>
+</div>
+<div class="card">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Company Forms (PDFs for Field Crew)</h3>
+        <form method="POST" action="{{ url_for('forms_upload') }}" enctype="multipart/form-data" style="display:flex;gap:.5rem;align-items:center">
+            <input type="file" name="file" accept=".pdf" required style="font-size:.82rem">
+            <button type="submit" class="btn btn-primary btn-sm">Upload PDF</button>
+        </form>
+    </div>
+    {% if forms %}
+    <table class="data-table" style="margin:0">
+        <thead><tr><th>File Name</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
+        <tbody>
+            {% for form in forms %}
+            <tr>
+                <td><a href="{{ url_for('serve_form', form_id=form.id) }}" target="_blank">&#128196; {{ form.name }}</a></td>
+                <td style="font-size:.82rem;color:#888">{{ (form.file_size / 1024)|round(1) }} KB</td>
+                <td style="font-size:.82rem;color:#888">{{ (form.uploaded_at|string)[:10] if form.uploaded_at else '&mdash;' }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('forms_delete', form_id=form.id) }}"
+                          onsubmit="return confirm('Delete {{ form.name }}?')" style="display:inline">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="padding:1rem;color:#aaa;font-size:.88rem">No forms uploaded yet.</p>
+    {% endif %}
+</div>
+
+<!-- Configure Stat Cards -->
+<div class="section-header" style="margin-top:2rem">
+    <h2>Configure Stat Cards</h2>
+</div>
+<div class="card" style="padding:1.25rem">
+    <p style="font-size:.85rem;color:#666;margin-bottom:1rem">Add, remove, reorder, or rename the stat cards shown at the top of the dashboard.</p>
+    <table class="data-table" id="stat-card-table" style="margin-bottom:1rem">
+        <thead><tr><th style="width:40px"></th><th>Key</th><th>Label</th><th>Color</th><th></th></tr></thead>
+        <tbody id="stat-card-tbody">
+            {% for card in stat_cards %}
+            <tr data-key="{{ card.key }}">
+                <td style="text-align:center">
+                    <button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer;font-size:1rem">&#9650;</button>
+                    <button type="button" onclick="scMove(this,1)"  style="background:none;border:none;cursor:pointer;font-size:1rem">&#9660;</button>
+                </td>
+                <td><code style="font-size:.82rem">{{ card.key }}</code></td>
+                <td><input type="text" value="{{ card.label }}" class="sc-label" style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td>
+                <td>
+                    <select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px">
+                        <option value=""            {% if card.color == ''            %}selected{% endif %}>Default</option>
+                        <option value="text-blue"   {% if card.color == 'text-blue'   %}selected{% endif %}>Blue</option>
+                        <option value="text-green"  {% if card.color == 'text-green'  %}selected{% endif %}>Green</option>
+                        <option value="text-yellow" {% if card.color == 'text-yellow' %}selected{% endif %}>Yellow</option>
+                        <option value="text-grey"   {% if card.color == 'text-grey'   %}selected{% endif %}>Grey</option>
+                        <option value="text-orange" {% if card.color == 'text-orange' %}selected{% endif %}>Orange</option>
+                    </select>
+                </td>
+                <td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+        <strong style="font-size:.88rem">Add card:</strong>
+        <select id="sc-new-key" style="font-size:.82rem;padding:.3rem .5rem;border-radius:4px;border:1px solid #ddd">
+            <option value="total">total</option>
+            <option value="pipeline_value">pipeline_value ($ total)</option>
+            <option value="deposit_received">deposit_received</option>
+            <option value="design">design</option>
+            <option value="engineering">engineering</option>
+            <option value="permitting">permitting</option>
+            <option value="fabrication">fabrication</option>
+            <option value="installation">installation</option>
+            <option value="completed">completed</option>
+        </select>
+        <input type="text" id="sc-new-label" placeholder="Display label" maxlength="40"
+               style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:160px">
+        <button type="button" onclick="scAdd()" class="btn btn-sm btn-outline">+ Add</button>
+    </div>
+    <button type="button" onclick="scSave()" class="btn btn-primary">Save Stat Cards</button>
+    <span id="sc-msg" style="font-size:.85rem;margin-left:.75rem;color:#2a7a4f"></span>
+</div>
+
+<script>
+function scMove(btn,dir){const row=btn.closest('tr'),tbody=row.parentElement,rows=Array.from(tbody.rows),idx=rows.indexOf(row),t=idx+dir;if(t<0||t>=rows.length)return;if(dir===-1)tbody.insertBefore(row,rows[t]);else tbody.insertBefore(rows[t],row);}
+function scRemove(btn){btn.closest('tr').remove();}
+function scAdd(){
+    const key=document.getElementById('sc-new-key').value;
+    const label=document.getElementById('sc-new-label').value.trim();
+    if(!label){alert('Enter a label.');return;}
+    const tbody=document.getElementById('stat-card-tbody');
+    const tr=document.createElement('tr');
+    tr.dataset.key=key;
+    tr.innerHTML='<td style="text-align:center"><button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer">&#9650;</button><button type="button" onclick="scMove(this,1)" style="background:none;border:none;cursor:pointer">&#9660;</button></td><td><code>'+key+'</code></td><td><input type="text" value="'+label+'" class="sc-label" style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td><td><select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px"><option value="">Default</option><option value="text-blue">Blue</option><option value="text-green">Green</option><option value="text-yellow">Yellow</option><option value="text-grey">Grey</option><option value="text-orange">Orange</option></select></td><td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>';
+    tbody.appendChild(tr);
+}
+function scSave(){
+    const rows=document.querySelectorAll('#stat-card-tbody tr');
+    const cards=Array.from(rows).map(r=>({
+        key:r.dataset.key,
+        label:r.querySelector('.sc-label').value.trim(),
+        color:r.querySelector('.sc-color').value
+    }));
+    fetch('/admin/stat-cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cards})})
+        .then(r=>r.json()).then(d=>{
+            const msg=document.getElementById('sc-msg');
+            msg.textContent=d.ok?'Saved!':'Error saving.';
+            setTimeout(()=>msg.textContent='',3000);
+        });
+}
+</script>
+{% endblock %}
