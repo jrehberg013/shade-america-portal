@@ -142,6 +142,9 @@ def init_db():
                 status TEXT DEFAULT 'quoted',
                 estimate_total REAL DEFAULT 0,
                 notes TEXT,
+                trello_url TEXT,
+                contract_value REAL DEFAULT 0,
+                deposit_paid REAL DEFAULT 0,
                 created_by INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -206,6 +209,9 @@ def init_db():
                 status TEXT DEFAULT 'quoted',
                 estimate_total REAL DEFAULT 0,
                 notes TEXT,
+                trello_url TEXT,
+                contract_value REAL DEFAULT 0,
+                deposit_paid REAL DEFAULT 0,
                 created_by INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -342,6 +348,16 @@ def init_db():
         if not db.execute("SELECT id FROM pricing WHERE category=? AND name=?", (cat, name)).fetchone():
             db.execute("INSERT INTO pricing (category,name,price,unit,sort_order) VALUES (?,?,?,?,?)",
                        (cat, name, price, unit, sort))
+
+    # Migrate existing databases — add Trello sync columns if missing
+    for col, typedef in [('trello_url','TEXT'), ('contract_value','REAL DEFAULT 0'), ('deposit_paid','REAL DEFAULT 0')]:
+        try:
+            if USE_PG:
+                db.execute(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col} {typedef}")
+            else:
+                db.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass
 
     db.commit()
     db.close()
@@ -525,9 +541,10 @@ def new_job():
             est = float(request.form.get('estimate_total', 0) or 0)
         except ValueError:
             est = 0
+        trello_url = request.form.get('trello_url', '').strip()
         db.execute(
-            "INSERT INTO jobs (name,client,phone,location,status,estimate_total,notes,created_by) "
-            "VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO jobs (name,client,phone,location,status,estimate_total,notes,trello_url,created_by) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
             (name,
              request.form.get('client', ''),
              request.form.get('phone', ''),
@@ -535,6 +552,7 @@ def new_job():
              request.form.get('status', 'deposit_received'),
              est,
              request.form.get('notes', ''),
+             trello_url,
              session['user_id'])
         )
         db.commit()
@@ -1436,6 +1454,152 @@ def trello_data():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+
+
+
+# ─────────────────────────────────────────────────────────────
+# TRELLO SYNC ROUTES
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/jobs/<int:job_id>/trello-link', methods=['POST'])
+@manager_required
+def trello_link(job_id):
+    db = get_db()
+    job = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        flash('Job not found.', 'error')
+        return redirect(url_for('dashboard'))
+    trello_url = request.form.get('trello_url', '').strip()
+    db.execute("UPDATE jobs SET trello_url=? WHERE id=?", (trello_url, job_id))
+    db.commit()
+    db.close()
+    flash('Trello card linked.', 'success')
+    return redirect(url_for('job_detail', job_id=job_id))
+
+
+@app.route('/jobs/<int:job_id>/trello-sync', methods=['POST'])
+@manager_required
+def trello_sync(job_id):
+    import re as _re
+    db = get_db()
+    job = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        flash('Job not found.', 'error')
+        return redirect(url_for('dashboard'))
+
+    trello_url = job['trello_url'] or ''
+    if not trello_url:
+        flash('No Trello card linked to this job.', 'error')
+        return redirect(url_for('job_detail', job_id=job_id))
+
+    # Extract short link from URL: https://trello.com/c/{shortLink}/...
+    m = _re.search(r'trello\.com/c/([^/]+)', trello_url)
+    if not m:
+        flash('Invalid Trello card URL.', 'error')
+        return redirect(url_for('job_detail', job_id=job_id))
+    short_link = m.group(1)
+
+    api_key = os.environ.get('TRELLO_API_KEY', '')
+    token   = os.environ.get('TRELLO_TOKEN', '')
+    if not api_key or not token:
+        flash('Trello API not configured.', 'error')
+        return redirect(url_for('job_detail', job_id=job_id))
+
+    auth = f'key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}'
+
+    try:
+        # Get card info (board id + custom fields)
+        card_url = f'https://api.trello.com/1/cards/{short_link}?{auth}&fields=idBoard,name'
+        with urllib.request.urlopen(card_url, timeout=10) as r:
+            card = json.loads(r.read())
+        board_id = card['idBoard']
+
+        # Get board custom field definitions
+        cf_def_url = f'https://api.trello.com/1/boards/{board_id}/customFields?{auth}'
+        with urllib.request.urlopen(cf_def_url, timeout=10) as r:
+            cf_defs = json.loads(r.read())
+        cf_name_map = {cf['id']: cf['name'] for cf in cf_defs}
+
+        # Get card custom field values
+        cf_val_url = f'https://api.trello.com/1/cards/{short_link}/customFieldItems?{auth}'
+        with urllib.request.urlopen(cf_val_url, timeout=10) as r:
+            cf_items = json.loads(r.read())
+
+        contract_value = 0.0
+        deposit_paid   = 0.0
+        for item in cf_items:
+            fname = cf_name_map.get(item.get('idCustomField'), '').lower()
+            val   = item.get('value', {})
+            num   = None
+            if 'number' in val:
+                try:
+                    num = float(val['number'])
+                except (TypeError, ValueError):
+                    pass
+            if num is not None:
+                if 'contract' in fname:
+                    contract_value = num
+                elif 'deposit' in fname:
+                    deposit_paid = num
+
+        # Fetch attachments, download SA- prefixed ones
+        att_url = f'https://api.trello.com/1/cards/{short_link}/attachments?{auth}'
+        with urllib.request.urlopen(att_url, timeout=10) as r:
+            attachments = json.loads(r.read())
+
+        synced_files = 0
+        for att in attachments:
+            att_name = att.get('name', '')
+            if not att_name.upper().startswith('SA-'):
+                continue
+            # Check if already uploaded
+            existing = db.execute(
+                "SELECT id FROM documents WHERE job_id=? AND original_name=?",
+                (job_id, att_name)
+            ).fetchone()
+            if existing:
+                continue
+            # Download
+            try:
+                dl_url = att.get('url', '')
+                if not dl_url:
+                    continue
+                req = urllib.request.Request(
+                    dl_url,
+                    headers={'Authorization': f'OAuth oauth_consumer_key="{api_key}", oauth_token="{token}"'}
+                )
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    file_data = r.read()
+                mime = att.get('mimeType') or 'application/octet-stream'
+                if USE_PG:
+                    db.execute(
+                        "INSERT INTO documents (job_id,original_name,doc_type,file_data,mime_type,file_size,uploaded_by)"
+                        " VALUES (?,?,?,?,?,?,?)",
+                        (job_id, att_name, 'drawing', _bin(file_data), mime, len(file_data), session['user_id'])
+                    )
+                else:
+                    db.execute(
+                        "INSERT INTO documents (job_id,original_name,doc_type,file_data,mime_type,file_size,uploaded_by)"
+                        " VALUES (?,?,?,?,?,?,?)",
+                        (job_id, att_name, 'drawing', file_data, mime, len(file_data), session['user_id'])
+                    )
+                synced_files += 1
+            except Exception:
+                pass
+
+        # Update job with contract value and deposit
+        db.execute(
+            "UPDATE jobs SET contract_value=?, deposit_paid=? WHERE id=?",
+            (contract_value, deposit_paid, job_id)
+        )
+        db.commit()
+        db.close()
+        flash(f'Synced from Trello: {synced_files} file(s) downloaded, contract ${contract_value:,.2f}, deposit ${deposit_paid:,.2f}.', 'success')
+
+    except Exception as e:
+        flash(f'Trello sync error: {str(e)}', 'error')
+
+    return redirect(url_for('job_detail', job_id=job_id))
 
 
 # ─────────────────────────────────────────────────────────────

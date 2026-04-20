@@ -43,6 +43,56 @@
             {% endif %}
         </div>
 
+        <!-- Trello Sync -->
+        <div class="card">
+            <div class="card-header card-header-row">
+                <h3>Trello Card</h3>
+                {% if job.trello_url %}
+                <a href="{{ job.trello_url }}" target="_blank" class="btn btn-sm btn-outline">Open in Trello</a>
+                {% endif %}
+            </div>
+
+            {% if current_user.role in ['admin','manager'] %}
+            <form method="POST" action="{{ url_for('trello_link', job_id=job.id) }}" style="margin-bottom:.75rem">
+                <div class="form-row" style="align-items:flex-end;gap:.5rem">
+                    <div class="form-group" style="flex:1;margin:0">
+                        <label style="font-size:.8rem;color:#6b7280">Trello Card URL</label>
+                        <input type="url" name="trello_url" class="form-control"
+                               value="{{ job.trello_url or '' }}"
+                               placeholder="https://trello.com/c/...">
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary">Save Link</button>
+                </div>
+            </form>
+
+            {% if job.trello_url %}
+            <form method="POST" action="{{ url_for('trello_sync', job_id=job.id) }}" style="margin-bottom:.5rem">
+                <button type="submit" class="btn btn-sm btn-outline" style="background:#0079bf;color:#fff;border-color:#0079bf">
+                    ⟳ Sync from Trello
+                </button>
+                <span style="font-size:.78rem;color:#6b7280;margin-left:.5rem">Downloads SA- files · pulls Contract Value &amp; Deposit</span>
+            </form>
+            {% endif %}
+
+            {% if job.contract_value or job.deposit_paid %}
+            <div class="detail-grid" style="margin-top:.75rem">
+                <div class="detail-item">
+                    <div class="detail-label">Contract Value</div>
+                    <div class="detail-value" style="font-weight:600;color:#1d4ed8">${{ "{:,.2f}".format(job.contract_value or 0) }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Deposit Paid</div>
+                    <div class="detail-value" style="font-weight:600;color:#15803d">${{ "{:,.2f}".format(job.deposit_paid or 0) }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Balance Due</div>
+                    <div class="detail-value" style="font-weight:600;color:#b91c1c">${{ "{:,.2f}".format((job.contract_value or 0) - (job.deposit_paid or 0)) }}</div>
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+
         <!-- Move Status -->
         <div class="card">
             <div class="card-header"><h3>Update Status</h3></div>
