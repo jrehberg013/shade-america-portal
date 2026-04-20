@@ -18,7 +18,7 @@ if "%GIT%"=="" (
 echo Using git at: %GIT%
 echo Committing all changes...
 "%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/forms.html templates/login.html templates/job_detail.html templates/new_job.html static/style.css static/logo.png
-"%GIT%" commit -m "Auto-sync Trello SA- files every 20 min; field staff doc filter; drag-to-pipeline"
+"%GIT%" commit -m "Fix escape corruption in auto-sync SQL query"
 echo Pushing to GitHub...
 "%GIT%" push origin main
 echo Done!

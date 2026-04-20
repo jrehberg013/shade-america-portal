@@ -1778,7 +1778,7 @@ def sync_all_trello_jobs():
     with app.app_context():
         db = get_db()
         jobs = db.execute(
-            "SELECT id, trello_url FROM jobs WHERE trello_url IS NOT NULL AND trello_url \!= \'\'"
+            "SELECT id, trello_url FROM jobs WHERE trello_url IS NOT NULL AND trello_url != ''"
         ).fetchall()
 
         for job in jobs:
