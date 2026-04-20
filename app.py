@@ -625,6 +625,8 @@ def upload_doc(job_id):
     )
     db.commit()
     flash('File uploaded.', 'success')
+    if session.get('role') == 'field':
+        return redirect(url_for('field'))
     return redirect(url_for('job_detail', job_id=job_id))
 
 @app.route('/docs/<int:doc_id>')
@@ -674,13 +676,14 @@ def field():
             "SELECT * FROM documents WHERE job_id=? ORDER BY uploaded_at DESC", (job['id'],)
         ).fetchall()
         sa_docs = [d for d in docs if d['original_name'].upper().startswith('SA-')]
+        all_photos = [d for d in docs if d['doc_type'] == 'photo']
         jobs.append({
             'id':       job['id'],
             'name':     job['name'],
             'location': job['location'],
             'status':   job['status'],
             'drawings': [d for d in sa_docs if d['doc_type'] == 'drawing'],
-            'photos':   [d for d in sa_docs if d['doc_type'] == 'photo'],
+            'photos':   all_photos,
         })
     return render_template('field.html', jobs=jobs)
 
@@ -1641,11 +1644,12 @@ def trello_sync(job_id):
     auth = f'key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}'
 
     try:
-        # Get card info (board id + custom fields)
-        card_url = f'https://api.trello.com/1/cards/{short_link}?{auth}&fields=idBoard,name'
+        # Get card info (board id + custom fields + desc)
+        card_url = f'https://api.trello.com/1/cards/{short_link}?{auth}&fields=idBoard,name,desc'
         with urllib.request.urlopen(card_url, timeout=10) as r:
             card = json.loads(r.read())
         board_id = card['idBoard']
+        card_desc = (card.get('desc') or '').strip()
 
         # Get board custom field definitions
         cf_def_url = f'https://api.trello.com/1/boards/{board_id}/customFields?{auth}'
@@ -1720,11 +1724,17 @@ def trello_sync(job_id):
             except Exception:
                 pass
 
-        # Update job with contract value and deposit
-        db.execute(
-            "UPDATE jobs SET contract_value=?, deposit_paid=? WHERE id=?",
-            (contract_value, deposit_paid, job_id)
-        )
+        # Update job with contract value, deposit, and notes (from card desc)
+        if card_desc:
+            db.execute(
+                "UPDATE jobs SET contract_value=?, deposit_paid=?, notes=? WHERE id=?",
+                (contract_value, deposit_paid, card_desc, job_id)
+            )
+        else:
+            db.execute(
+                "UPDATE jobs SET contract_value=?, deposit_paid=? WHERE id=?",
+                (contract_value, deposit_paid, job_id)
+            )
         db.commit()
         db.close()
         flash(f'Synced from Trello: {synced_files} file(s) downloaded, contract ${contract_value:,.2f}, deposit ${deposit_paid:,.2f}.', 'success')
@@ -1791,11 +1801,12 @@ def field_preview():
             "SELECT * FROM documents WHERE job_id=? ORDER BY uploaded_at DESC", (job['id'],)
         ).fetchall()
         sa_docs = [d for d in docs if d['original_name'].upper().startswith('SA-')]
+        all_photos = [d for d in docs if d['doc_type'] == 'photo']
         jobs.append({
             'id': job['id'], 'name': job['name'],
             'location': job['location'], 'status': job['status'],
             'drawings': [d for d in sa_docs if d['doc_type'] == 'drawing'],
-            'photos':   [d for d in sa_docs if d['doc_type'] == 'photo'],
+            'photos':   all_photos,
         })
     return render_template('field.html', jobs=jobs, preview_mode=True)
 

@@ -43,7 +43,8 @@
             {% endif %}
         </div>
 
-        <!-- Trello Sync -->
+        <!-- Trello Sync (admin/manager only) -->
+        {% if current_user.role in ['admin','manager'] %}
         <div class="card">
             <div class="card-header card-header-row">
                 <h3>Trello Card</h3>
@@ -51,7 +52,6 @@
                 <a href="{{ job.trello_url }}" target="_blank" class="btn btn-sm btn-outline">Open in Trello</a>
                 {% endif %}
             </div>
-            {% if current_user.role in ['admin','manager'] %}
             <form method="POST" action="{{ url_for('trello_link', job_id=job.id) }}" style="margin-bottom:.75rem">
                 <div class="form-row" style="align-items:flex-end;gap:.5rem">
                     <div class="form-group" style="flex:1;margin:0">
@@ -87,8 +87,8 @@
                 </div>
             </div>
             {% endif %}
-            {% endif %}
         </div>
+        {% endif %}
 
         <!-- Move Status -->
         <div class="card">
@@ -174,7 +174,7 @@
         <div class="card">
             <div class="card-header"><h3>Field Photos</h3></div>
             <div class="photo-grid">
-                {% for doc in documents if doc.doc_type == 'photo' and (current_user.role != 'field' or doc.original_name[:3].upper() == 'SA-') %}
+                {% for doc in documents if doc.doc_type == 'photo' %}
                 <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank">
                     <img src="{{ url_for('serve_doc', doc_id=doc.id) }}" alt="{{ doc.original_name }}" class="photo-thumb">
                 </a>

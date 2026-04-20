@@ -17,8 +17,8 @@ if "%GIT%"=="" (
 
 echo Using git at: %GIT%
 echo Committing all changes...
-"%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/forms.html templates/login.html templates/job_detail.html templates/new_job.html static/style.css static/logo.png
-"%GIT%" commit -m "Field view shows Installation jobs only with SA- files"
+"%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/forms.html templates/login.html templates/job_detail.html templates/new_job.html templates/field.html static/style.css static/logo.png
+"%GIT%" commit -m "Fix field staff mobile: tappable cards, photo redirect, hide Trello, show all photos, sync notes"
 echo Pushing to GitHub...
 "%GIT%" push origin main
 echo Done!

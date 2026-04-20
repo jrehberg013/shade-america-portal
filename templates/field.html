@@ -9,6 +9,8 @@
 <div class="field-job-list">
     {% for job in jobs %}
     <div class="field-job-card">
+        <!-- Tap header to open job detail -->
+        <a href="{{ url_for('job_detail', job_id=job.id) }}" class="field-job-tap-link">
         <div class="field-job-header">
             <div>
                 <div class="field-job-name">{{ job.name }}</div>
@@ -16,6 +18,7 @@
             </div>
             <span class="status-badge status-{{ job.status }}">{{ job.status.replace('_',' ').title() }}</span>
         </div>
+        </a>
 
         <!-- Drawings -->
         {% if job.drawings %}

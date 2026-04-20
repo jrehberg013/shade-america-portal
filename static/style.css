@@ -198,7 +198,9 @@ img{max-width:100%}
 /* ---- FIELD VIEW ---- */
 .field-job-list{display:flex;flex-direction:column;gap:1.25rem}
 .field-job-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;box-shadow:var(--shadow)}
-.field-job-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem}
+.field-job-tap-link{display:block;text-decoration:none;color:inherit;margin:-1.25rem -1.25rem 0;padding:1.25rem 1.25rem 1rem;border-radius:var(--radius) var(--radius) 0 0;transition:background .15s}
+.field-job-tap-link:hover,.field-job-tap-link:active{background:var(--off-white)}
+.field-job-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0}
 .field-job-name{font-size:1.05rem;font-weight:700}
 .field-job-loc{font-size:.8rem;color:var(--muted);margin-top:.2rem}
 .field-section-label{font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:.75rem 0 .4rem}
