@@ -271,7 +271,7 @@
         const col=e.currentTarget;
         col.classList.remove('drag-over');
         let payload;
-        try{ payload=JSON.parse(e.dataTransfer.getData('text/plain')); }catch(){ return; }
+        try{ payload=JSON.parse(e.dataTransfer.getData('text/plain')); }catch(_e){ return; }
         if(!payload.url) return;
         const status=col.dataset.status;
         const spinner=document.createElement('div');
