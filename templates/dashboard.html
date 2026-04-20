@@ -154,8 +154,20 @@
                         due=`<div class="trello-card-due${ov?' overdue':''}">`+
                             `Due: ${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>`;
                     }
+                    const TCOLORS={red:'#eb5a46',orange:'#ff9f1a',yellow:'#f2d600',
+                        green:'#61bd4f',blue:'#0079bf',purple:'#c377e0',
+                        pink:'#ff78cb',sky:'#00c2e0',lime:'#51e898',black:'#344563'};
+                    let labels='';
+                    if(c.labels&&c.labels.length){
+                        labels='<div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:.3rem">'
+                            +c.labels.map(lb=>{
+                                const bg=TCOLORS[lb.color]||'#aaa';
+                                return `<span title="${lb.name||lb.color||''}"
+                                    style="display:inline-block;height:8px;min-width:32px;border-radius:3px;background:${bg}"></span>`;
+                            }).join('')+'</div>';
+                    }
                     return `<a class="trello-card" href="${c.url}" target="_blank">
-                        <div class="trello-card-name">${c.name}</div>${due}</a>`;
+                        ${labels}<div class="trello-card-name">${c.name}</div>${due}</a>`;
                 }).join(''):'<div class="trello-empty">No cards</div>';
                 return `<div class="trello-list">
                     <div class="trello-list-header">

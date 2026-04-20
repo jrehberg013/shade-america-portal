@@ -1415,13 +1415,15 @@ def trello_data():
                     continue
                 curl = (f"https://api.trello.com/1/lists/{lst['id']}/cards"
                         f"?key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}"
-                        f"&fields=name,shortLink,url,due,desc&filter=open")
+                        f"&fields=name,shortLink,url,due,desc,labels&filter=open")
                 with urllib.request.urlopen(curl, timeout=10) as resp:
                     cards = json.loads(resp.read())
                 board_data['lists'].append({
                     'name': lst['name'],
                     'cards': [{'name': _card_name(c), 'url': c['url'],
-                               'due': c.get('due'), 'desc': c.get('desc', '')}
+                               'due': c.get('due'), 'desc': c.get('desc', ''),
+                               'labels': [{'color': lb.get('color'), 'name': lb.get('name','')}
+                                          for lb in c.get('labels', [])]}
                               for c in cards]
                 })
             result.append(board_data)
