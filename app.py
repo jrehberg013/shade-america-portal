@@ -1388,7 +1388,7 @@ def trello_data():
     if not api_key or not token:
         return jsonify({'error': 'not_configured'})
 
-    target_boards = ['Shade America', 'Installation', 'Sewing Shop']
+    target_boards = ['Shade America']
 
     # Lists to EXCLUDE per board (case-insensitive)
     EXCLUDED_LISTS = {

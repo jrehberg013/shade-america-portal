@@ -18,7 +18,7 @@ if "%GIT%"=="" (
 echo Using git at: %GIT%
 echo Committing all changes...
 "%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/forms.html templates/login.html templates/job_detail.html templates/new_job.html static/style.css static/logo.png
-"%GIT%" commit -m "Cache Trello API response 5min; delay auto-sync 3min; show error detail in widget"
+"%GIT%" commit -m "Load only Shade America board in Trello widget; add API caching and error detail"
 echo Pushing to GitHub...
 "%GIT%" push origin main
 echo Done!
