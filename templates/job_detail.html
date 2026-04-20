@@ -32,7 +32,7 @@
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Created</div>
-                    <div class="detail-value">{{ job.created_at[:10] if job.created_at else '—' }}</div>
+                    <div class="detail-value">{{ (job.created_at|string)[:10] if job.created_at else '—' }}</div>
                 </div>
             </div>
             {% if job.notes %}
@@ -48,7 +48,7 @@
             <div class="card-header"><h3>Update Status</h3></div>
             <form method="POST" action="{{ url_for('update_status', job_id=job.id) }}" class="status-form">
                 <div class="status-buttons">
-                    {% for s, label in [('quoted','Quoted'),('approved','Approved'),('in_progress','In Progress'),('install','Install'),('completed','Completed')] %}
+                    {% for s, label in [('deposit_received','Deposit Received'),('design','Design / Drawings'),('engineering','Engineering'),('permitting','Permitting'),('fabrication','Fabrication'),('installation','Installation'),('completed','Completed')] %}
                     <button type="submit" name="status" value="{{ s }}"
                             class="btn btn-status {% if job.status == s %}active{% endif %} status-{{ s }}">
                         {{ label }}

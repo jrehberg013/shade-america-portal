@@ -26,11 +26,13 @@
 
 <div class="pipeline-board">
     {% set columns = [
-        ('quoted',      '📋', 'Quoted',      'col-blue'),
-        ('approved',    '✅', 'Approved',    'col-green'),
-        ('in_progress', '🔨', 'In Progress', 'col-yellow'),
-        ('install',     '🏗️', 'Install',     'col-orange'),
-        ('completed',   '🎉', 'Completed',   'col-grey'),
+        ('deposit_received', '💰', 'Deposit Received',  'col-blue'),
+        ('design',           '✏️',  'Design / Drawings', 'col-purple'),
+        ('engineering',      '📐', 'Engineering',       'col-teal'),
+        ('permitting',       '📝', 'Permitting',        'col-orange'),
+        ('fabrication',      '🔧', 'Fabrication',       'col-yellow'),
+        ('installation',     '🏗️', 'Installation',      'col-green'),
+        ('completed',        '🎉', 'Completed',         'col-grey'),
     ] %}
 
     {% for status, icon, label, cls in columns %}
@@ -175,158 +177,4 @@
 </script>
 
 {% if current_user.role == 'admin' %}
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- MANAGE FORMS (admin only)                                  -->
-<!-- ══════════════════════════════════════════════════════════ -->
-<div class="section-header" style="margin-top:2rem">
-    <h2>Manage Forms</h2>
-</div>
-<div class="card">
-  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-    <h3>Company Forms (PDFs for Field Crew)</h3>
-    <form method="POST" action="{{ url_for('forms_upload') }}" enctype="multipart/form-data" style="display:flex;gap:.5rem;align-items:center">
-      <input type="file" name="file" accept=".pdf" required style="font-size:.82rem">
-      <button type="submit" class="btn btn-primary btn-sm">Upload PDF</button>
-    </form>
-  </div>
-  {% set all_forms = [] %}
-  {% if forms %}
-  <table class="data-table" style="margin:0">
-    <thead><tr><th>File Name</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
-    <tbody>
-      {% for form in forms %}
-      <tr>
-        <td><a href="{{ url_for('serve_form', form_id=form.id) }}" target="_blank">📄 {{ form.name }}</a></td>
-        <td style="font-size:.82rem;color:#888">{{ (form.file_size / 1024)|round(1) }} KB</td>
-        <td style="font-size:.82rem;color:#888">{{ (form.uploaded_at|string)[:10] if form.uploaded_at else '—' }}</td>
-        <td>
-          <form method="POST" action="{{ url_for('forms_delete', form_id=form.id) }}"
-                onsubmit="return confirm('Delete {{ form.name }}?')" style="display:inline">
-            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p style="padding:1rem;color:#aaa;font-size:.88rem">No forms uploaded yet. Use the button above to add PDFs for the field crew.</p>
-  {% endif %}
-</div>
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- CONFIGURE STAT CARDS (admin only)                          -->
-<!-- ══════════════════════════════════════════════════════════ -->
-<div class="section-header" style="margin-top:2rem">
-    <h2>Configure Stat Cards</h2>
-</div>
-<div class="card" style="padding:1.25rem">
-  <p style="font-size:.85rem;color:#666;margin-bottom:1rem">Add, remove, reorder, or rename the stat cards shown at the top of this page.</p>
-
-  <table class="data-table" id="stat-card-table" style="margin-bottom:1rem">
-    <thead><tr><th style="width:40px"></th><th>Key</th><th>Label (display name)</th><th>Color</th><th></th></tr></thead>
-    <tbody id="stat-card-tbody">
-      {% for card in stat_cards %}
-      <tr data-key="{{ card.key }}">
-        <td style="text-align:center">
-          <button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer;font-size:1rem">▲</button>
-          <button type="button" onclick="scMove(this,1)"  style="background:none;border:none;cursor:pointer;font-size:1rem">▼</button>
-        </td>
-        <td><code style="font-size:.82rem">{{ card.key }}</code></td>
-        <td><input type="text" value="{{ card.label }}" class="sc-label"
-             style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td>
-        <td>
-          <select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px">
-            <option value=""           {% if card.color == ''           %}selected{% endif %}>Default (dark)</option>
-            <option value="text-blue"  {% if card.color == 'text-blue'  %}selected{% endif %}>Blue</option>
-            <option value="text-green" {% if card.color == 'text-green' %}selected{% endif %}>Green</option>
-            <option value="text-yellow"{% if card.color == 'text-yellow'%}selected{% endif %}>Yellow</option>
-            <option value="text-grey"  {% if card.color == 'text-grey'  %}selected{% endif %}>Grey</option>
-          </select>
-        </td>
-        <td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
-    <strong style="font-size:.88rem">Add card:</strong>
-    <select id="sc-new-key" style="font-size:.82rem;padding:.3rem .5rem;border-radius:4px;border:1px solid #ddd">
-      <option value="total">total — Total Jobs</option>
-      <option value="pipeline_value">pipeline_value — Pipeline Value ($)</option>
-      <option value="quoted">quoted — Quoted</option>
-      <option value="approved">approved — Approved</option>
-      <option value="in_progress">in_progress — In Progress</option>
-      <option value="install">install — Install</option>
-      <option value="completed">completed — Completed</option>
-    </select>
-    <input type="text" id="sc-new-label" placeholder="Display label" maxlength="40"
-           style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:160px">
-    <button type="button" onclick="scAdd()" class="btn btn-sm btn-outline">+ Add</button>
-  </div>
-
-  <button type="button" onclick="scSave()" class="btn btn-primary">Save Stat Cards</button>
-  <span id="sc-msg" style="font-size:.85rem;margin-left:.75rem;color:#2a7a4f"></span>
-</div>
-
-<script>
-function scMove(btn, dir) {
-    const row = btn.closest('tr');
-    const tbody = row.parentElement;
-    const rows  = Array.from(tbody.rows);
-    const idx   = rows.indexOf(row);
-    const target = idx + dir;
-    if (target < 0 || target >= rows.length) return;
-    if (dir === -1) tbody.insertBefore(row, rows[target]);
-    else tbody.insertBefore(rows[target], row);
-}
-function scRemove(btn) {
-    btn.closest('tr').remove();
-}
-function scAdd() {
-    const key   = document.getElementById('sc-new-key').value;
-    const label = document.getElementById('sc-new-label').value.trim();
-    if (!label) { alert('Enter a display label.'); return; }
-    const tbody = document.getElementById('stat-card-tbody');
-    const tr = document.createElement('tr');
-    tr.dataset.key = key;
-    tr.innerHTML = `
-      <td style="text-align:center">
-        <button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer;font-size:1rem">▲</button>
-        <button type="button" onclick="scMove(this,1)"  style="background:none;border:none;cursor:pointer;font-size:1rem">▼</button>
-      </td>
-      <td><code style="font-size:.82rem">${key}</code></td>
-      <td><input type="text" value="${label}" class="sc-label"
-           style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td>
-      <td><select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px">
-        <option value="">Default (dark)</option>
-        <option value="text-blue">Blue</option>
-        <option value="text-green">Green</option>
-        <option value="text-yellow">Yellow</option>
-        <option value="text-grey">Grey</option>
-      </select></td>
-      <td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>`;
-    tbody.appendChild(tr);
-    document.getElementById('sc-new-label').value = '';
-}
-function scSave() {
-    const rows  = Array.from(document.getElementById('stat-card-tbody').rows);
-    const cards = rows.map(r => ({
-        key:   r.dataset.key,
-        label: r.querySelector('.sc-label').value.trim(),
-        color: r.querySelector('.sc-color').value,
-    })).filter(c => c.label);
-    fetch('{{ url_for("save_stat_cards") }}', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({cards})
-    }).then(r => r.json()).then(d => {
-        if (d.ok) {
-            document.getElementById('sc-msg').textContent = '✓ Saved! Refresh to see updated cards.';
-            setTimeout(() => document.getElementById('sc-msg').textContent = '', 4000);
-        }
-    });
-}
-</script>
-{% endif %}
-{% endblock %}
+<!-- ════════════════════════════════════════════════════�

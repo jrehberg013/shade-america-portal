@@ -354,9 +354,9 @@ def init_db():
 _DEFAULT_STAT_CARDS = json.dumps([
     {"key": "total",          "label": "Total Jobs",     "color": ""},
     {"key": "pipeline_value", "label": "Pipeline Value", "color": "text-green"},
-    {"key": "in_progress",    "label": "In Progress",    "color": "text-yellow"},
+    {"key": "fabrication",    "label": "Fabrication",    "color": "text-yellow"},
+    {"key": "installation",   "label": "Installation",   "color": "text-orange"},
     {"key": "completed",      "label": "Completed",      "color": "text-grey"},
-    {"key": "quoted",         "label": "Quoted",         "color": "text-blue"},
 ])
 
 def get_stat_cards_config(db):
@@ -477,18 +477,20 @@ def change_password():
 def dashboard():
     db = get_db()
     all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
-    statuses = ['quoted', 'approved', 'in_progress', 'install', 'completed']
+    statuses = ['deposit_received','design','engineering','permitting','fabrication','installation','completed']
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
     active_jobs   = [j for j in all_jobs if j['status'] != 'completed']
     pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
     stats = {
         'total':          len(all_jobs),
-        'quoted':         len(jobs_by_status['quoted']),
-        'approved':       len(jobs_by_status['approved']),
-        'in_progress':    len(jobs_by_status['in_progress']),
-        'install':        len(jobs_by_status['install']),
-        'completed':      len(jobs_by_status['completed']),
-        'pipeline_value': pipeline_value,
+        'deposit_received': len(jobs_by_status['deposit_received']),
+        'design':           len(jobs_by_status['design']),
+        'engineering':      len(jobs_by_status['engineering']),
+        'permitting':       len(jobs_by_status['permitting']),
+        'fabrication':      len(jobs_by_status['fabrication']),
+        'installation':     len(jobs_by_status['installation']),
+        'completed':        len(jobs_by_status['completed']),
+        'pipeline_value':   pipeline_value,
     }
     stat_cards = get_stat_cards_config(db)
     forms = db.execute("SELECT id, name, file_size, uploaded_at FROM forms ORDER BY name").fetchall()
@@ -530,7 +532,7 @@ def new_job():
              request.form.get('client', ''),
              request.form.get('phone', ''),
              request.form.get('location', ''),
-             request.form.get('status', 'quoted'),
+             request.form.get('status', 'deposit_received'),
              est,
              request.form.get('notes', ''),
              session['user_id'])
@@ -564,7 +566,7 @@ def job_detail(job_id):
 @manager_required
 def update_status(job_id):
     status = request.form.get('status')
-    if status in ['quoted', 'approved', 'in_progress', 'install', 'completed']:
+    if status in ['deposit_received','design','engineering','permitting','fabrication','installation','completed']:
         db = get_db()
         db.execute("UPDATE jobs SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", (status, job_id))
         db.commit()
@@ -1264,7 +1266,7 @@ def create_user():
 def save_stat_cards():
     data  = request.get_json(silent=True) or {}
     cards = data.get('cards', [])
-    valid_keys = {'total','quoted','approved','in_progress','install','completed','pipeline_value'}
+    valid_keys = {'total','deposit_received','design','engineering','permitting','fabrication','installation','completed','pipeline_value'}
     clean = [
         {'key': c['key'], 'label': c['label'].strip(), 'color': c.get('color','')}
         for c in cards if c.get('key') in valid_keys and c.get('label','').strip()
