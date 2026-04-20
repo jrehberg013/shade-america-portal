@@ -1457,6 +1457,93 @@ def trello_data():
 
 
 
+
+# ─────────────────────────────────────────────────────────────
+# CREATE JOB FROM TRELLO CARD (drag-and-drop)
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/jobs/from-trello', methods=['POST'])
+@manager_required
+def job_from_trello():
+    import re as _re
+    data = request.get_json(force=True) or {}
+    trello_url = data.get('trello_url', '').strip()
+    status     = data.get('status', 'deposit_received')
+    card_name  = data.get('card_name', '').strip()
+
+    if not trello_url:
+        return jsonify({'error': 'No Trello URL provided'}), 400
+
+    m = _re.search(r'trello\.com/c/([^/]+)', trello_url)
+    if not m:
+        return jsonify({'error': 'Invalid Trello URL'}), 400
+    short_link = m.group(1)
+
+    api_key = os.environ.get('TRELLO_API_KEY', '')
+    token   = os.environ.get('TRELLO_TOKEN', '')
+    auth    = f'key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}'
+
+    contract_value = 0.0
+    deposit_paid   = 0.0
+
+    try:
+        # Fetch card details
+        card_url = f'https://api.trello.com/1/cards/{short_link}?{auth}&fields=name,desc,idBoard'
+        with urllib.request.urlopen(card_url, timeout=10) as r:
+            card = json.loads(r.read())
+        job_name   = card.get('name') or card_name or 'New Job'
+        board_id   = card.get('idBoard', '')
+        notes      = card.get('desc', '')
+
+        # Fetch custom field definitions + values
+        if board_id:
+            cf_def_url = f'https://api.trello.com/1/boards/{board_id}/customFields?{auth}'
+            with urllib.request.urlopen(cf_def_url, timeout=10) as r:
+                cf_defs = json.loads(r.read())
+            cf_name_map = {cf['id']: cf['name'] for cf in cf_defs}
+
+            cf_val_url = f'https://api.trello.com/1/cards/{short_link}/customFieldItems?{auth}'
+            with urllib.request.urlopen(cf_val_url, timeout=10) as r:
+                cf_items = json.loads(r.read())
+
+            for item in cf_items:
+                fname = cf_name_map.get(item.get('idCustomField'), '').lower()
+                val   = item.get('value', {})
+                if 'number' in val:
+                    try:
+                        num = float(val['number'])
+                        if 'contract' in fname:
+                            contract_value = num
+                        elif 'deposit' in fname:
+                            deposit_paid = num
+                    except (TypeError, ValueError):
+                        pass
+    except Exception as e:
+        job_name = card_name or 'New Job'
+        notes    = ''
+
+    # Create the job
+    db = get_db()
+    db.execute(
+        "INSERT INTO jobs (name,status,trello_url,contract_value,deposit_paid,notes,created_by)"
+        " VALUES (?,?,?,?,?,?,?)",
+        (job_name, status, trello_url, contract_value, deposit_paid, notes, session['user_id'])
+    )
+    db.commit()
+    job_id = db.execute("SELECT last_insert_rowid() AS id").fetchone()['id'] if not USE_PG else              db.execute("SELECT id FROM jobs WHERE trello_url=? ORDER BY id DESC LIMIT 1", (trello_url,)).fetchone()['id']
+    db.close()
+
+    return jsonify({
+        'id':             job_id,
+        'name':           job_name,
+        'status':         status,
+        'trello_url':     trello_url,
+        'contract_value': contract_value,
+        'deposit_paid':   deposit_paid,
+        'url':            f'/jobs/{job_id}',
+    })
+
+
 # ─────────────────────────────────────────────────────────────
 # TRELLO SYNC ROUTES
 # ─────────────────────────────────────────────────────────────
@@ -1674,12 +1761,143 @@ def not_found(e):
                            message="The page you're looking for doesn't exist."), 404
 
 
+
+# ─────────────────────────────────────────────────────────────
+# AUTO TRELLO SYNC (background scheduler — runs every 20 min)
+# ─────────────────────────────────────────────────────────────
+
+def sync_all_trello_jobs():
+    """Download new SA- attachments and refresh contract/deposit for every linked job."""
+    import re as _re
+    api_key = os.environ.get('TRELLO_API_KEY', '')
+    token   = os.environ.get('TRELLO_TOKEN', '')
+    if not api_key or not token:
+        return
+    auth = f'key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}'
+
+    with app.app_context():
+        db = get_db()
+        jobs = db.execute(
+            "SELECT id, trello_url FROM jobs WHERE trello_url IS NOT NULL AND trello_url \!= \'\'"
+        ).fetchall()
+
+        for job in jobs:
+            job_id     = job['id']
+            trello_url = job['trello_url']
+            m = _re.search(r'trello\.com/c/([^/]+)', trello_url)
+            if not m:
+                continue
+            short_link = m.group(1)
+
+            try:
+                # Get board id
+                card_url = f'https://api.trello.com/1/cards/{short_link}?{auth}&fields=idBoard'
+                with urllib.request.urlopen(card_url, timeout=10) as r:
+                    card = json.loads(r.read())
+                board_id = card.get('idBoard', '')
+
+                # Custom fields — contract value + deposit
+                contract_value = None
+                deposit_paid   = None
+                if board_id:
+                    cf_def_url = f'https://api.trello.com/1/boards/{board_id}/customFields?{auth}'
+                    with urllib.request.urlopen(cf_def_url, timeout=10) as r:
+                        cf_defs = json.loads(r.read())
+                    cf_name_map = {cf['id']: cf['name'] for cf in cf_defs}
+
+                    cf_val_url = f'https://api.trello.com/1/cards/{short_link}/customFieldItems?{auth}'
+                    with urllib.request.urlopen(cf_val_url, timeout=10) as r:
+                        cf_items = json.loads(r.read())
+
+                    for item in cf_items:
+                        fname = cf_name_map.get(item.get('idCustomField'), '').lower()
+                        val   = item.get('value', {})
+                        if 'number' in val:
+                            try:
+                                num = float(val['number'])
+                                if 'contract' in fname:
+                                    contract_value = num
+                                elif 'deposit' in fname:
+                                    deposit_paid = num
+                            except (TypeError, ValueError):
+                                pass
+
+                # Update dollar values if we got them
+                if contract_value is not None or deposit_paid is not None:
+                    if contract_value is not None and deposit_paid is not None:
+                        db.execute(
+                            "UPDATE jobs SET contract_value=?, deposit_paid=? WHERE id=?",
+                            (contract_value, deposit_paid, job_id)
+                        )
+                    elif contract_value is not None:
+                        db.execute("UPDATE jobs SET contract_value=? WHERE id=?", (contract_value, job_id))
+                    else:
+                        db.execute("UPDATE jobs SET deposit_paid=? WHERE id=?", (deposit_paid, job_id))
+
+                # Attachments — download new SA- files
+                att_url = f'https://api.trello.com/1/cards/{short_link}/attachments?{auth}'
+                with urllib.request.urlopen(att_url, timeout=10) as r:
+                    attachments = json.loads(r.read())
+
+                for att in attachments:
+                    att_name = att.get('name', '')
+                    if not att_name.upper().startswith('SA-'):
+                        continue
+                    existing = db.execute(
+                        "SELECT id FROM documents WHERE job_id=? AND original_name=?",
+                        (job_id, att_name)
+                    ).fetchone()
+                    if existing:
+                        continue
+                    try:
+                        dl_url = att.get('url', '')
+                        if not dl_url:
+                            continue
+                        req = urllib.request.Request(
+                            dl_url,
+                            headers={'Authorization': f'OAuth oauth_consumer_key="{api_key}", oauth_token="{token}"'}
+                        )
+                        with urllib.request.urlopen(req, timeout=30) as r:
+                            file_data = r.read()
+                        mime = att.get('mimeType') or 'application/octet-stream'
+                        if USE_PG:
+                            db.execute(
+                                "INSERT INTO documents (job_id,original_name,doc_type,file_data,mime_type,file_size,uploaded_by)"
+                                " VALUES (?,?,?,?,?,?,?)",
+                                (job_id, att_name, 'drawing', _bin(file_data), mime, len(file_data), 1)
+                            )
+                        else:
+                            db.execute(
+                                "INSERT INTO documents (job_id,original_name,doc_type,file_data,mime_type,file_size,uploaded_by)"
+                                " VALUES (?,?,?,?,?,?,?)",
+                                (job_id, att_name, 'drawing', file_data, mime, len(file_data), 1)
+                            )
+                    except Exception:
+                        pass
+
+                db.commit()
+
+            except Exception:
+                pass
+
+        db.close()
+
+
 # ─────────────────────────────────────────────────────────────
 # STARTUP
 # ─────────────────────────────────────────────────────────────
 
 with app.app_context():
     init_db()
+
+# Start background Trello sync scheduler (every 20 minutes)
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    _scheduler = BackgroundScheduler(daemon=True)
+    _scheduler.add_job(sync_all_trello_jobs, 'interval', minutes=20, id='trello_sync')
+    _scheduler.start()
+except Exception:
+    pass  # APScheduler not available — sync will be manual only
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

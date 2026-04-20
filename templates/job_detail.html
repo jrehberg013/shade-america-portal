@@ -112,7 +112,9 @@
         <div class="card">
             <div class="card-header card-header-row">
                 <h3>Documents & Drawings</h3>
+                {% if current_user.role != 'field' %}
                 <button class="btn btn-sm btn-outline" onclick="toggleUpload()">+ Upload</button>
+                {% endif %}
             </div>
 
             <div id="uploadArea" class="upload-area" style="display:none">
@@ -138,7 +140,7 @@
             </div>
 
             <div class="doc-list">
-                {% for doc in documents %}
+                {% for doc in documents if current_user.role != 'field' or doc.original_name[:3].upper() == 'SA-' %}
                 <div class="doc-item">
                     <div class="doc-info">
                         <span class="doc-icon">
@@ -175,7 +177,7 @@
         <div class="card">
             <div class="card-header"><h3>Field Photos</h3></div>
             <div class="photo-grid">
-                {% for doc in documents if doc.doc_type == 'photo' %}
+                {% for doc in documents if doc.doc_type == 'photo' and (current_user.role != 'field' or doc.original_name[:3].upper() == 'SA-') %}
                 <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank">
                     <img src="{{ url_for('serve_doc', doc_id=doc.id) }}" alt="{{ doc.original_name }}" class="photo-thumb">
                 </a>

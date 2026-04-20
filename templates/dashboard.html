@@ -41,7 +41,7 @@
             <span>{{ icon }} {{ label }}</span>
             <span class="col-count">{{ jobs_by_status[status]|length }}</span>
         </div>
-        <div class="col-cards" data-status="{{ status }}">
+        <div class="col-cards" data-status="{{ status }}" ondragover="pipelineDragOver(event)" ondrop="pipelineDrop(event)">
             {% for job in jobs_by_status[status] %}
             <a href="{{ url_for('job_detail', job_id=job.id) }}" class="job-card">
                 <div class="job-card-name">{{ job.name }}</div>
@@ -53,6 +53,14 @@
                 {% endif %}
                 {% if job.estimate_total %}
                 <div class="job-card-value">${{ "{:,.0f}".format(job.estimate_total) }}</div>
+                {% endif %}
+                {% if current_user.role in ['admin','manager'] and job.contract_value %}
+                <div class="job-card-contract">
+                    <span title="Contract">📋 ${{ "{:,.0f}".format(job.contract_value) }}</span>
+                    {% if job.deposit_paid %}
+                    <span title="Deposit" style="color:#15803d"> · dep ${{ "{:,.0f}".format(job.deposit_paid) }}</span>
+                    {% endif %}
+                </div>
                 {% endif %}
             </a>
             {% else %}
@@ -70,6 +78,11 @@
     <h2>Trello Boards</h2>
     <span onclick="loadTrello()" style="cursor:pointer;font-size:.8rem;color:#2e75b6;user-select:none">↻ Refresh</span>
 </div>
+{% if current_user.role in ['admin','manager'] %}
+<div id="drag-hint" style="font-size:.8rem;color:#6b7280;margin-bottom:.5rem;padding:.35rem .75rem;background:#f0f9ff;border:1px dashed #93c5fd;border-radius:6px;display:inline-flex;align-items:center;gap:.4rem">
+    <span>&#x1F4CC;</span> Drag any Trello card up into a pipeline column to create a job automatically.
+</div>
+{% endif %}
 
 <div class="card" id="trello-widget" style="padding:0;overflow:hidden">
     <div id="trello-tabs" class="trello-tab-bar"></div>
@@ -104,6 +117,13 @@
 .trello-empty{font-size:.77rem;color:#bbb;text-align:center;padding:.6rem 0;}
 .trello-no-cfg{text-align:center;padding:2rem;color:#999;font-size:.88rem;line-height:1.8;}
 .trello-no-cfg a{color:#2e75b6;}
+/* Drag & Drop */
+.trello-card{cursor:grab;}
+.trello-card:active{cursor:grabbing;}
+.trello-card-drag-hint{font-size:.65rem;color:#93c5fd;margin-top:.25rem;text-align:right;opacity:0;transition:opacity .15s;}
+.trello-card:hover .trello-card-drag-hint{opacity:1;}
+.col-cards.drag-over{background:rgba(59,130,246,.08);border:2px dashed #3b82f6;border-radius:8px;}
+.job-card-contract{font-size:.72rem;color:#6b7280;margin-top:.2rem;}
 </style>
 
 <script>
@@ -166,8 +186,15 @@
                                     style="display:inline-block;height:8px;min-width:32px;border-radius:3px;background:${bg}"></span>`;
                             }).join('')+'</div>';
                     }
-                    return `<a class="trello-card" href="${c.url}" target="_blank">
-                        ${labels}<div class="trello-card-name">${c.name}</div>${due}</a>`;
+                    const safeUrl=encodeURIComponent(c.url||'');
+                    const safeName=(c.name||'').replace(/"/g,'&quot;');
+                    return `<div class="trello-card" draggable="true"
+                        data-url="${safeUrl}" data-name="${safeName}"
+                        ondragstart="trelloDragStart(event)" ondragend="this.style.opacity='';this.style.display='';"
+                        onclick="window.open('${c.url}','_blank')">
+                        ${labels}<div class="trello-card-name">${c.name}</div>${due}
+                        <div class="trello-card-drag-hint">&#8645; drag to pipeline</div>
+                    </div>`;
                 }).join(''):'<div class="trello-empty">No cards</div>';
                 return `<div class="trello-list">
                     <div class="trello-list-header">
@@ -183,6 +210,75 @@
         document.querySelectorAll('.trello-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
         document.querySelectorAll('.trello-board').forEach((b,i)=>b.classList.toggle('active',i===idx));
     };
+
+    // ── Drag from Trello ──
+    window.trelloDragStart=function(e){
+        const url=decodeURIComponent(e.currentTarget.dataset.url||'');
+        const name=e.currentTarget.dataset.name||'';
+        e.dataTransfer.setData('text/plain', JSON.stringify({url,name}));
+        e.dataTransfer.effectAllowed='copy';
+        setTimeout(()=>{ e.target.style.opacity='1'; e.target.style.display=''; },0);
+    };
+
+    // ── Drop onto pipeline column ──
+    window.pipelineDragOver=function(e){
+        e.preventDefault();
+        e.dataTransfer.dropEffect='copy';
+        e.currentTarget.classList.add('drag-over');
+    };
+
+    window.pipelineDrop=function(e){
+        e.preventDefault();
+        const col=e.currentTarget;
+        col.classList.remove('drag-over');
+        let payload;
+        try{ payload=JSON.parse(e.dataTransfer.getData('text/plain')); }
+        catch(){ return; }
+        if(\!payload.url) return;
+        const status=col.dataset.status;
+        // Show spinner in column
+        const spinner=document.createElement('div');
+        spinner.style.cssText='padding:.5rem;text-align:center;color:#999;font-size:.8rem';
+        spinner.textContent='Creating job…';
+        col.prepend(spinner);
+        fetch('/jobs/from-trello',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({trello_url:payload.url, card_name:payload.name, status:status})
+        }).then(r=>r.json()).then(job=>{
+            col.removeChild(spinner);
+            if(job.error){ alert('Error: '+job.error); return; }
+            // Remove "No jobs" placeholder if present
+            const empty=col.querySelector('.col-empty');
+            if(empty) empty.remove();
+            // Build new job card
+            const a=document.createElement('a');
+            a.href=job.url;
+            a.className='job-card';
+            let html='<div class="job-card-name">'+job.name+'</div>';
+            if(job.contract_value){
+                html+='<div class="job-card-contract">'+
+                    '<span title="Contract">\uD83D\uDCCB $'+
+                    job.contract_value.toLocaleString('en-US',{maximumFractionDigits:0})+'</span>';
+                if(job.deposit_paid){
+                    html+=' <span title="Deposit" style="color:#15803d"> · dep $'+
+                        job.deposit_paid.toLocaleString('en-US',{maximumFractionDigits:0})+'</span>';
+                }
+                html+='</div>';
+            }
+            a.innerHTML=html;
+            col.prepend(a);
+            // Update column count badge
+            const hdr=col.closest('.pipeline-col').querySelector('.col-count');
+            if(hdr) hdr.textContent=parseInt(hdr.textContent||'0')+1;
+        }).catch(err=>{ col.removeChild(spinner); alert('Network error: '+err); });
+    };
+
+    // Remove drag-over style when leaving column
+    document.addEventListener('dragleave',function(e){
+        if(e.target.classList&&e.target.classList.contains('col-cards'))
+            e.target.classList.remove('drag-over');
+    });
 
     document.addEventListener('DOMContentLoaded',loadTrello);
 })();
@@ -282,8 +378,4 @@
 <script>
 function scMove(btn,dir){const row=btn.closest('tr'),tbody=row.parentElement,rows=Array.from(tbody.rows),idx=rows.indexOf(row),t=idx+dir;if(t<0||t>=rows.length)return;if(dir===-1)tbody.insertBefore(row,rows[t]);else tbody.insertBefore(rows[t],row);}
 function scRemove(btn){btn.closest('tr').remove();}
-function scAdd(){const key=document.getElementById('sc-new-key').value,label=document.getElementById('sc-new-label').value.trim();if(\!label){alert('Enter a label.');return;}const tbody=document.getElementById('stat-card-tbody'),tr=document.createElement('tr');tr.dataset.key=key;tr.innerHTML='<td style="text-align:center"><button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer">&#9650;</button><button type="button" onclick="scMove(this,1)" style="background:none;border:none;cursor:pointer">&#9660;</button></td><td><code>'+key+'</code></td><td><input type="text" value="'+label+'" class="sc-label" style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td><td><select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px"><option value="">Default</option><option value="text-blue">Blue</option><option value="text-green">Green</option><option value="text-yellow">Yellow</option><option value="text-grey">Grey</option><option value="text-orange">Orange</option></select></td><td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>';tbody.appendChild(tr);document.getElementById('sc-new-label').value='';}
-function scSave(){const rows=Array.from(document.getElementById('stat-card-tbody').rows),cards=rows.map(r=>({key:r.dataset.key,label:r.querySelector('.sc-label').value.trim(),color:r.querySelector('.sc-color').value})).filter(c=>c.label);fetch('{{ url_for("save_stat_cards") }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cards})}).then(r=>r.json()).then(d=>{if(d.ok){document.getElementById('sc-msg').textContent='Saved\! Refresh to see updated cards.';setTimeout(()=>document.getElementById('sc-msg').textContent='',4000);}});}
-</script>
-{% endif %}
-{% endblock %}
+function scAdd(){const key=document.getElementById('sc-new-key').value,label=document.getElementById('sc-new-label').value.trim();if(\!label){alert('Enter a label.');return;}const tbody=document.getElementById('stat-card-tbody'),tr=document.createElement('tr');tr.dataset.key=key;tr.innerHTML='<td style="text-align:center"><button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer">&#9650;</button><button type="button" onclick="scMove(this,1)" style="background:none;border:none;cursor:pointer">&#9660;</button></td><td><code>'+key+'</code></td><td><input type="text" value="'+label+'" class="sc-label" style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td><td><select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px"><option value="">Default</option><option value="text-blue">Blue</option><option value="text-green">Green</option><option value="text-yellow">Yellow</option><option value="text-grey">Grey</option><option value="text-orange">Orange</option></select></td><td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>';tbody.appendChild(tr
