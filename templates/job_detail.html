@@ -51,7 +51,6 @@
                 <a href="{{ job.trello_url }}" target="_blank" class="btn btn-sm btn-outline">Open in Trello</a>
                 {% endif %}
             </div>
-
             {% if current_user.role in ['admin','manager'] %}
             <form method="POST" action="{{ url_for('trello_link', job_id=job.id) }}" style="margin-bottom:.75rem">
                 <div class="form-row" style="align-items:flex-end;gap:.5rem">
@@ -64,16 +63,14 @@
                     <button type="submit" class="btn btn-sm btn-primary">Save Link</button>
                 </div>
             </form>
-
             {% if job.trello_url %}
             <form method="POST" action="{{ url_for('trello_sync', job_id=job.id) }}" style="margin-bottom:.5rem">
                 <button type="submit" class="btn btn-sm btn-outline" style="background:#0079bf;color:#fff;border-color:#0079bf">
-                    ⟳ Sync from Trello
+                    &#8634; Sync from Trello
                 </button>
-                <span style="font-size:.78rem;color:#6b7280;margin-left:.5rem">Downloads SA- files · pulls Contract Value &amp; Deposit</span>
+                <span style="font-size:.78rem;color:#6b7280;margin-left:.5rem">Downloads SA- files &middot; pulls Contract Value &amp; Deposit</span>
             </form>
             {% endif %}
-
             {% if job.contract_value or job.deposit_paid %}
             <div class="detail-grid" style="margin-top:.75rem">
                 <div class="detail-item">
@@ -152,7 +149,7 @@
                         </span>
                         <div>
                             <div class="doc-name">{{ doc.original_name }}</div>
-                            <div class="doc-meta">{{ doc.doc_type.title() }} · {{ doc.uploaded_at[:10] if doc.uploaded_at else '' }}</div>
+                            <div class="doc-meta">{{ doc.doc_type.title() }} · {{ (doc.uploaded_at|string)[:10] if doc.uploaded_at else '' }}</div>
                         </div>
                     </div>
                     <div class="doc-actions">
