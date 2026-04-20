@@ -479,7 +479,7 @@ def dashboard():
     all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
     statuses = ['quoted', 'approved', 'in_progress', 'install', 'completed']
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
-    active_jobs   = [j for j in all_jobs if j['status'] \!= 'completed']
+    active_jobs   = [j for j in all_jobs if j['status'] != 'completed']
     pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
     stats = {
         'total':          len(all_jobs),
