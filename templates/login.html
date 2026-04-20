@@ -4,8 +4,8 @@
 {% block auth_content %}
 <div class="auth-card">
     <div class="auth-logo">
-        <h2>Shade America</h2>
-        <p>Team Portal</p>
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shade America" class="login-logo-img">
+        <p style="margin-top:.5rem;color:#888;font-size:.85rem">Team Portal</p>
     </div>
     <form method="POST" action="{{ url_for('login') }}" class="auth-form">
         <div class="form-group">

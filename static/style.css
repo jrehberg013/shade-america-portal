@@ -35,8 +35,11 @@ img{max-width:100%}
     transition:transform .25s ease;
 }
 .sidebar-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.08)}
-.logo{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:1.05rem}
+.logo{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:1.05rem;overflow:hidden}
+.logo-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .logo-icon{font-size:1.4rem}
+.sidebar-logo-img{width:180px;display:block;filter:brightness(1.05)}
+.login-logo-img{width:260px;display:block;margin:0 auto}
 .sidebar-toggle{background:none;border:none;color:var(--white);cursor:pointer;font-size:1.2rem;display:none}
 
 .nav-user{display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.08)}
