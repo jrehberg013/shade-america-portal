@@ -129,12 +129,15 @@
 <script>
 (function(){
     let trelloData=null;
+
+    // Fetch Trello data directly from browser -> Trello API (bypasses server network)
     window.loadTrello=function(){
         document.getElementById('trello-content').innerHTML=
             '<div style="color:#aaa;font-size:.88rem;text-align:center;padding:2rem">Loading…</div>';
         document.getElementById('trello-tabs').innerHTML='';
-        fetch('/api/trello').then(r=>r.json()).then(data=>{
-            if(data.error==='not_configured'){
+
+        fetch('/api/trello/config').then(r=>r.json()).then(cfg=>{
+            if(cfg.error==='not_configured'){
                 document.getElementById('trello-content').innerHTML=`
                     <div class="trello-no-cfg">
                         Trello is not connected yet.<br>
@@ -144,16 +147,53 @@
                     </div>`;
                 return;
             }
-            if(data.error){
+            if(cfg.error){
                 document.getElementById('trello-content').innerHTML=
-                    `<div class="trello-no-cfg">Trello error: ${data.error}<br><small style="color:#bbb">${data.detail||''}</small></div>`;
+                    `<div class="trello-no-cfg">Config error: ${cfg.error}</div>`;
                 return;
             }
-            trelloData=data.boards;
-            renderTrello(0);
+            const key=cfg.api_key, tok=cfg.token;
+            const auth=`key=${key}&token=${tok}`;
+            const TARGET='Shade America';
+            const EXCLUDED=['design','card template under construction',"estimates & po's",'money received/ project done'];
+
+            // Step 1: get boards
+            fetch(`https://api.trello.com/1/members/me/boards?${auth}&fields=name,id,url&filter=open`)
+            .then(r=>r.json()).then(boards=>{
+                const board=boards.find(b=>b.name===TARGET);
+                if(!board){
+                    document.getElementById('trello-content').innerHTML=
+                        `<div class="trello-no-cfg">Board "${TARGET}" not found.</div>`;
+                    return;
+                }
+                // Step 2: get lists + all cards in parallel
+                return Promise.all([
+                    fetch(`https://api.trello.com/1/boards/${board.id}/lists?${auth}&filter=open&fields=name,id`).then(r=>r.json()),
+                    fetch(`https://api.trello.com/1/boards/${board.id}/cards?${auth}&fields=name,shortLink,url,due,desc,labels,idList&filter=open`).then(r=>r.json())
+                ]).then(([lists, cards])=>{
+                    // Group cards by list
+                    const byList={};
+                    cards.forEach(c=>{ (byList[c.idList]=byList[c.idList]||[]).push(c); });
+                    const boardData={name:board.name, url:board.url, lists:[]};
+                    lists.forEach(lst=>{
+                        if(EXCLUDED.includes(lst.name.trim().toLowerCase())) return;
+                        const lstCards=(byList[lst.id]||[]).map(c=>({
+                            name:c.name||'Card '+c.shortLink,
+                            url:c.url, due:c.due, desc:c.desc||'',
+                            labels:(c.labels||[]).map(lb=>({color:lb.color,name:lb.name||''}))
+                        }));
+                        boardData.lists.push({name:lst.name, cards:lstCards});
+                    });
+                    trelloData=[boardData];
+                    renderTrello(0);
+                });
+            }).catch(err=>{
+                document.getElementById('trello-content').innerHTML=
+                    `<div class="trello-no-cfg">Trello error: ${err.message}</div>`;
+            });
         }).catch(()=>{
             document.getElementById('trello-content').innerHTML=
-                '<div class="trello-no-cfg">Could not reach Trello API. Check your connection.</div>';
+                '<div class="trello-no-cfg">Could not load Trello config.</div>';
         });
     };
 

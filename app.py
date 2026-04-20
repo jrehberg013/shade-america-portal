@@ -1375,6 +1375,16 @@ _TRELLO_CACHE_TTL = 300  # seconds (5 minutes)
 # TRELLO API PROXY
 # ─────────────────────────────────────────────────────────────
 
+
+@app.route('/api/trello/config')
+@login_required
+def trello_config():
+    api_key = os.environ.get('TRELLO_API_KEY', '')
+    token   = os.environ.get('TRELLO_TOKEN', '')
+    if not api_key or not token:
+        return jsonify({'error': 'not_configured'})
+    return jsonify({'api_key': api_key, 'token': token})
+
 @app.route('/api/trello')
 @login_required
 def trello_data():
