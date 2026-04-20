@@ -191,7 +191,7 @@
                 document.getElementById('trello-content').innerHTML=
                     `<div class="trello-no-cfg">Trello error: ${err.message}</div>`;
             });
-        }).catch(()=>{
+        }).catch((_e)=>{
             document.getElementById('trello-content').innerHTML=
                 '<div class="trello-no-cfg">Could not load Trello config.</div>';
         });
