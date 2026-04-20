@@ -666,21 +666,21 @@ def delete_doc(doc_id):
 def field():
     db = get_db()
     raw_jobs = db.execute(
-        "SELECT * FROM jobs WHERE status IN ('approved','in_progress','install') ORDER BY updated_at DESC"
+        "SELECT * FROM jobs WHERE status = 'installation' ORDER BY updated_at DESC"
     ).fetchall()
     jobs = []
     for job in raw_jobs:
         docs = db.execute(
-            "SELECT * FROM documents WHERE job_id=? AND doc_type IN ('drawing','photo')"
-            " ORDER BY uploaded_at DESC", (job['id'],)
+            "SELECT * FROM documents WHERE job_id=? ORDER BY uploaded_at DESC", (job['id'],)
         ).fetchall()
+        sa_docs = [d for d in docs if d['original_name'].upper().startswith('SA-')]
         jobs.append({
             'id':       job['id'],
             'name':     job['name'],
             'location': job['location'],
             'status':   job['status'],
-            'drawings': [d for d in docs if d['doc_type'] == 'drawing'],
-            'photos':   [d for d in docs if d['doc_type'] == 'photo'],
+            'drawings': [d for d in sa_docs if d['doc_type'] == 'drawing'],
+            'photos':   [d for d in sa_docs if d['doc_type'] == 'photo'],
         })
     return render_template('field.html', jobs=jobs)
 
@@ -1783,19 +1783,19 @@ def trello_list_names():
 def field_preview():
     db = get_db()
     raw_jobs = db.execute(
-        "SELECT * FROM jobs WHERE status IN ('approved','in_progress','install') ORDER BY updated_at DESC"
+        "SELECT * FROM jobs WHERE status = 'installation' ORDER BY updated_at DESC"
     ).fetchall()
     jobs = []
     for job in raw_jobs:
         docs = db.execute(
-            "SELECT * FROM documents WHERE job_id=? AND doc_type IN ('drawing','photo')"
-            " ORDER BY uploaded_at DESC", (job['id'],)
+            "SELECT * FROM documents WHERE job_id=? ORDER BY uploaded_at DESC", (job['id'],)
         ).fetchall()
+        sa_docs = [d for d in docs if d['original_name'].upper().startswith('SA-')]
         jobs.append({
             'id': job['id'], 'name': job['name'],
             'location': job['location'], 'status': job['status'],
-            'drawings': [d for d in docs if d['doc_type'] == 'drawing'],
-            'photos':   [d for d in docs if d['doc_type'] == 'photo'],
+            'drawings': [d for d in sa_docs if d['doc_type'] == 'drawing'],
+            'photos':   [d for d in sa_docs if d['doc_type'] == 'photo'],
         })
     return render_template('field.html', jobs=jobs, preview_mode=True)
 

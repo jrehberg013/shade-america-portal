@@ -18,7 +18,7 @@ if "%GIT%"=="" (
 echo Using git at: %GIT%
 echo Committing all changes...
 "%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/forms.html templates/login.html templates/job_detail.html templates/new_job.html static/style.css static/logo.png
-"%GIT%" commit -m "Fix Jobs tab server error: datetime slicing on PostgreSQL"
+"%GIT%" commit -m "Field view shows Installation jobs only with SA- files"
 echo Pushing to GitHub...
 "%GIT%" push origin main
 echo Done!
