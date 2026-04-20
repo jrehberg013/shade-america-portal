@@ -174,6 +174,10 @@ def init_db():
                 uploaded_by INTEGER,
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )""",
+            """CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )""",
         ]
         for stmt in statements:
             cur.execute(stmt)
@@ -233,6 +237,10 @@ def init_db():
                 file_size INTEGER,
                 uploaded_by INTEGER,
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
             );
         """)
         conn.commit()
@@ -337,6 +345,26 @@ def init_db():
 
     db.commit()
     db.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# STAT CARDS CONFIG
+# ─────────────────────────────────────────────────────────────
+
+_DEFAULT_STAT_CARDS = json.dumps([
+    {"key": "total",          "label": "Total Jobs",     "color": ""},
+    {"key": "pipeline_value", "label": "Pipeline Value", "color": "text-green"},
+    {"key": "in_progress",    "label": "In Progress",    "color": "text-yellow"},
+    {"key": "completed",      "label": "Completed",      "color": "text-grey"},
+    {"key": "quoted",         "label": "Quoted",         "color": "text-blue"},
+])
+
+def get_stat_cards_config(db):
+    try:
+        row = db.execute("SELECT value FROM settings WHERE key='stat_cards'").fetchone()
+        return json.loads(row['value'] if row else _DEFAULT_STAT_CARDS)
+    except Exception:
+        return json.loads(_DEFAULT_STAT_CARDS)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -451,14 +479,24 @@ def dashboard():
     all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
     statuses = ['quoted', 'approved', 'in_progress', 'install', 'completed']
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
+    active_jobs   = [j for j in all_jobs if j['status'] \!= 'completed']
+    pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
     stats = {
-        'total':       len(all_jobs),
-        'quoted':      len(jobs_by_status['quoted']),
-        'in_progress': len(jobs_by_status['in_progress']),
-        'completed':   len(jobs_by_status['completed']),
+        'total':          len(all_jobs),
+        'quoted':         len(jobs_by_status['quoted']),
+        'approved':       len(jobs_by_status['approved']),
+        'in_progress':    len(jobs_by_status['in_progress']),
+        'install':        len(jobs_by_status['install']),
+        'completed':      len(jobs_by_status['completed']),
+        'pipeline_value': pipeline_value,
     }
+    stat_cards = get_stat_cards_config(db)
     forms = db.execute("SELECT id, name, file_size, uploaded_at FROM forms ORDER BY name").fetchall()
-    return render_template('dashboard.html', jobs_by_status=jobs_by_status, stats=stats, forms=forms)
+    return render_template('dashboard.html',
+                           jobs_by_status=jobs_by_status,
+                           stats=stats,
+                           stat_cards=stat_cards,
+                           forms=forms)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1190,6 +1228,55 @@ def reset_user(user_id):
     flash(f'Password for {user["username"]} reset to: {temp_pw}  — send this to them.', 'success')
     return redirect(url_for('admin_users'))
 
+
+
+@app.route('/admin/users/create', methods=['POST'])
+@admin_required
+def create_user():
+    username = request.form.get('username', '').strip().lower()
+    name     = request.form.get('name', '').strip()
+    role     = request.form.get('role', 'field')
+    password = request.form.get('password', '').strip()
+    if not username or not password:
+        flash('Username and password are required.', 'error')
+        return redirect(url_for('admin_users'))
+    if len(password) < 6:
+        flash('Password must be at least 6 characters.', 'error')
+        return redirect(url_for('admin_users'))
+    if role not in ('admin', 'manager', 'field'):
+        flash('Invalid role.', 'error')
+        return redirect(url_for('admin_users'))
+    db = get_db()
+    if db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone():
+        flash(f'Username "{username}" is already taken.', 'error')
+        return redirect(url_for('admin_users'))
+    db.execute(
+        "INSERT INTO users (username,password_hash,name,role,must_change_password) VALUES (?,?,?,?,?)",
+        (username, generate_password_hash(password), name, role, 1)
+    )
+    db.commit()
+    flash(f'User "{username}" created. They must change password on first login.', 'success')
+    return redirect(url_for('admin_users'))
+
+
+@app.route('/admin/stat-cards', methods=['POST'])
+@admin_required
+def save_stat_cards():
+    data  = request.get_json(silent=True) or {}
+    cards = data.get('cards', [])
+    valid_keys = {'total','quoted','approved','in_progress','install','completed','pipeline_value'}
+    clean = [
+        {'key': c['key'], 'label': c['label'].strip(), 'color': c.get('color','')}
+        for c in cards if c.get('key') in valid_keys and c.get('label','').strip()
+    ]
+    db  = get_db()
+    val = json.dumps(clean)
+    if db.execute("SELECT key FROM settings WHERE key='stat_cards'").fetchone():
+        db.execute("UPDATE settings SET value=? WHERE key='stat_cards'", (val,))
+    else:
+        db.execute("INSERT INTO settings (key,value) VALUES ('stat_cards',?)", (val,))
+    db.commit()
+    return jsonify({'ok': True})
 
 
 # ─────────────────────────────────────────────────────────────
