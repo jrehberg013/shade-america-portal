@@ -368,11 +368,12 @@ def init_db():
 # ─────────────────────────────────────────────────────────────
 
 _DEFAULT_STAT_CARDS = json.dumps([
-    {"key": "total",          "label": "Total Jobs",     "color": ""},
-    {"key": "pipeline_value", "label": "Pipeline Value", "color": "text-green"},
-    {"key": "fabrication",    "label": "Fabrication",    "color": "text-yellow"},
-    {"key": "installation",   "label": "Installation",   "color": "text-orange"},
-    {"key": "completed",      "label": "Completed",      "color": "text-grey"},
+    {"key": "total",           "label": "Total Jobs",        "color": ""},
+    {"key": "contract_total",  "label": "Total Job Value",   "color": "text-blue"},
+    {"key": "balance_owed",    "label": "Balance Owed",      "color": "text-orange"},
+    {"key": "pipeline_value",  "label": "Pipeline Value",    "color": "text-green"},
+    {"key": "installation",    "label": "Installation",      "color": "text-orange"},
+    {"key": "completed",       "label": "Completed",         "color": "text-grey"},
 ])
 
 def get_stat_cards_config(db):
@@ -495,10 +496,12 @@ def dashboard():
     all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
     statuses = ['deposit_received','design','engineering','permitting','fabrication','installation','completed']
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
-    active_jobs   = [j for j in all_jobs if j['status'] != 'completed']
+    active_jobs    = [j for j in all_jobs if j['status'] != 'completed']
     pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
+    contract_total = sum(float(j['contract_value'] or 0) for j in active_jobs)
+    balance_owed   = sum(float(j['contract_value'] or 0) - float(j['deposit_paid'] or 0) for j in active_jobs)
     stats = {
-        'total':          len(all_jobs),
+        'total':            len(all_jobs),
         'deposit_received': len(jobs_by_status['deposit_received']),
         'design':           len(jobs_by_status['design']),
         'engineering':      len(jobs_by_status['engineering']),
@@ -507,6 +510,8 @@ def dashboard():
         'installation':     len(jobs_by_status['installation']),
         'completed':        len(jobs_by_status['completed']),
         'pipeline_value':   pipeline_value,
+        'contract_total':   contract_total,
+        'balance_owed':     balance_owed,
     }
     stat_cards = get_stat_cards_config(db)
     forms = db.execute("SELECT id, name, file_size, uploaded_at FROM forms ORDER BY name").fetchall()
@@ -1294,7 +1299,7 @@ def admin_settings():
 def save_stat_cards():
     data  = request.get_json(silent=True) or {}
     cards = data.get('cards', [])
-    valid_keys = {'total','deposit_received','design','engineering','permitting','fabrication','installation','completed','pipeline_value'}
+    valid_keys = {'total','deposit_received','design','engineering','permitting','fabrication','installation','completed','pipeline_value','contract_total','balance_owed'}
     clean = [
         {'key': c['key'], 'label': c['label'].strip(), 'color': c.get('color','')}
         for c in cards if c.get('key') in valid_keys and c.get('label','').strip()
