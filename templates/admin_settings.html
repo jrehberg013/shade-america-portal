@@ -65,6 +65,7 @@
                         <option value="text-yellow" {% if card.color == 'text-yellow' %}selected{% endif %}>Yellow</option>
                         <option value="text-grey"   {% if card.color == 'text-grey'   %}selected{% endif %}>Grey</option>
                         <option value="text-orange" {% if card.color == 'text-orange' %}selected{% endif %}>Orange</option>
+                        <option value="text-red"    {% if card.color == 'text-red' %}selected{% endif %}>Red</option>
                     </select>
                 </td>
                 <td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>
@@ -103,7 +104,7 @@ function scAdd(){
     const tbody=document.getElementById('stat-card-tbody');
     const tr=document.createElement('tr');
     tr.dataset.key=key;
-    tr.innerHTML='<td style="text-align:center"><button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer">&#9650;</button><button type="button" onclick="scMove(this,1)" style="background:none;border:none;cursor:pointer">&#9660;</button></td><td><code>'+key+'</code></td><td><input type="text" value="'+label+'" class="sc-label" style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td><td><select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px"><option value="">Default</option><option value="text-blue">Blue</option><option value="text-green">Green</option><option value="text-yellow">Yellow</option><option value="text-grey">Grey</option><option value="text-orange">Orange</option></select></td><td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>';
+    tr.innerHTML='<td style="text-align:center"><button type="button" onclick="scMove(this,-1)" style="background:none;border:none;cursor:pointer">&#9650;</button><button type="button" onclick="scMove(this,1)" style="background:none;border:none;cursor:pointer">&#9660;</button></td><td><code>'+key+'</code></td><td><input type="text" value="'+label+'" class="sc-label" style="border:1px solid #ddd;border-radius:4px;padding:.3rem .5rem;font-size:.88rem;width:180px"></td><td><select class="sc-color" style="font-size:.82rem;padding:.2rem .4rem;border-radius:4px"><option value="">Default</option><option value="text-blue">Blue</option><option value="text-green">Green</option><option value="text-yellow">Yellow</option><option value="text-grey">Grey</option><option value="text-orange">Orange</option><option value="text-red">Red</option></select></td><td><button type="button" onclick="scRemove(this)" class="btn btn-sm btn-danger">Remove</button></td>';
     tbody.appendChild(tr);
 }
 function scSave(){

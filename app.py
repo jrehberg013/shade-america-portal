@@ -786,7 +786,7 @@ def parse_pole_rows(prefix, f):
     return rows
 
 @app.route('/estimator')
-@admin_required
+@manager_required
 def estimator():
     db = get_db()
     pm = get_pricing_map(db)

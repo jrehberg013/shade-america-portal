@@ -119,6 +119,9 @@ img{max-width:100%}
 .text-green{color:var(--green)}
 .text-yellow{color:var(--warn)}
 .text-blue{color:var(--blue)}
+.text-grey{color:#888}
+.text-orange{color:#e07b00}
+.text-red{color:#c0392b}
 
 /* ---- SECTION HEADER ---- */
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
@@ -267,28 +270,4 @@ code{background:var(--off-white);border:1px solid var(--border);padding:.15rem .
 @media(max-width:900px){
     .sidebar{transform:translateX(-100%)}
     .sidebar.open{transform:translateX(0)}
-    .main-wrapper{margin-left:0}
-    .mobile-menu-btn{display:block}
-    .sidebar-toggle{display:none}
-    .overlay.open{display:block}
-    .pipeline-board{grid-template-columns:repeat(3,minmax(160px,1fr))}
-    .stats-row{grid-template-columns:repeat(2,1fr)}
-    .job-detail-layout{grid-template-columns:1fr}
-    .form-row{grid-template-columns:1fr}
-    .pole-row-header{display:none}
-    .pole-row{grid-template-columns:1fr 80px 60px 1fr 36px;font-size:.8rem}
-}
-@media(max-width:580px){
-    .pipeline-board{grid-template-columns:repeat(2,minmax(150px,1fr))}
-    .stats-row{grid-template-columns:repeat(2,1fr)}
-    .content{padding:1rem}
-    .card-header{padding:1rem}
-    .form-stack{padding:1rem}
-}
-@media print{
-    .sidebar,.top-bar,.btn,.form-actions{display:none!important}
-    .main-wrapper{margin-left:0}
-    .content{padding:0}
-    .card{box-shadow:none;border:1px solid #ccc}
-    .totals-box{background:var(--navy)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-}
+    .ma
