@@ -585,6 +585,31 @@ def job_detail(job_id):
         docs = [d for d in docs if d['doc_type'] in ('drawing', 'photo')]
     return render_template('job_detail.html', job=job, documents=docs, is_admin=is_admin)
 
+
+@app.route('/jobs/<int:job_id>/edit', methods=['POST'])
+@manager_required
+def edit_job(job_id):
+    db = get_db()
+    if not db.execute("SELECT id FROM jobs WHERE id=?", (job_id,)).fetchone():
+        abort(404)
+    name           = request.form.get('name', '').strip()
+    client         = request.form.get('client', '').strip()
+    phone          = request.form.get('phone', '').strip()
+    location       = request.form.get('location', '').strip()
+    notes          = request.form.get('notes', '').strip()
+    estimate_total = request.form.get('estimate_total', '').strip()
+    try:
+        estimate_total = float(estimate_total) if estimate_total else None
+    except ValueError:
+        estimate_total = None
+    db.execute(
+        "UPDATE jobs SET name=?, client=?, phone=?, location=?, notes=?, estimate_total=? WHERE id=?",
+        (name, client, phone, location, notes, estimate_total, job_id)
+    )
+    db.commit()
+    flash('Job details updated.', 'success')
+    return redirect(url_for('job_detail', job_id=job_id))
+
 @app.route('/jobs/<int:job_id>/status', methods=['POST'])
 @manager_required
 def update_status(job_id):
@@ -649,13 +674,18 @@ def serve_doc(doc_id):
 @admin_required
 def delete_doc(doc_id):
     db = get_db()
-    doc = db.execute("SELECT job_id FROM documents WHERE id=?", (doc_id,)).fetchone()
+    doc = db.execute("SELECT job_id, doc_type FROM documents WHERE id=?", (doc_id,)).fetchone()
     if not doc:
         abort(404)
+    # Field staff may only delete photos
+    if session.get('role') == 'field' and doc['doc_type'] != 'photo':
+        abort(403)
     job_id = doc['job_id']
     db.execute("DELETE FROM documents WHERE id=?", (doc_id,))
     db.commit()
     flash('File deleted.', 'success')
+    if session.get('role') == 'field':
+        return redirect(url_for('field'))
     return redirect(url_for('job_detail', job_id=job_id))
 
 
@@ -1557,7 +1587,7 @@ def job_from_trello():
 
             for item in cf_items:
                 fname = cf_name_map.get(item.get('idCustomField'), '').lower()
-                val   = item.get('value', {})
+                val   = item.get('value') or {}
                 if 'number' in val:
                     try:
                         num = float(val['number'])
@@ -1876,7 +1906,7 @@ def sync_all_trello_jobs():
 
                     for item in cf_items:
                         fname = cf_name_map.get(item.get('idCustomField'), '').lower()
-                        val   = item.get('value', {})
+                        val   = item.get('value') or {}
                         if 'number' in val:
                             try:
                                 num = float(val['number'])

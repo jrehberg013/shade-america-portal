@@ -9,36 +9,87 @@
         <div class="card">
             <div class="card-header card-header-row">
                 <h2>Job Details</h2>
-                <span class="status-badge status-{{ job.status }}">
-                    {{ job.status.replace('_', ' ').title() }}
-                </span>
-            </div>
-            <div class="detail-grid">
-                <div class="detail-item">
-                    <div class="detail-label">Client</div>
-                    <div class="detail-value">{{ job.client or '—' }}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Phone</div>
-                    <div class="detail-value">{{ job.phone or '—' }}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Location</div>
-                    <div class="detail-value">{{ job.location or '—' }}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Estimate</div>
-                    <div class="detail-value">{% if job.estimate_total %}${{ "{:,.2f}".format(job.estimate_total) }}{% else %}—{% endif %}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Created</div>
-                    <div class="detail-value">{{ (job.created_at|string)[:10] if job.created_at else '—' }}</div>
+                <div style="display:flex;gap:.5rem;align-items:center">
+                    <span class="status-badge status-{{ job.status }}">
+                        {{ job.status.replace('_', ' ').title() }}
+                    </span>
+                    {% if current_user.role in ['admin','manager'] %}
+                    <button class="btn btn-sm btn-outline" onclick="toggleEditJob()">&#9998; Edit</button>
+                    {% endif %}
                 </div>
             </div>
-            {% if job.notes %}
-            <div class="detail-notes">
-                <div class="detail-label">Notes</div>
-                <p>{{ job.notes }}</p>
+
+            <!-- Read-only view -->
+            <div id="jobReadView">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Client</div>
+                        <div class="detail-value">{{ job.client or '&mdash;' }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Phone</div>
+                        <div class="detail-value">{{ job.phone or '&mdash;' }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Location</div>
+                        <div class="detail-value">{{ job.location or '&mdash;' }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Estimate</div>
+                        <div class="detail-value">{% if job.estimate_total %}${{ "{:,.2f}".format(job.estimate_total) }}{% else %}&mdash;{% endif %}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Created</div>
+                        <div class="detail-value">{{ (job.created_at|string)[:10] if job.created_at else '&mdash;' }}</div>
+                    </div>
+                </div>
+                {% if job.notes %}
+                <div class="detail-notes">
+                    <div class="detail-label">Notes</div>
+                    <p>{{ job.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Edit form (admin/manager only) -->
+            {% if current_user.role in ['admin','manager'] %}
+            <div id="jobEditForm" style="display:none">
+                <form method="POST" action="{{ url_for('edit_job', job_id=job.id) }}">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Job Name</label>
+                            <input type="text" name="name" class="form-control" value="{{ job.name or '' }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Client</label>
+                            <input type="text" name="client" class="form-control" value="{{ job.client or '' }}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="text" name="phone" class="form-control" value="{{ job.phone or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Location</label>
+                            <input type="text" name="location" class="form-control" value="{{ job.location or '' }}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Estimate Total ($)</label>
+                            <input type="number" step="0.01" name="estimate_total" class="form-control" value="{{ job.estimate_total or '' }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea name="notes" class="form-control" rows="3">{{ job.notes or '' }}</textarea>
+                    </div>
+                    <div style="display:flex;gap:.5rem;margin-top:.5rem">
+                        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                        <button type="button" class="btn btn-sm btn-outline" onclick="toggleEditJob()">Cancel</button>
+                    </div>
+                </form>
             </div>
             {% endif %}
         </div>
@@ -90,7 +141,8 @@
         </div>
         {% endif %}
 
-        <!-- Move Status -->
+        <!-- Move Status (admin/manager only) -->
+        {% if current_user.role != 'field' %}
         <div class="card">
             <div class="card-header"><h3>Update Status</h3></div>
             <form method="POST" action="{{ url_for('update_status', job_id=job.id) }}" class="status-form">
@@ -104,11 +156,12 @@
                 </div>
             </form>
         </div>
+        {% endif %}
 
         <!-- Documents -->
         <div class="card">
             <div class="card-header card-header-row">
-                <h3>Documents & Drawings</h3>
+                <h3>Documents &amp; Drawings</h3>
                 {% if current_user.role != 'field' %}
                 <button class="btn btn-sm btn-outline" onclick="toggleUpload()">+ Upload</button>
                 {% endif %}
@@ -141,20 +194,20 @@
                 <div class="doc-item">
                     <div class="doc-info">
                         <span class="doc-icon">
-                            {% if doc.doc_type == 'drawing' %}📐
-                            {% elif doc.doc_type == 'photo' %}📷
-                            {% elif doc.doc_type == 'estimate' %}💵
-                            {% elif doc.doc_type == 'contract' %}📄
-                            {% else %}📎{% endif %}
+                            {% if doc.doc_type == 'drawing' %}&#128208;
+                            {% elif doc.doc_type == 'photo' %}&#128247;
+                            {% elif doc.doc_type == 'estimate' %}&#128181;
+                            {% elif doc.doc_type == 'contract' %}&#128196;
+                            {% else %}&#128206;{% endif %}
                         </span>
                         <div>
                             <div class="doc-name">{{ doc.original_name }}</div>
-                            <div class="doc-meta">{{ doc.doc_type.title() }} · {{ (doc.uploaded_at|string)[:10] if doc.uploaded_at else '' }}</div>
+                            <div class="doc-meta">{{ doc.doc_type.title() }} &middot; {{ (doc.uploaded_at|string)[:10] if doc.uploaded_at else '' }}</div>
                         </div>
                     </div>
                     <div class="doc-actions">
                         <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" class="btn btn-sm btn-outline" target="_blank">View</a>
-                        {% if current_user.role == 'admin' %}
+                        {% if current_user.role == 'admin' or (current_user.role == 'field' and doc.doc_type == 'photo') %}
                         <form method="POST" action="{{ url_for('delete_doc', doc_id=doc.id) }}" style="display:inline"
                               onsubmit="return confirm('Delete this file?')">
                             <button type="submit" class="btn btn-sm btn-danger">Del</button>
@@ -185,4 +238,17 @@
         </div>
     </div>
 </div>
+
+<script>
+function toggleEditJob() {
+    var rv = document.getElementById('jobReadView');
+    var ef = document.getElementById('jobEditForm');
+    rv.style.display = rv.style.display === 'none' ? '' : 'none';
+    ef.style.display = ef.style.display === 'none' ? '' : 'none';
+}
+function toggleUpload() {
+    var el = document.getElementById('uploadArea');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
 {% endblock %}
