@@ -7,12 +7,14 @@
 <div class="stats-row" id="stats-row">
     {% for card in stat_cards %}
     <div class="stat-card">
+        <div class="stat-band {{ card.color }}">
+            <div class="stat-label">{{ card.label }}</div>
+        </div>
         {% if card.key in ['pipeline_value','contract_total','balance_owed'] %}
-        <div class="stat-value {{ card.color }}">${{ "{:,.0f}".format(stats.get(card.key, 0)) }}</div>
+        <div class="stat-value">${{ "{:,.0f}".format(stats.get(card.key, 0)) }}</div>
         {% else %}
-        <div class="stat-value {{ card.color }}">{{ stats.get(card.key, 0) }}</div>
+        <div class="stat-value">{{ stats.get(card.key, 0) }}</div>
         {% endif %}
-        <div class="stat-label">{{ card.label }}</div>
     </div>
     {% endfor %}
 </div>

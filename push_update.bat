@@ -18,7 +18,7 @@ if "%GIT%"=="" (
 echo Using git at: %GIT%
 echo Committing all changes...
 "%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/admin_settings.html templates/forms.html templates/login.html templates/job_detail.html templates/new_job.html templates/jobs.html templates/field.html templates/report.html templates/pricing.html static/style.css static/logo.png static/apple-touch-icon.png static/icon-192.png static/icon-512.png
-"%GIT%" commit -m "Manager estimator access, pricing read-only, rename Client to Contact, remove estimate column, password eyeball, fix stat card colors, add red color option"
+"%GIT%" commit -m "Stat cards bold top band with color, mobile CSS restore, all manager fixes"
 echo Pushing to GitHub...
 "%GIT%" push origin main
 echo Done!

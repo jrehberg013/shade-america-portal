@@ -113,9 +113,16 @@ img{max-width:100%}
 
 /* ---- STATS ---- */
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
-.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem;text-align:center}
-.stat-value{font-size:2rem;font-weight:700}
-.stat-label{font-size:.8rem;color:var(--muted);margin-top:.25rem;text-transform:uppercase;letter-spacing:.04em}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);text-align:center;overflow:hidden}
+.stat-band{background:#1a3a5c;padding:.6rem 1rem}
+.stat-band.text-green{background:var(--green)}
+.stat-band.text-blue{background:var(--blue)}
+.stat-band.text-yellow{background:var(--warn)}
+.stat-band.text-grey{background:#888}
+.stat-band.text-orange{background:#e07b00}
+.stat-band.text-red{background:#c0392b}
+.stat-value{font-size:2rem;font-weight:700;color:#1a3a5c;padding:.75rem .5rem .5rem}
+.stat-label{font-size:.75rem;color:#fff;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
 .text-green{color:var(--green)}
 .text-yellow{color:var(--warn)}
 .text-blue{color:var(--blue)}
