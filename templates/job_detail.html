@@ -24,23 +24,25 @@
                 <div class="detail-grid">
                     <div class="detail-item">
                         <div class="detail-label">Client</div>
-                        <div class="detail-value">{{ job.client or '&mdash;' }}</div>
+                        <div class="detail-value">{{ job.client or '' }}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Phone</div>
-                        <div class="detail-value">{{ job.phone or '&mdash;' }}</div>
+                        <div class="detail-value">{{ job.phone or '' }}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Location</div>
-                        <div class="detail-value">{{ job.location or '&mdash;' }}</div>
+                        <div class="detail-value">{{ job.location or '' }}</div>
                     </div>
+                    {% if current_user.role != 'field' %}
                     <div class="detail-item">
                         <div class="detail-label">Estimate</div>
-                        <div class="detail-value">{% if job.estimate_total %}${{ "{:,.2f}".format(job.estimate_total) }}{% else %}&mdash;{% endif %}</div>
+                        <div class="detail-value">{% if job.estimate_total %}${{ "{:,.2f}".format(job.estimate_total) }}{% endif %}</div>
                     </div>
+                    {% endif %}
                     <div class="detail-item">
                         <div class="detail-label">Created</div>
-                        <div class="detail-value">{{ (job.created_at|string)[:10] if job.created_at else '&mdash;' }}</div>
+                        <div class="detail-value">{{ (job.created_at|string)[:10] if job.created_at else '' }}</div>
                     </div>
                 </div>
                 {% if job.notes %}
@@ -207,7 +209,7 @@
                     </div>
                     <div class="doc-actions">
                         <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" class="btn btn-sm btn-outline" target="_blank">View</a>
-                        {% if current_user.role == 'admin' or (current_user.role == 'field' and doc.doc_type == 'photo') %}
+                        {% if current_user.role == 'admin' %}
                         <form method="POST" action="{{ url_for('delete_doc', doc_id=doc.id) }}" style="display:inline"
                               onsubmit="return confirm('Delete this file?')">
                             <button type="submit" class="btn btn-sm btn-danger">Del</button>
@@ -228,9 +230,17 @@
             <div class="card-header"><h3>Field Photos</h3></div>
             <div class="photo-grid">
                 {% for doc in documents if doc.doc_type == 'photo' %}
-                <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank">
-                    <img src="{{ url_for('serve_doc', doc_id=doc.id) }}" alt="{{ doc.original_name }}" class="photo-thumb">
-                </a>
+                <div class="photo-thumb-wrap">
+                    <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank">
+                        <img src="{{ url_for('serve_doc', doc_id=doc.id) }}" alt="{{ doc.original_name }}" class="photo-thumb">
+                    </a>
+                    {% if current_user.role in ['admin','field'] %}
+                    <form method="POST" action="{{ url_for('delete_doc', doc_id=doc.id) }}"
+                          onsubmit="return confirm('Delete this photo?')" class="photo-del-form">
+                        <button type="submit" class="photo-del-btn" title="Delete">&#x2715;</button>
+                    </form>
+                    {% endif %}
+                </div>
                 {% else %}
                 <div class="text-muted" style="padding:1rem;font-size:.85rem">No photos yet.</div>
                 {% endfor %}

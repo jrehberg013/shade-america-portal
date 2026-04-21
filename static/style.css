@@ -61,7 +61,7 @@ img{max-width:100%}
 /* ---- MAIN WRAPPER ---- */
 .main-wrapper{margin-left:var(--sidebar-w);min-height:100vh;display:flex;flex-direction:column}
 .top-bar{height:var(--top-bar-h);background:var(--white);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
-.page-title{font-size:1.1rem;font-weight:600;flex:1}
+.page-title{font-size:1.1rem;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .top-bar-right{font-size:.85rem;color:var(--muted)}
 .mobile-menu-btn{display:none;background:none;border:none;font-size:1.3rem;cursor:pointer}
 .content{flex:1;padding:1.5rem;max-width:1200px;width:100%}
@@ -194,6 +194,9 @@ img{max-width:100%}
 .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;padding:1rem}
 .photo-grid-sm{grid-template-columns:repeat(4,1fr)}
 .photo-thumb{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px}
+.photo-thumb-wrap{position:relative}
+.photo-del-form{position:absolute;top:3px;right:3px;margin:0}
+.photo-del-btn{background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
 
 /* ---- FIELD VIEW ---- */
 .field-job-list{display:flex;flex-direction:column;gap:1.25rem}
