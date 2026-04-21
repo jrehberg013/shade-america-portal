@@ -43,15 +43,9 @@
             </label>
         </form>
 
-        <!-- Recent Photos -->
+        <!-- Photo count indicator (tap card to see full photos) -->
         {% if job.photos %}
-        <div class="photo-grid photo-grid-sm">
-            {% for doc in job.photos[-4:] %}
-            <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank">
-                <img src="{{ url_for('serve_doc', doc_id=doc.id) }}" alt="photo" class="photo-thumb">
-            </a>
-            {% endfor %}
-        </div>
+        <div style="font-size:.8rem;color:var(--muted);margin-top:.4rem">📷 {{ job.photos|length }} photo{{ 's' if job.photos|length != 1 }} — tap job to view</div>
         {% endif %}
     </div>
     {% endfor %}

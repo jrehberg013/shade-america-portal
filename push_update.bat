@@ -18,7 +18,7 @@ if "%GIT%"=="" (
 echo Using git at: %GIT%
 echo Committing all changes...
 "%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/forms.html templates/login.html templates/job_detail.html templates/new_job.html templates/field.html static/style.css static/logo.png
-"%GIT%" commit -m "Fix photo delete permission error; fix mobile nav sidebar close on tap"
+"%GIT%" commit -m "Hide photo thumbnails on field card list; show count instead"
 echo Pushing to GitHub...
 "%GIT%" push origin main
 echo Done!
