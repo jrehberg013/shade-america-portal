@@ -18,6 +18,16 @@ if (overlay) {
     });
 }
 
+// ---- Close sidebar on nav link tap (mobile) ----
+if (sidebar) {
+    sidebar.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay && overlay.classList.remove('open');
+        });
+    });
+}
+
 // ---- Jobs table search ----
 const searchInput = document.getElementById('jobSearch');
 if (searchInput) {

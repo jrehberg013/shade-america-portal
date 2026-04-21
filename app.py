@@ -671,7 +671,7 @@ def serve_doc(doc_id):
     )
 
 @app.route('/docs/<int:doc_id>/delete', methods=['POST'])
-@admin_required
+@login_required
 def delete_doc(doc_id):
     db = get_db()
     doc = db.execute("SELECT job_id, doc_type FROM documents WHERE id=?", (doc_id,)).fetchone()
