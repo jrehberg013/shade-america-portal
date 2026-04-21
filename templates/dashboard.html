@@ -101,7 +101,9 @@
 .trello-board{display:none;}
 .trello-board.active{display:flex;gap:.75rem;overflow-x:auto;padding:1rem;padding-top:.75rem;}
 .trello-list{min-width:185px;max-width:225px;flex-shrink:0;
-             background:#f5f7fa;border-radius:8px;padding:.65rem;}
+             background:#f5f7fa;border-radius:8px;padding:.65rem;
+             max-height:380px;display:flex;flex-direction:column;}
+.trello-list-cards{overflow-y:auto;flex:1;}
 .trello-list-header{font-size:.76rem;font-weight:700;color:#555;text-transform:uppercase;
                     letter-spacing:.04em;margin-bottom:.5rem;
                     display:flex;justify-content:space-between;align-items:center;}
@@ -241,7 +243,7 @@
                     <div class="trello-list-header">
                         <span>${lst.name}</span>
                         <span class="trello-list-count">${lst.cards.length}</span>
-                    </div>${cardsHtml}</div>`;
+                    </div><div class="trello-list-cards">${cardsHtml}</div></div>`;
             }).join(''):'<div style="color:#bbb;font-size:.85rem;padding:.5rem">No lists found.</div>';
             return `<div class="trello-board${i===activeIdx?' active':''}" id="trello-board-${i}">${listsHtml}</div>`;
         }).join('');
