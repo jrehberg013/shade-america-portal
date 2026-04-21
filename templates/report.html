@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shade America — Job Report {{ report_date }}</title>
+    <style>
+        /* ── Base ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 12px;
+            color: #222;
+            background: #fff;
+            padding: 20px 28px;
+        }
+
+        /* ── Header ── */
+        .report-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #1a3a5c;
+            padding-bottom: 10px;
+            margin-bottom: 18px;
+        }
+        .report-logo {
+            height: 48px;
+        }
+        .report-title-block { text-align: right; }
+        .report-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a3a5c;
+        }
+        .report-date {
+            font-size: 11px;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        /* ── Stats row ── */
+        .stats-grid {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+        }
+        .stat-box {
+            flex: 1;
+            min-width: 130px;
+            border: 1px solid #dde2ea;
+            border-radius: 6px;
+            padding: 10px 14px;
+            background: #f7f9fc;
+        }
+        .stat-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #667;
+            margin-bottom: 4px;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a3a5c;
+        }
+        .stat-value.green  { color: #2a7a2a; }
+        .stat-value.orange { color: #c05a00; }
+
+        /* ── Section heading ── */
+        .section-heading {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1a3a5c;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            border-bottom: 1px solid #c8d3e0;
+            padding-bottom: 4px;
+            margin-bottom: 12px;
+        }
+
+        /* ── Pipeline section ── */
+        .pipeline-section { margin-bottom: 28px; }
+
+        /* ── Status block ── */
+        .status-block { margin-bottom: 20px; }
+        .status-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: #fff;
+            background: #3a6ea8;
+            border-radius: 4px 4px 0 0;
+            padding: 4px 10px;
+            display: inline-block;
+        }
+        .status-label.deposit_received { background: #4a90d9; }
+        .status-label.design           { background: #9b59b6; }
+        .status-label.engineering      { background: #2980b9; }
+        .status-label.permitting       { background: #e67e22; }
+        .status-label.fabrication      { background: #16a085; }
+        .status-label.installation     { background: #27ae60; }
+        .status-label.completed        { background: #7f8c8d; }
+
+        .status-empty {
+            font-size: 11px;
+            color: #aaa;
+            font-style: italic;
+            padding: 6px 10px;
+            border: 1px solid #e5e9f0;
+            border-radius: 0 4px 4px 4px;
+        }
+
+        /* ── Jobs table ── */
+        .jobs-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #e0e5ee;
+            border-radius: 0 4px 4px 4px;
+            overflow: hidden;
+        }
+        .jobs-table th {
+            background: #eef2f8;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            color: #556;
+            padding: 5px 8px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .jobs-table td {
+            padding: 6px 8px;
+            border-top: 1px solid #e8edf5;
+            vertical-align: top;
+        }
+        .jobs-table tr:nth-child(even) td { background: #f9fafc; }
+        .job-name { font-weight: 600; color: #1a3a5c; }
+        .job-sub  { font-size: 10px; color: #777; margin-top: 1px; }
+        .money    { font-family: monospace; text-align: right; }
+        .no-val   { color: #bbb; }
+
+        /* ── Summary counts ── */
+        .counts-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 22px;
+        }
+        .count-chip {
+            border: 1px solid #dde2ea;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 11px;
+            color: #334;
+        }
+        .count-chip strong { color: #1a3a5c; }
+
+        /* ── Print button ── */
+        .print-bar {
+            text-align: right;
+            margin-bottom: 18px;
+        }
+        .print-btn {
+            background: #1a3a5c;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 9px 22px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: .03em;
+        }
+        .print-btn:hover { background: #254e7a; }
+        .back-link {
+            color: #3a6ea8;
+            text-decoration: none;
+            font-size: 12px;
+            margin-right: 14px;
+        }
+
+        /* ── Print media ── */
+        @media print {
+            .print-bar { display: none !important; }
+            body { padding: 8px 14px; }
+            .stat-box { break-inside: avoid; }
+            .status-block { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Print / Back bar -->
+<div class="print-bar">
+    <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+    <button class="print-btn" onclick="window.print()">🖨 Print Report</button>
+</div>
+
+<!-- Header -->
+<div class="report-header">
+    <img src="/static/logo.png" alt="Shade America" class="report-logo">
+    <div class="report-title-block">
+        <div class="report-title">Job Status Report</div>
+        <div class="report-date">Generated: {{ report_date }}</div>
+    </div>
+</div>
+
+<!-- Stats summary -->
+<div class="stats-grid">
+    <div class="stat-box">
+        <div class="stat-label">Total Jobs</div>
+        <div class="stat-value">{{ stats.total }}</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Active Jobs</div>
+        <div class="stat-value">{{ stats.active }}</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Pipeline Value</div>
+        <div class="stat-value green">${{ "{:,.0f}".format(stats.pipeline_value) }}</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Contract Total</div>
+        <div class="stat-value">${{ "{:,.0f}".format(stats.contract_total) }}</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Balance Owed</div>
+        <div class="stat-value orange">${{ "{:,.0f}".format(stats.balance_owed) }}</div>
+    </div>
+</div>
+
+<!-- Count chips -->
+<div class="counts-grid">
+    {% for s in statuses %}
+    <div class="count-chip">
+        {{ status_labels[s] }}: <strong>{{ jobs_by_status[s]|length }}</strong>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pipeline by status -->
+<div class="pipeline-section">
+    <div class="section-heading">Jobs by Pipeline Stage</div>
+
+    {% for s in statuses %}
+    {% set group = jobs_by_status[s] %}
+    <div class="status-block">
+        <div class="status-label {{ s }}">{{ status_labels[s] }} ({{ group|length }})</div>
+
+        {% if not group %}
+        <div class="status-empty">No jobs in this stage</div>
+        {% else %}
+        <table class="jobs-table">
+            <thead>
+                <tr>
+                    <th style="width:28%">Job Name</th>
+                    <th style="width:20%">Client</th>
+                    <th style="width:22%">Location</th>
+                    <th style="width:15%">Estimate</th>
+                    <th style="width:15%">Contract</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in group %}
+                <tr>
+                    <td>
+                        <div class="job-name">{{ job.name }}</div>
+                        {% if job.notes %}
+                        <div class="job-sub">{{ job.notes[:80] }}{% if job.notes|length > 80 %}…{% endif %}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ job.client or '<span class="no-val">—</span>' }}
+                        {% if job.phone %}
+                        <div class="job-sub">{{ job.phone }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ job.location or '<span class="no-val">—</span>' }}</td>
+                    <td class="money">
+                        {% if job.estimate_total %}
+                        ${{ "{:,.0f}".format(job.estimate_total|float) }}
+                        {% else %}
+                        <span class="no-val">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="money">
+                        {% if job.contract_value %}
+                        ${{ "{:,.0f}".format(job.contract_value|float) }}
+                        {% else %}
+                        <span class="no-val">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Footer -->
+<div style="border-top:1px solid #dde2ea; padding-top:8px; font-size:10px; color:#aaa; text-align:center; margin-top:10px;">
+    Shade America Team Portal &mdash; Confidential &mdash; {{ report_date }}
+</div>
+
+</body>
+</html>

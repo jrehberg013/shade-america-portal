@@ -36,6 +36,8 @@
             <span class="nav-label">Jobs</span></a></li>
         <li><a href="{{ url_for('estimator') }}" class="{{ 'active' if request.endpoint in ['estimator','calculate'] }}">
             <span class="nav-label">Estimator</span></a></li>
+        <li><a href="{{ url_for('report') }}" class="{{ 'active' if request.endpoint == 'report' }}">
+            <span class="nav-label">Report</span></a></li>
         <li><a href="{{ url_for('pricing') }}" class="{{ 'active' if request.endpoint == 'pricing' }}">
             <span class="nav-label">Pricing</span></a></li>
         <li><a href="{{ url_for('hip_calc') }}" class="{{ 'active' if request.endpoint == 'hip_calc' }}">
@@ -85,6 +87,14 @@
         {% endfor %}
     </div>
     {% endif %}
+    {% endwith %}
+    {% block auth_content %}{% endblock %}
+</div>
+{% endif %}
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
     {% endwith %}
     {% block auth_content %}{% endblock %}
 </div>

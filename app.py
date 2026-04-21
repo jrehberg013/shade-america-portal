@@ -1978,6 +1978,48 @@ def sync_all_trello_jobs():
         db.close()
 
 
+
+# ─────────────────────────────────────────────────────────────
+# REPORT
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/report')
+@manager_required
+def report():
+    import datetime
+    db = get_db()
+    all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
+    statuses = ['deposit_received','design','engineering','permitting','fabrication','installation','completed']
+    status_labels = {
+        'deposit_received': 'Deposit Received',
+        'design':           'Design',
+        'engineering':      'Engineering',
+        'permitting':       'Permitting',
+        'fabrication':      'Fabrication',
+        'installation':     'Installation',
+        'completed':        'Completed',
+    }
+    jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
+    active_jobs    = [j for j in all_jobs if j['status'] != 'completed']
+    pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
+    contract_total = sum(float(j['contract_value']  or 0) for j in active_jobs)
+    balance_owed   = sum(float(j['contract_value']  or 0) - float(j['deposit_paid'] or 0) for j in active_jobs)
+    stats = {
+        'total':          len(all_jobs),
+        'active':         len(active_jobs),
+        'pipeline_value': pipeline_value,
+        'contract_total': contract_total,
+        'balance_owed':   balance_owed,
+    }
+    report_date = datetime.datetime.now().strftime('%B %d, %Y  %I:%M %p')
+    db.close()
+    return render_template('report.html',
+                           jobs_by_status=jobs_by_status,
+                           status_labels=status_labels,
+                           statuses=statuses,
+                           stats=stats,
+                           report_date=report_date)
+
 # ─────────────────────────────────────────────────────────────
 # STARTUP
 # ─────────────────────────────────────────────────────────────

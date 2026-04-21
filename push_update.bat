@@ -17,8 +17,8 @@ if "%GIT%"=="" (
 
 echo Using git at: %GIT%
 echo Committing all changes...
-"%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/forms.html templates/login.html templates/job_detail.html templates/new_job.html templates/field.html static/style.css static/logo.png
-"%GIT%" commit -m "Add Installation and Sewing Shop as Trello board tabs"
+"%GIT%" add app.py templates/estimator.html templates/base.html templates/dashboard.html templates/admin_users.html templates/forms.html templates/login.html templates/job_detail.html templates/new_job.html templates/field.html templates/report.html static/style.css static/logo.png
+"%GIT%" commit -m "Add print report page with pipeline summary and stats"
 echo Pushing to GitHub...
 "%GIT%" push origin main
 echo Done!
