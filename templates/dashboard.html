@@ -156,37 +156,38 @@
             }
             const key=cfg.api_key, tok=cfg.token;
             const auth=`key=${key}&token=${tok}`;
-            const TARGET='Shade America';
+            const BOARD_NAMES=['Shade America','Installation','Sewing Shop'];
             const EXCLUDED=['design','card template under construction',"estimates & po's",'money received/ project done'];
 
-            // Step 1: get boards
             fetch(`https://api.trello.com/1/members/me/boards?${auth}&fields=name,id,url&filter=open`)
-            .then(r=>r.json()).then(boards=>{
-                const board=boards.find(b=>b.name===TARGET);
-                if(!board){
+            .then(r=>r.json()).then(allBoards=>{
+                const matched=BOARD_NAMES.map(n=>allBoards.find(b=>b.name===n)).filter(Boolean);
+                if(!matched.length){
                     document.getElementById('trello-content').innerHTML=
-                        `<div class="trello-no-cfg">Board "${TARGET}" not found.</div>`;
+                        '<div class="trello-no-cfg">No matching Trello boards found.</div>';
                     return;
                 }
-                // Step 2: get lists + all cards in parallel
-                return Promise.all([
-                    fetch(`https://api.trello.com/1/boards/${board.id}/lists?${auth}&filter=open&fields=name,id`).then(r=>r.json()),
-                    fetch(`https://api.trello.com/1/boards/${board.id}/cards?${auth}&fields=name,shortLink,url,due,desc,labels,idList&filter=open`).then(r=>r.json())
-                ]).then(([lists, cards])=>{
-                    // Group cards by list
-                    const byList={};
-                    cards.forEach(c=>{ (byList[c.idList]=byList[c.idList]||[]).push(c); });
-                    const boardData={name:board.name, url:board.url, lists:[]};
-                    lists.forEach(lst=>{
-                        if(EXCLUDED.includes(lst.name.trim().toLowerCase())) return;
-                        const lstCards=(byList[lst.id]||[]).map(c=>({
-                            name:c.name||'Card '+c.shortLink,
-                            url:c.url, due:c.due, desc:c.desc||'',
-                            labels:(c.labels||[]).map(lb=>({color:lb.color,name:lb.name||''}))
-                        }));
-                        boardData.lists.push({name:lst.name, cards:lstCards});
-                    });
-                    trelloData=[boardData];
+                return Promise.all(matched.map(board=>
+                    Promise.all([
+                        fetch(`https://api.trello.com/1/boards/${board.id}/lists?${auth}&filter=open&fields=name,id`).then(r=>r.json()),
+                        fetch(`https://api.trello.com/1/boards/${board.id}/cards?${auth}&fields=name,shortLink,url,due,desc,labels,idList&filter=open`).then(r=>r.json())
+                    ]).then(([lists, cards])=>{
+                        const byList={};
+                        cards.forEach(c=>{ (byList[c.idList]=byList[c.idList]||[]).push(c); });
+                        const boardData={name:board.name, url:board.url, draggable:board.name==='Shade America', lists:[]};
+                        lists.forEach(lst=>{
+                            if(EXCLUDED.includes(lst.name.trim().toLowerCase())) return;
+                            const lstCards=(byList[lst.id]||[]).map(c=>({
+                                name:c.name||'Card '+c.shortLink,
+                                url:c.url, due:c.due, desc:c.desc||'',
+                                labels:(c.labels||[]).map(lb=>({color:lb.color,name:lb.name||''}))
+                            }));
+                            boardData.lists.push({name:lst.name, cards:lstCards});
+                        });
+                        return boardData;
+                    })
+                )).then(results=>{
+                    trelloData=results;
                     renderTrello(0);
                 });
             }).catch(err=>{
@@ -208,6 +209,7 @@
 
         document.getElementById('trello-content').innerHTML=boards.map((b,i)=>{
             const listsHtml=b.lists.length?b.lists.map(lst=>{
+                const isDraggable=b.draggable!==false;
                 const cardsHtml=lst.cards.length?lst.cards.map(c=>{
                     let due='';
                     if(c.due){
