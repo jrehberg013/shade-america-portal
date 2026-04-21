@@ -1980,6 +1980,19 @@ def sync_all_trello_jobs():
 
 
 # ─────────────────────────────────────────────────────────────
+# STATIC ICON ROUTES (Safari looks for these at root)
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/apple-touch-icon.png')
+@app.route('/apple-touch-icon-precomposed.png')
+def apple_touch_icon():
+    return app.send_static_file('apple-touch-icon.png')
+
+@app.route('/favicon.ico')
+def favicon():
+    return app.send_static_file('apple-touch-icon.png')
+
+# ─────────────────────────────────────────────────────────────
 # REPORT
 # ─────────────────────────────────────────────────────────────
 
