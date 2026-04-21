@@ -1696,7 +1696,7 @@ def trello_sync(job_id):
         deposit_paid   = 0.0
         for item in cf_items:
             fname = cf_name_map.get(item.get('idCustomField'), '').lower()
-            val   = item.get('value', {})
+            val   = item.get('value') or {}
             num   = None
             if 'number' in val:
                 try:
