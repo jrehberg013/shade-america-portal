@@ -1109,6 +1109,7 @@ function estUpdateAll() {
     });
 
     estUpdateSummary(totalSqft, fabricCost);
+    if (typeof saveFormState === "function") saveFormState();
 }
 
 function estCalcPoleSection(prefix, hasAttach, hasFooters) {
@@ -1243,7 +1244,7 @@ function estUpdateSummary(totalSqft, fabricCost) {
     let powderCost = 0;
     // Sail & hip: only apply powder if Black Pipe selected
     ['sail','hip'].forEach(prefix => {
-        const tbody = document.getElementById(prefix+'Rows'); if (\!tbody) return;
+        const tbody = document.getElementById(prefix+'Rows'); if (!tbody) return;
         tbody.querySelectorAll('.est-row').forEach(row => {
             const size     = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
             const material = row.querySelector(`select[name^="${prefix}_material_"]`)?.value || 'Galvanized';
@@ -1254,7 +1255,7 @@ function estUpdateSummary(totalSqft, fabricCost) {
     });
     // Cantilever posts & beams: always powder coated
     ['cpost','cbeam'].forEach(prefix => {
-        const tbody = document.getElementById(prefix+'Rows'); if (\!tbody) return;
+        const tbody = document.getElementById(prefix+'Rows'); if (!tbody) return;
         tbody.querySelectorAll('.est-row').forEach(row => {
             const profile = row.querySelector(`select[name^="${prefix}_profile_"]`)?.value || '';
             const wall    = row.querySelector(`select[name^="${prefix}_wall_"]`)?.value   || '';
@@ -1416,45 +1417,28 @@ function emailEstimate() {
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
 }
 
-/* ═══════════════════════════════════════════════════════
-   INIT
-═══════════════════════════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('estimatorForm');
-    form.addEventListener('input',  estUpdateAll);
-    form.addEventListener('change', estUpdateAll);
-    // Auto-populate first frame for dynamic sections
-    estAddHipFrame();
-    estAddCantFrame();
-    estAddPurlinFrame();
-    estUpdateAll();
-});
-
-
 /* ===================================================
-   LOCAL STORAGE PERSISTENCE
+   INIT + LOCAL STORAGE
 =================================================== */
 const LS_KEY = 'sa_estimator_v2';
 
 function saveFormState() {
     const data = {};
-    document.querySelectorAll('form [name]').forEach(el => {
+    document.querySelectorAll('#estimatorForm [name]').forEach(function(el) {
         if (el.name) data[el.name] = el.value;
     });
     try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
-function restoreFormState() {
-    let saved;
-    try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch(e) { return; }
-    if (\!saved) return;
-    const sections = [
-        { countKey:'struct_count',      addFn: estAddStructRow },
-        { countKey:'sail_count',        addFn: function(){ estAddPoleRow('sail','sailRows',true); } },
-        { countKey:'hip_count',         addFn: estAddHipPoleRow },
-        { countKey:'cpost_count',       addFn: estAddCpostRow },
-        { countKey:'cbeam_count',       addFn: estAddCbeamRow },
-        { countKey:'sup_footer_count',  addFn: addSupFooterRow },
+function restoreFormState(saved) {
+    if (!saved) return;
+    var sections = [
+        { countKey:'struct_count',     addFn: estAddStructRow },
+        { countKey:'sail_count',       addFn: function(){ estAddPoleRow('sail','sailRows',true); } },
+        { countKey:'hip_count',        addFn: estAddHipPoleRow },
+        { countKey:'cpost_count',      addFn: estAddCpostRow },
+        { countKey:'cbeam_count',      addFn: estAddCbeamRow },
+        { countKey:'sup_footer_count', addFn: addSupFooterRow },
     ];
     for (var s = 0; s < sections.length; s++) {
         var n = parseInt(saved[sections[s].countKey] || '1');
@@ -1463,29 +1447,39 @@ function restoreFormState() {
     var hfN = parseInt(saved['hf_frame_count'] || '0');
     var cfN = parseInt(saved['cf_frame_count'] || '0');
     var pfN = parseInt(saved['pf_frame_count'] || '0');
-    for (var i = 0; i < hfN; i++) { try { estAddHipFrame(); } catch(e) {} }
-    for (var i = 0; i < cfN; i++) { try { estAddCantFrame(); } catch(e) {} }
-    for (var i = 0; i < pfN; i++) { try { estAddPurlinFrame(); } catch(e) {} }
+    for (var i = 0; i < hfN; i++) { try { estAddHipFrame();   } catch(e) {} }
+    for (var i = 0; i < cfN; i++) { try { estAddCantFrame();  } catch(e) {} }
+    for (var i = 0; i < pfN; i++) { try { estAddPurlinFrame();} catch(e) {} }
     Object.keys(saved).forEach(function(name) {
         var el = document.querySelector('[name="' + name + '"]');
         if (el) el.value = saved[name];
     });
-    try { estUpdateAll(); } catch(e) {}
 }
 
 function clearFormState() {
-    if (\!confirm('Clear all saved estimator data and reset the form?')) return;
+    if (!confirm('Clear all saved estimator data and reset the form?')) return;
     try { localStorage.removeItem(LS_KEY); } catch(e) {}
     location.reload();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    restoreFormState();
-    var form = document.querySelector('form');
-    if (form) {
-        form.addEventListener('input', saveFormState);
-        form.addEventListener('change', saveFormState);
+    var form = document.getElementById('estimatorForm');
+    form.addEventListener('input',  estUpdateAll);
+    form.addEventListener('change', estUpdateAll);
+    form.addEventListener('input',  saveFormState);
+    form.addEventListener('change', saveFormState);
+
+    // Restore saved state or add default frames
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch(e) {}
+    if (saved) {
+        restoreFormState(saved);
+    } else {
+        estAddHipFrame();
+        estAddCantFrame();
+        estAddPurlinFrame();
     }
+    estUpdateAll();
 });
 </script>
 {% endblock %}

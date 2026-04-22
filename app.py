@@ -2158,7 +2158,7 @@ def send_db_backup_email():
         part.add_header('Content-Disposition', 'attachment', filename=fname)
         msg.attach(part)
 
-        with smtplib.SMTP('smtp.office365.com', 587) as smtp:
+        with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
             smtp.ehlo()
             smtp.starttls()
             smtp.login(from_addr, password)
