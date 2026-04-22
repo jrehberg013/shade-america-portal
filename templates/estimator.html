@@ -134,6 +134,7 @@
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Structure Types &amp; Sizes</h3></div>
+  {% if section_descs.get("structure_types") %}<div class="est-section-hint sec-desc">{{ section_descs["structure_types"] }}</div>{% endif %}
   <div class="est-table-wrap">
   <table class="est-table" id="structTable">
     <thead>
@@ -184,11 +185,12 @@
     <h3>Sail Poles</h3>
     <div class="struct-ref-badge">Structure Ref: {{ struct_ref_select('sail_struct_ref') }}</div>
   </div>
+  {% if section_descs.get("sail_poles") %}<div class="est-section-hint sec-desc">{{ section_descs["sail_poles"] }}</div>{% endif %}
   <div class="est-table-wrap">
   <table class="est-table">
     <thead>
       <tr>
-        <th>#</th><th>Pipe Size</th><th>Length (ft)</th><th>Qty</th>
+        <th>#</th><th>Pipe Size</th><th>Material</th><th>Length (ft)</th><th>Qty</th>
         <th>Attachment</th><th>Footer Ø (ft)</th><th>Footer Depth (ft)</th>
         <th>Pipe Total $</th><th>CY Each</th><th></th>
       </tr>
@@ -196,9 +198,13 @@
     <tbody id="sailRows">
       <tr class="est-row" id="sail_0">
         <td class="row-num">1</td>
-        <td><select name="sail_size_0">
+        <td><select name="sail_size_0" onchange="estUpdateAll()">
           <option value="">-- Size --</option>
           {% for s in pipe_sizes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select></td>
+        <td><select name="sail_material_0" onchange="estUpdateAll()">
+          <option value="Galvanized">Galvanized</option>
+          <option value="Black Pipe">Black Pipe</option>
         </select></td>
         <td><input type="number" name="sail_len_0" placeholder="ft" min="0" step="0.5"></td>
         <td><input type="number" name="sail_qty_0" placeholder="qty" min="1" style="width:60px"></td>
@@ -215,7 +221,7 @@
     </tbody>
     <tfoot>
       <tr class="subtotal-row">
-        <td colspan="7"><strong>Sail Poles Subtotal</strong></td>
+        <td colspan="8"><strong>Sail Poles Subtotal</strong></td>
         <td><strong id="sail_total_steel">$0.00</strong></td>
         <td><strong id="sail_total_cy">0 CY</strong></td>
         <td></td>
@@ -244,11 +250,12 @@
   <div class="card-header">
     <h3>Hip &amp; Canopy Poles</h3>
   </div>
+  {% if section_descs.get("hip_poles") %}<div class="est-section-hint sec-desc">{{ section_descs["hip_poles"] }}</div>{% endif %}
   <div class="est-table-wrap">
   <table class="est-table">
     <thead>
       <tr>
-        <th>#</th><th>Struct #</th><th>Pipe Size</th><th>Length (ft)</th><th>Qty</th>
+        <th>#</th><th>Struct #</th><th>Pipe Size</th><th>Material</th><th>Length (ft)</th><th>Qty</th>
         <th>Footer Ø (ft)</th><th>Footer Depth (ft)</th>
         <th>Pipe Total $</th><th>CY Each</th><th></th>
       </tr>
@@ -257,9 +264,13 @@
       <tr class="est-row" id="hip_0">
         <td class="row-num">1</td>
         <td>{{ struct_ref_select('hip_sref_0') }}</td>
-        <td><select name="hip_size_0">
+        <td><select name="hip_size_0" onchange="estUpdateAll()">
           <option value="">-- Size --</option>
           {% for s in pipe_sizes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select></td>
+        <td><select name="hip_material_0" onchange="estUpdateAll()">
+          <option value="Galvanized">Galvanized</option>
+          <option value="Black Pipe">Black Pipe</option>
         </select></td>
         <td><input type="number" name="hip_len_0" placeholder="ft" min="0" step="0.5"></td>
         <td><input type="number" name="hip_qty_0" placeholder="qty" min="1" style="width:60px"></td>
@@ -272,7 +283,7 @@
     </tbody>
     <tfoot>
       <tr class="subtotal-row">
-        <td colspan="7"><strong>Hip/Canopy Subtotal</strong></td>
+        <td colspan="8"><strong>Hip/Canopy Subtotal</strong></td>
         <td><strong id="hip_total_steel">$0.00</strong></td>
         <td><strong id="hip_total_cy">0 CY</strong></td>
         <td></td>
@@ -291,6 +302,7 @@
   <div class="card-header">
     <h3>Cantilever Posts</h3>
   </div>
+  {% if section_descs.get("cant_posts") %}<div class="est-section-hint sec-desc">{{ section_descs["cant_posts"] }}</div>{% endif %}
   <div class="est-table-wrap">
   <table class="est-table">
     <thead>
@@ -340,6 +352,7 @@
   <div class="card-header">
     <h3>Cantilever Beams</h3>
   </div>
+  {% if section_descs.get("cant_beams") %}<div class="est-section-hint sec-desc">{{ section_descs["cant_beams"] }}</div>{% endif %}
   <div class="est-table-wrap">
   <table class="est-table">
     <thead>
@@ -393,7 +406,7 @@
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Cantilever Upper Frames — Pipe System</h3></div>
-  <div class="est-section-hint">Prices auto-filled from Pricing page.</div>
+  <div class="est-section-hint">Prices auto-filled from Pricing page. Sizes limited to 3", 4", 5" OD Galv (same as hip upper frames).</div>
   <div id="cfFrames"></div>
   <button type="button" class="btn btn-sm btn-outline" onclick="estAddCantFrame()">+ Add Cantilever Frame</button>
   <input type="hidden" name="cf_frame_count" id="cf_frame_count" value="0">
@@ -415,6 +428,7 @@
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Travel &amp; Fuel</h3></div>
+  {% if section_descs.get("travel_fuel") %}<div class="est-section-hint sec-desc">{{ section_descs["travel_fuel"] }}</div>{% endif %}
   <div class="form-row" style="align-items:flex-end">
     <div class="form-group">
       <label>Location (pick city to auto-fill miles)</label>
@@ -469,6 +483,7 @@
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-header"><h3>Materials &amp; Other Costs</h3></div>
+  {% if section_descs.get("materials_other") %}<div class="est-section-hint sec-desc">{{ section_descs["materials_other"] }}</div>{% endif %}
   <div class="form-row">
     <div class="form-group">
       <label>Hardware / Fasteners ($)</label>
@@ -537,6 +552,7 @@
   </div>
   <div class="form-actions" style="margin-top:1.25rem">
     <button type="submit" class="btn btn-primary btn-lg">Calculate Full Estimate →</button>
+    <button type="button" class="btn btn-outline btn-sm" onclick="clearFormState()" style="margin-left:.75rem;color:#888">Clear Saved Data</button>
   </div>
 </div>
 
@@ -569,6 +585,7 @@
 .frame-remove-btn{margin-left:auto;background:none;border:none;color:#c0392b;cursor:pointer;
                   font-size:.8rem;padding:.2rem .5rem;border-radius:4px;}
 .frame-remove-btn:hover{background:#fdf0f0;}
+.sec-desc{font-size:.82rem;color:#555;background:#fffbe6;border-left:3px solid #f0b429;padding:.4rem .75rem;margin:.25rem 0 .5rem;border-radius:0 4px 4px 0}
 .frame-table{max-width:600px;}
 .frame-total{font-weight:500;white-space:nowrap;}
 .tubing-sel,.od-tubing-sel,.purlin-tubing-sel{min-width:140px;font-size:.8rem;}
@@ -742,7 +759,8 @@ function estAddPoleRow(prefix, containerId, hasAttach) {
     const cyCol = `<td><span class="pole-cy">—</span></td>`;
     tr.innerHTML = `
       <td class="row-num">${estCountRows(containerId)+1}</td>
-      <td><select name="${prefix}_size_${i}">${PIPE_OPTS}</select></td>
+      <td><select name="${prefix}_size_${i}" onchange="estUpdateAll()">${PIPE_OPTS}</select></td>
+      <td><select name="${prefix}_material_${i}" onchange="estUpdateAll()"><option value="Galvanized">Galvanized</option><option value="Black Pipe">Black Pipe</option></select></td>
       <td><input type="number" name="${prefix}_len_${i}" placeholder="ft" min="0" step="0.5"></td>
       <td><input type="number" name="${prefix}_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
       ${attachCol}
@@ -764,7 +782,8 @@ function estAddHipPoleRow() {
     tr.innerHTML = `
       <td class="row-num">${estCountRows('hipRows')+1}</td>
       <td><select name="hip_sref_${i}" style="width:70px;font-size:.8rem">${SREF_OPTS}</select></td>
-      <td><select name="hip_size_${i}">${PIPE_OPTS}</select></td>
+      <td><select name="hip_size_${i}" onchange="estUpdateAll()">${PIPE_OPTS}</select></td>
+      <td><select name="hip_material_${i}" onchange="estUpdateAll()"><option value="Galvanized">Galvanized</option><option value="Black Pipe">Black Pipe</option></select></td>
       <td><input type="number" name="hip_len_${i}" placeholder="ft" min="0" step="0.5"></td>
       <td><input type="number" name="hip_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
       <td><input type="number" name="hip_footer_dia_${i}" value="0" min="0" step="0.25" style="width:70px"></td>
@@ -906,13 +925,13 @@ function estAddCantFrame() {
             <td class="frame-total" id="cf_ys_total_${i}">$0.00</td></tr>
           <tr>
             <td>Ridge (1 pc)</td>
-            <td><select name="cf_ridge_size_${i}" class="tubing-sel" onchange="estCalcFrameSection('cf',${i})">${TUBING_OPTS}</select></td>
+            <td><select name="cf_ridge_size_${i}" class="od-tubing-sel" onchange="estCalcFrameSection('cf',${i})">${OD_TUBING_OPTS}</select></td>
             <td><input type="number" name="cf_ridge_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('cf',${i})"></td>
             <td class="auto-price" id="cf_ridge_uprice_${i}">—</td>
             <td class="frame-total" id="cf_ridge_total_${i}">$0.00</td></tr>
           <tr>
             <td>Rafters</td>
-            <td><select name="cf_rafters_size_${i}" class="tubing-sel" onchange="estCalcFrameSection('cf',${i})">${TUBING_OPTS}</select></td>
+            <td><select name="cf_rafters_size_${i}" class="od-tubing-sel" onchange="estCalcFrameSection('cf',${i})">${OD_TUBING_OPTS}</select></td>
             <td><input type="number" name="cf_rafters_qty_${i}" value="0" min="0" style="width:70px" oninput="estCalcFrameSection('cf',${i})"></td>
             <td class="auto-price" id="cf_rafters_uprice_${i}">—</td>
             <td class="frame-total" id="cf_rafters_total_${i}">$0.00</td></tr>
@@ -1222,17 +1241,20 @@ function estUpdateSummary(totalSqft, fabricCost) {
     const weldingCost = (weldLugs + cpostQty + cbeamQty) * WELD_RATE;
 
     let powderCost = 0;
+    // Sail & hip: only apply powder if Black Pipe selected
     ['sail','hip'].forEach(prefix => {
-        const tbody = document.getElementById(prefix+'Rows'); if (!tbody) return;
+        const tbody = document.getElementById(prefix+'Rows'); if (\!tbody) return;
         tbody.querySelectorAll('.est-row').forEach(row => {
-            const size = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
-            const len  = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
-            const qty  = parseInt(row.querySelector(`input[name^="${prefix}_qty_"]`)?.value) || 0;
-            powderCost += getPowderRate(size) * len * qty;
+            const size     = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
+            const material = row.querySelector(`select[name^="${prefix}_material_"]`)?.value || 'Galvanized';
+            const len      = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
+            const qty      = parseInt(row.querySelector(`input[name^="${prefix}_qty_"]`)?.value) || 0;
+            if (material === 'Black Pipe') powderCost += getPowderRate(size) * len * qty;
         });
     });
+    // Cantilever posts & beams: always powder coated
     ['cpost','cbeam'].forEach(prefix => {
-        const tbody = document.getElementById(prefix+'Rows'); if (!tbody) return;
+        const tbody = document.getElementById(prefix+'Rows'); if (\!tbody) return;
         tbody.querySelectorAll('.est-row').forEach(row => {
             const profile = row.querySelector(`select[name^="${prefix}_profile_"]`)?.value || '';
             const wall    = row.querySelector(`select[name^="${prefix}_wall_"]`)?.value   || '';
@@ -1406,6 +1428,64 @@ document.addEventListener('DOMContentLoaded', () => {
     estAddCantFrame();
     estAddPurlinFrame();
     estUpdateAll();
+});
+
+
+/* ===================================================
+   LOCAL STORAGE PERSISTENCE
+=================================================== */
+const LS_KEY = 'sa_estimator_v2';
+
+function saveFormState() {
+    const data = {};
+    document.querySelectorAll('form [name]').forEach(el => {
+        if (el.name) data[el.name] = el.value;
+    });
+    try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
+}
+
+function restoreFormState() {
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch(e) { return; }
+    if (\!saved) return;
+    const sections = [
+        { countKey:'struct_count',      addFn: estAddStructRow },
+        { countKey:'sail_count',        addFn: function(){ estAddPoleRow('sail','sailRows',true); } },
+        { countKey:'hip_count',         addFn: estAddHipPoleRow },
+        { countKey:'cpost_count',       addFn: estAddCpostRow },
+        { countKey:'cbeam_count',       addFn: estAddCbeamRow },
+        { countKey:'sup_footer_count',  addFn: addSupFooterRow },
+    ];
+    for (var s = 0; s < sections.length; s++) {
+        var n = parseInt(saved[sections[s].countKey] || '1');
+        for (var x = 1; x < n; x++) { try { sections[s].addFn(); } catch(e) {} }
+    }
+    var hfN = parseInt(saved['hf_frame_count'] || '0');
+    var cfN = parseInt(saved['cf_frame_count'] || '0');
+    var pfN = parseInt(saved['pf_frame_count'] || '0');
+    for (var i = 0; i < hfN; i++) { try { estAddHipFrame(); } catch(e) {} }
+    for (var i = 0; i < cfN; i++) { try { estAddCantFrame(); } catch(e) {} }
+    for (var i = 0; i < pfN; i++) { try { estAddPurlinFrame(); } catch(e) {} }
+    Object.keys(saved).forEach(function(name) {
+        var el = document.querySelector('[name="' + name + '"]');
+        if (el) el.value = saved[name];
+    });
+    try { estUpdateAll(); } catch(e) {}
+}
+
+function clearFormState() {
+    if (\!confirm('Clear all saved estimator data and reset the form?')) return;
+    try { localStorage.removeItem(LS_KEY); } catch(e) {}
+    location.reload();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    restoreFormState();
+    var form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('input', saveFormState);
+        form.addEventListener('change', saveFormState);
+    }
 });
 </script>
 {% endblock %}

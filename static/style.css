@@ -240,9 +240,9 @@ img{max-width:100%}
 .result-table td{padding:.5rem 1.5rem;border-bottom:1px solid var(--border)}
 .result-table .subtotal-row td{border-top:2px solid var(--border);padding-top:.75rem}
 .td-right{text-align:right}
-.totals-box{background:var(--navy);color:var(--white);border-radius:0 0 var(--radius) var(--radius);padding:1.25rem 1.5rem;margin-top:1rem}
-.totals-row{display:flex;justify-content:space-between;padding:.4rem 0;font-size:.9rem;opacity:.8}
-.totals-final{font-size:1.2rem;font-weight:700;opacity:1;border-top:1px solid rgba(255,255,255,.2);margin-top:.5rem;padding-top:.75rem}
+.totals-box{background:var(--off-white);color:var(--text);border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);padding:1.25rem 1.5rem;margin-top:1rem}
+.totals-row{display:flex;justify-content:space-between;padding:.4rem 0;font-size:.9rem;color:var(--text)}
+.totals-final{font-size:1.2rem;font-weight:700;color:var(--navy3);border-top:2px solid var(--border);margin-top:.5rem;padding-top:.75rem}
 .pole-detail-toggle{margin:.75rem 1.5rem;font-size:.85rem;cursor:pointer}
 .pole-detail-toggle summary{font-weight:600;color:var(--muted);list-style:none;padding:.4rem}
 .pole-detail-toggle summary:hover{color:var(--green)}

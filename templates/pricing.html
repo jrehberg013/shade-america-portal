@@ -6,21 +6,42 @@
 <div class="card">
     <div class="card-header">
         <h2>Pipe & Material Pricing</h2>
-        <p class="text-muted">Update unit prices used by the estimator. Changes take effect immediately.</p>
+        <p class="text-muted">Update prices, item names, categories, and units. Changes take effect immediately.</p>
     </div>
     {% if current_user.role == 'admin' %}
     <form method="POST" action="{{ url_for('update_pricing') }}">
     {% endif %}
         <table class="data-table pricing-table">
             <thead>
-                <tr><th>Item</th><th>Category</th><th>Unit</th><th>Price ($)</th></tr>
+                <tr><th>Item Name</th><th>Category</th><th>Unit</th><th>Price ($)</th></tr>
             </thead>
             <tbody>
                 {% for item in pricing %}
                 <tr>
-                    <td>{{ item.name }}</td>
-                    <td><span class="tag">{{ item.category }}</span></td>
-                    <td class="text-muted">{{ item.unit or 'ea' }}</td>
+                    <td>
+                        {% if current_user.role == 'admin' %}
+                        <input type="text" name="iname_{{ item.id }}" value="{{ item.name }}"
+                               class="price-input" style="width:200px">
+                        {% else %}
+                        {{ item.name }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if current_user.role == 'admin' %}
+                        <input type="text" name="icat_{{ item.id }}" value="{{ item.category }}"
+                               class="price-input" style="width:110px">
+                        {% else %}
+                        <span class="tag">{{ item.category }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if current_user.role == 'admin' %}
+                        <input type="text" name="iunit_{{ item.id }}" value="{{ item.unit or 'ea' }}"
+                               class="price-input" style="width:80px">
+                        {% else %}
+                        <span class="text-muted">{{ item.unit or 'ea' }}</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if current_user.role == 'admin' %}
                         <input type="number" name="price_{{ item.id }}" value="{{ item.price }}"
@@ -35,7 +56,7 @@
         </table>
         {% if current_user.role == 'admin' %}
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Save Prices</button>
+            <button type="submit" class="btn btn-primary">Save Pricing</button>
         </div>
     </form>
     {% endif %}

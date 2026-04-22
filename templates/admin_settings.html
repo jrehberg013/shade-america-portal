@@ -122,4 +122,52 @@ function scSave(){
         });
 }
 </script>
+
+<\!-- Section Descriptions -->
+<div class="section-header" style="margin-top:2rem">
+    <h2>Estimator Section Descriptions</h2>
+</div>
+<div class="card" style="padding:1.25rem">
+    <p style="font-size:.85rem;color:#666;margin-bottom:1.25rem">
+        These notes appear below each section heading in the estimator — visible to anyone filling out an estimate. Leave blank to hide.
+    </p>
+    <div id="sec-desc-fields">
+        {% set sec_labels = [
+            ('structure_types', 'Structure Types & Sizes'),
+            ('sail_poles',      'Sail Poles'),
+            ('hip_poles',       'Hip & Canopy Poles'),
+            ('cant_posts',      'Cantilever Posts'),
+            ('cant_beams',      'Cantilever Beams'),
+            ('travel_fuel',     'Travel & Fuel'),
+            ('materials_other', 'Materials & Other Costs'),
+        ] %}
+        {% for key, label in sec_labels %}
+        <div class="form-group" style="margin-bottom:1rem">
+            <label style="font-weight:600;font-size:.88rem;margin-bottom:.3rem;display:block">{{ label }}</label>
+            <textarea id="sd_{{ key }}" rows="2"
+                style="width:100%;padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:.85rem;resize:vertical"
+                placeholder="Optional note for estimator users…">{{ section_descs.get(key, '') }}</textarea>
+        </div>
+        {% endfor %}
+    </div>
+    <button type="button" onclick="sdSave()" class="btn btn-primary">Save Descriptions</button>
+    <span id="sd-msg" style="font-size:.85rem;margin-left:.75rem;color:#2a7a4f"></span>
+</div>
+
+<script>
+const SD_KEYS = ['structure_types','sail_poles','hip_poles','cant_posts','cant_beams','travel_fuel','materials_other'];
+function sdSave() {
+    const data = {};
+    SD_KEYS.forEach(k => { data[k] = (document.getElementById('sd_' + k)?.value || '').trim(); });
+    fetch('/admin/section-descriptions', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        const msg = document.getElementById('sd-msg');
+        msg.textContent = d.ok ? 'Saved\!' : 'Error saving.';
+        setTimeout(() => msg.textContent = '', 3000);
+    });
+}
+</script>
 {% endblock %}

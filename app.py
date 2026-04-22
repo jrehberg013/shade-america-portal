@@ -1,4 +1,9 @@
-import os, math, json, sqlite3, secrets, urllib.request, urllib.parse
+import os, math, json, sqlite3, secrets, urllib.request, urllib.parse, smtplib, io as _io
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email import encoders as _encoders
+import datetime as _dt_module
 from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, g, send_file, abort, jsonify)
@@ -181,6 +186,10 @@ def init_db():
                 key TEXT PRIMARY KEY,
                 value TEXT
             )""",
+            """CREATE TABLE IF NOT EXISTS section_descriptions (
+                key TEXT PRIMARY KEY,
+                value TEXT DEFAULT ''
+            )""",
         ]
         for stmt in statements:
             cur.execute(stmt)
@@ -248,6 +257,10 @@ def init_db():
                 key TEXT PRIMARY KEY,
                 value TEXT
             );
+            CREATE TABLE IF NOT EXISTS section_descriptions (
+                key TEXT PRIMARY KEY,
+                value TEXT DEFAULT ''
+            );
         """)
         conn.commit()
         db = _DB(conn)
@@ -298,15 +311,15 @@ def init_db():
             ('hardware','Clamp',            0,    '$/piece', 3),
             ('hardware','Wall Mount',       0,    '$/piece', 4),
             ('hardware','Welding Rate',     95,   '$/weld',  5),
-            ('powder','5" SCH40',           0,    '$/LF',    1),
-            ('powder','6" SCH40',           0,    '$/LF',    2),
-            ('powder','8" SCH40',           0,    '$/LF',    3),
+            ('powder','5" SCH40',           15,   '$/LF',    1),
+            ('powder','6" SCH40',           15,   '$/LF',    2),
+            ('powder','8" SCH40',           15,   '$/LF',    3),
             ('powder','3" OD Galv',         0,    '$/LF',    4),
             ('powder','4" OD Galv',         0,    '$/LF',    5),
             ('powder','5" OD Galv',         0,    '$/LF',    6),
-            ('powder','4x4 HSS',            0,    '$/LF',    7),
-            ('powder','4x6 HSS',            0,    '$/LF',    8),
-            ('powder','4x8 HSS',            0,    '$/LF',    9),
+            ('powder','4x4 HSS',            15,   '$/LF',    7),
+            ('powder','4x6 HSS',            15,   '$/LF',    8),
+            ('powder','4x8 HSS',            15,   '$/LF',    9),
             ('fabric','Fabric per Sq Ft',   3.25, '$/sqft',  1),
             ('concrete','Price per CY',     200,  '$/CY',    1),
             ('crew','Rate - Person 1',      650,  '$/day',   1),
@@ -356,6 +369,27 @@ def init_db():
                 db.execute(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col} {typedef}")
             else:
                 db.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass
+
+    # Migrate: create section_descriptions table on existing DBs
+    try:
+        if USE_PG:
+            db.execute("""CREATE TABLE IF NOT EXISTS section_descriptions (
+                key TEXT PRIMARY KEY, value TEXT DEFAULT '')""")
+        else:
+            db.execute("""CREATE TABLE IF NOT EXISTS section_descriptions (
+                key TEXT PRIMARY KEY, value TEXT DEFAULT '')""")
+    except Exception:
+        pass
+
+    # Migrate: update powder prices on existing databases
+    for pname, price in [('5" SCH40', 15), ('6" SCH40', 15), ('8" SCH40', 15),
+                          ('4x4 HSS', 15), ('4x6 HSS', 15), ('4x8 HSS', 15)]:
+        try:
+            row = db.execute("SELECT price FROM pricing WHERE category='powder' AND name=?", (pname,)).fetchone()
+            if row and row['price'] == 0:
+                db.execute("UPDATE pricing SET price=15 WHERE category='powder' AND name=?", (pname,))
         except Exception:
             pass
 
@@ -778,10 +812,11 @@ def parse_pole_rows(prefix, f):
     rows = []
     for i in range(n):
         rows.append({
-            'size':   f.get(f'{prefix}_size_{i}', ''),
-            'length': f.get(f'{prefix}_len_{i}', 0),
-            'qty':    f.get(f'{prefix}_qty_{i}', 0),
-            'attach': f.get(f'{prefix}_attach_{i}', ''),
+            'size':     f.get(f'{prefix}_size_{i}', ''),
+            'length':   f.get(f'{prefix}_len_{i}', 0),
+            'qty':      f.get(f'{prefix}_qty_{i}', 0),
+            'attach':   f.get(f'{prefix}_attach_{i}', ''),
+            'material': f.get(f'{prefix}_material_{i}', 'Galvanized'),
         })
     return rows
 
@@ -810,6 +845,8 @@ def estimator():
         '1.9" Steel Tubing 24ft',
     ]
     location_cities = sorted(LOCATION_MILES.keys())
+    desc_rows  = db.execute("SELECT key, value FROM section_descriptions").fetchall()
+    section_descs = {r['key']: r['value'] for r in desc_rows}
     return render_template('estimator.html',
                            pricing_json=json.dumps(pm),
                            fabric_rate=fabric_rate,
@@ -820,7 +857,8 @@ def estimator():
                            od_tubing_names=od_tubing_names,
                            purlin_tubing_names=purlin_tubing_names,
                            location_cities=location_cities,
-                           location_miles_json=json.dumps(LOCATION_MILES))
+                           location_miles_json=json.dumps(LOCATION_MILES),
+                           section_descs=section_descs)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1041,10 +1079,11 @@ def calculate():
             attach     = f.get(f'{prefix}_attach_{i}', '') if has_attach else ''
             footer_dia = float(f.get(f'{prefix}_footer_dia_{i}', 0) or 0)
             footer_dep = float(f.get(f'{prefix}_footer_depth_{i}', 0) or 0)
+            material = f.get(f'{prefix}_material_{i}', 'Galvanized') if not has_wall else 'Black Pipe'
             if size and length and qty:
                 cy = math.pi * (footer_dia/2)**2 * footer_dep / 27 if footer_dia and footer_dep else 0
                 rows.append({'size': size, 'length': length, 'qty': qty,
-                             'attach': attach, 'cy': cy * qty})
+                             'attach': attach, 'cy': cy * qty, 'material': material})
         return rows
 
     sail_poles  = _poles('sail',  has_attach=True)
@@ -1072,12 +1111,14 @@ def calculate():
     cbeam_qty    = sum(r['qty'] for r in cant_beams)
     welding_cost = (weld_lug_count + cpost_qty + cbeam_qty) * weld_rate
 
-    # Powder
+    # Powder — sail/hip only if Black Pipe; cantilever always
     powder_cost = 0
-    for rows in [sail_poles, hip_poles, cant_posts, cant_beams]:
+    for is_cant, rows in [(False, sail_poles), (False, hip_poles),
+                          (True, cant_posts), (True, cant_beams)]:
         for row in rows:
-            rate = get_powder_rate(row['size'], pm)
-            powder_cost += rate * row['length'] * row['qty']
+            if is_cant or row.get('material', 'Galvanized') == 'Black Pipe':
+                rate = get_powder_rate(row['size'], pm)
+                powder_cost += rate * row['length'] * row['qty']
 
     # Concrete — regular footers
     all_cy        = sum(r['cy'] for r in sail_poles + hip_poles + cant_posts)
@@ -1234,14 +1275,50 @@ def update_pricing():
     db = get_db()
     for key, val in request.form.items():
         if key.startswith('price_'):
-            pid = int(key.split('_')[1])
+            pid = int(key.split('_', 1)[1])
             try:
                 db.execute("UPDATE pricing SET price=? WHERE id=?", (float(val), pid))
             except (ValueError, TypeError):
                 pass
+        elif key.startswith('iname_'):
+            pid = int(key.split('_', 1)[1])
+            if val.strip():
+                db.execute("UPDATE pricing SET name=? WHERE id=?", (val.strip(), pid))
+        elif key.startswith('icat_'):
+            pid = int(key.split('_', 1)[1])
+            if val.strip():
+                db.execute("UPDATE pricing SET category=? WHERE id=?", (val.strip(), pid))
+        elif key.startswith('iunit_'):
+            pid = int(key.split('_', 1)[1])
+            db.execute("UPDATE pricing SET unit=? WHERE id=?", (val.strip(), pid))
     db.commit()
-    flash('Prices updated.', 'success')
+    flash('Pricing updated.', 'success')
     return redirect(url_for('pricing'))
+
+
+# ─────────────────────────────────────────────────────────────
+# SECTION DESCRIPTIONS
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/api/section-descriptions')
+@manager_required
+def get_section_descriptions():
+    db = get_db()
+    rows = db.execute("SELECT key, value FROM section_descriptions").fetchall()
+    return jsonify({r['key']: r['value'] for r in rows})
+
+@app.route('/admin/section-descriptions', methods=['POST'])
+@admin_required
+def save_section_descriptions():
+    db   = get_db()
+    data = request.get_json(silent=True) or {}
+    for key, value in data.items():
+        if db.execute("SELECT key FROM section_descriptions WHERE key=?", (key,)).fetchone():
+            db.execute("UPDATE section_descriptions SET value=? WHERE key=?", (value, key))
+        else:
+            db.execute("INSERT INTO section_descriptions (key, value) VALUES (?,?)", (key, value))
+    db.commit()
+    return jsonify({'ok': True})
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1324,8 +1401,11 @@ def admin_settings():
     db    = get_db()
     forms = db.execute("SELECT * FROM forms ORDER BY uploaded_at DESC").fetchall()
     stat_cards = get_stat_cards_config(db)
+    desc_rows  = db.execute("SELECT key, value FROM section_descriptions").fetchall()
+    section_descs = {r['key']: r['value'] for r in desc_rows}
     db.close()
-    return render_template('admin_settings.html', forms=forms, stat_cards=stat_cards)
+    return render_template('admin_settings.html', forms=forms, stat_cards=stat_cards,
+                           section_descs=section_descs)
 
 @app.route('/admin/stat-cards', methods=['POST'])
 @admin_required
@@ -2034,6 +2114,60 @@ def report():
                            report_date=report_date)
 
 # ─────────────────────────────────────────────────────────────
+# EMAIL BACKUP
+# ─────────────────────────────────────────────────────────────
+
+def send_db_backup_email():
+    """Send a daily SQLite or PG dump as an email attachment via Outlook SMTP."""
+    try:
+        from_addr = os.environ.get('BACKUP_EMAIL_FROM', '')
+        to_addr   = os.environ.get('BACKUP_EMAIL_TO', '')
+        password  = os.environ.get('BACKUP_EMAIL_PASSWORD', '')
+        if not (from_addr and to_addr and password):
+            return  # Not configured — skip silently
+
+        now_str = _dt_module.datetime.now().strftime('%Y-%m-%d')
+
+        if USE_PG:
+            # Dump key tables as JSON
+            with app.app_context():
+                db = get_db()
+                backup_data = {}
+                for tbl in ['jobs', 'users', 'pricing', 'settings', 'section_descriptions']:
+                    rows = db.execute(f"SELECT * FROM {tbl}").fetchall()
+                    backup_data[tbl] = [dict(r) for r in rows]
+                dump = json.dumps(backup_data, indent=2, default=str).encode('utf-8')
+                fname = f'sa_portal_backup_{now_str}.json'
+        else:
+            # Read SQLite file directly
+            db_path = DATABASE
+            with open(db_path, 'rb') as fh:
+                dump = fh.read()
+            fname = f'sa_portal_backup_{now_str}.sqlite'
+
+        msg = MIMEMultipart()
+        msg['From']    = from_addr
+        msg['To']      = to_addr
+        msg['Subject'] = f'Shade America Portal — Daily Backup {now_str}'
+        msg.attach(MIMEText(
+            f'Automated daily backup attached.\n\nDate: {now_str}\nFile: {fname}',
+            'plain'))
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(dump)
+        _encoders.encode_base64(part)
+        part.add_header('Content-Disposition', 'attachment', filename=fname)
+        msg.attach(part)
+
+        with smtplib.SMTP('smtp.office365.com', 587) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(from_addr, password)
+            smtp.sendmail(from_addr, to_addr, msg.as_string())
+    except Exception as e:
+        app.logger.error(f'Backup email failed: {e}')
+
+
+# ─────────────────────────────────────────────────────────────
 # STARTUP
 # ─────────────────────────────────────────────────────────────
 
@@ -2047,6 +2181,7 @@ try:
     _scheduler.add_job(sync_all_trello_jobs, 'interval', minutes=20, id='trello_sync', next_run_time=None)
     import datetime as _dt
     _scheduler.add_job(sync_all_trello_jobs, 'date', run_date=_dt.datetime.now()+_dt.timedelta(minutes=3), id='trello_sync_first')
+    _scheduler.add_job(send_db_backup_email, 'cron', hour=2, minute=0, id='daily_backup')
     _scheduler.start()
 except Exception:
     pass  # APScheduler not available — sync will be manual only
