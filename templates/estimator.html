@@ -198,7 +198,7 @@
     <tbody id="sailRows">
       <tr class="est-row" id="sail_0">
         <td class="row-num">1</td>
-        <td><select name="sail_size_0" onchange="estUpdateAll()">
+        <td><select name="sail_size_0" onchange="syncMaterialDropdown(this);estUpdateAll()">
           <option value="">-- Size --</option>
           {% for s in pipe_sizes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
         </select></td>
@@ -264,7 +264,7 @@
       <tr class="est-row" id="hip_0">
         <td class="row-num">1</td>
         <td>{{ struct_ref_select('hip_sref_0') }}</td>
-        <td><select name="hip_size_0" onchange="estUpdateAll()">
+        <td><select name="hip_size_0" onchange="syncMaterialDropdown(this);estUpdateAll()">
           <option value="">-- Size --</option>
           {% for s in pipe_sizes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
         </select></td>
@@ -645,14 +645,36 @@ function applyLocationMiles(city) {
 /* ═══════════════════════════════════════════════════════
    PRICING HELPERS
 ═══════════════════════════════════════════════════════ */
-function getPipeCostPerPole(size, lengthFt) {
+function syncMaterialDropdown(sizeEl) {
+    var row = sizeEl.closest('tr') || sizeEl.closest('.est-row');
+    if (!row) return;
+    var matSel = row.querySelector('select[name*="_material_"]');
+    if (!matSel) return;
+    var isODGalv = sizeEl.value.includes('OD Galv');
+    if (isODGalv) {
+        matSel.value = 'Galvanized';
+        matSel.disabled = true;
+        matSel.style.opacity = '0.45';
+        matSel.title = 'OD Galv tubing is galvanized only';
+    } else {
+        matSel.disabled = false;
+        matSel.style.opacity = '1';
+        matSel.title = '';
+    }
+}
+
+function getPipeCostPerPole(size, lengthFt, material) {
     if (!size || !lengthFt) return 0;
     const len = parseFloat(lengthFt) || 0;
     if (len <= 0) return 0;
+    // For SCH40 sizes filter by material (Galv vs Black)
+    const isSCH40 = size.includes('SCH40');
+    const colorFilter = isSCH40 ? (material === 'Black Pipe' ? 'Black' : 'Galv') : null;
     let best = null;
     for (const [key, price] of Object.entries(PRICING)) {
         if (!price || price <= 0) continue;
         if (!key.startsWith(size + ' ')) continue;
+        if (colorFilter && !key.includes(' ' + colorFilter + ' ')) continue;
         const m = key.match(/(\d+)ft$/);
         if (!m) continue;
         const stickLen = parseInt(m[1]);
@@ -759,7 +781,7 @@ function estAddPoleRow(prefix, containerId, hasAttach) {
     const cyCol = `<td><span class="pole-cy">—</span></td>`;
     tr.innerHTML = `
       <td class="row-num">${estCountRows(containerId)+1}</td>
-      <td><select name="${prefix}_size_${i}" onchange="estUpdateAll()">${PIPE_OPTS}</select></td>
+      <td><select name="${prefix}_size_${i}" onchange="syncMaterialDropdown(this);estUpdateAll()">${PIPE_OPTS}</select></td>
       <td><select name="${prefix}_material_${i}" onchange="estUpdateAll()"><option value="Galvanized">Galvanized</option><option value="Black Pipe">Black Pipe</option></select></td>
       <td><input type="number" name="${prefix}_len_${i}" placeholder="ft" min="0" step="0.5"></td>
       <td><input type="number" name="${prefix}_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
@@ -782,7 +804,7 @@ function estAddHipPoleRow() {
     tr.innerHTML = `
       <td class="row-num">${estCountRows('hipRows')+1}</td>
       <td><select name="hip_sref_${i}" style="width:70px;font-size:.8rem">${SREF_OPTS}</select></td>
-      <td><select name="hip_size_${i}" onchange="estUpdateAll()">${PIPE_OPTS}</select></td>
+      <td><select name="hip_size_${i}" onchange="syncMaterialDropdown(this);estUpdateAll()">${PIPE_OPTS}</select></td>
       <td><select name="hip_material_${i}" onchange="estUpdateAll()"><option value="Galvanized">Galvanized</option><option value="Black Pipe">Black Pipe</option></select></td>
       <td><input type="number" name="hip_len_${i}" placeholder="ft" min="0" step="0.5"></td>
       <td><input type="number" name="hip_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
@@ -1116,13 +1138,14 @@ function estCalcPoleSection(prefix, hasAttach, hasFooters) {
     const tbody = document.getElementById(prefix + 'Rows'); if (!tbody) return;
     let steel=0, cy=0, welds=0;
     tbody.querySelectorAll('.est-row').forEach(row => {
-        const size   = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
-        const len    = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
-        const qty    = parseInt(row.querySelector(`input[name^="${prefix}_qty_"]`)?.value) || 0;
-        const attach = hasAttach ? (row.querySelector(`select[name^="${prefix}_attach_"]`)?.value || '') : '';
-        const fdia   = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_dia_"]`)?.value) || 0) : 0;
-        const fdep   = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_depth_"]`)?.value) || 0) : 0;
-        const rowCost = size && len && qty > 0 ? getPipeCostPerPole(size, len) * qty : 0;
+        const size     = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
+        const material = row.querySelector(`select[name^="${prefix}_material_"]`)?.value || 'Galvanized';
+        const len      = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
+        const qty      = parseInt(row.querySelector(`input[name^="${prefix}_qty_"]`)?.value) || 0;
+        const attach   = hasAttach ? (row.querySelector(`select[name^="${prefix}_attach_"]`)?.value || '') : '';
+        const fdia     = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_dia_"]`)?.value) || 0) : 0;
+        const fdep     = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_depth_"]`)?.value) || 0) : 0;
+        const rowCost  = size && len && qty > 0 ? getPipeCostPerPole(size, len, material) * qty : 0;
         const rowCY   = getCYperPole(fdia, fdep);
         const costEl = row.querySelector('.pole-cost');
         const cyEl   = row.querySelector('.pole-cy');

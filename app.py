@@ -760,7 +760,7 @@ def get_pricing_map(db):
     rows = db.execute("SELECT name, price FROM pricing").fetchall()
     return {r['name']: r['price'] for r in rows}
 
-def pipe_cost_calc(size, length_ft, qty, pm):
+def pipe_cost_calc(size, length_ft, qty, pm, material='Galvanized'):
     if not size or not length_ft or not qty:
         return 0, 0
     length_ft = float(length_ft)
@@ -777,11 +777,12 @@ def pipe_cost_calc(size, length_ft, qty, pm):
         if key in pm and pm[key] > 0:
             options.append((24, pm[key]))
     else:
-        for color in ['Galv', 'Black']:
-            for stick_len in [21, 24, 40, 42, 48]:
-                key = f'{size} {color} {stick_len}ft'
-                if key in pm and pm[key] > 0:
-                    options.append((stick_len, pm[key]))
+        # SCH40 — filter by material
+        color = 'Black' if material == 'Black Pipe' else 'Galv'
+        for stick_len in [21, 24, 40, 42, 48]:
+            key = f'{size} {color} {stick_len}ft'
+            if key in pm and pm[key] > 0:
+                options.append((stick_len, pm[key]))
     if not options:
         return 0, 0
     best_cost = None
@@ -1098,7 +1099,7 @@ def calculate():
     for section, rows in [('Sail Poles', sail_poles), ('Hip/Canopy', hip_poles),
                            ('Cant. Posts', cant_posts), ('Cant. Beams', cant_beams)]:
         for row in rows:
-            cost, unit_cost = pipe_cost_calc(row['size'], row['length'], row['qty'], pm)
+            cost, unit_cost = pipe_cost_calc(row['size'], row['length'], row['qty'], pm, row.get('material', 'Galvanized'))
             steel_cost += cost
             pole_detail.append({'section': section, 'size': row['size'],
                                 'length': row['length'], 'qty': row['qty'],
