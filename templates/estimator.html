@@ -214,7 +214,7 @@
         </select></td>
         <td><input type="number" name="sail_footer_dia_0" value="0" min="0" step="0.25" style="width:70px"></td>
         <td><input type="number" name="sail_footer_depth_0" value="0" min="0" step="0.5" style="width:70px"></td>
-        <td><span class="pole-cost">—</span></td>
+        <td><span class="pole-cost">—</span><div class="waste-note"></div></td>
         <td><span class="pole-cy">—</span></td>
         <td><button type="button" class="btn btn-sm btn-danger" onclick="estRemoveRow('sail_0','sailRows','sail')">✕</button></td>
       </tr>
@@ -240,6 +240,7 @@
     </div>
   </div>
   <button type="button" class="btn btn-sm btn-outline" onclick="estAddPoleRow('sail','sailRows',true)">+ Add Row</button>
+  <button type="button" class="btn-waste" onclick="estAddWasteRow('sail','sailRows')">+ Waste Row</button>
   <input type="hidden" name="sail_count" id="sail_count" value="1">
 </div>
 
@@ -276,7 +277,7 @@
         <td><input type="number" name="hip_qty_0" placeholder="qty" min="1" style="width:60px"></td>
         <td><input type="number" name="hip_footer_dia_0" value="0" min="0" step="0.25" style="width:70px"></td>
         <td><input type="number" name="hip_footer_depth_0" value="0" min="0" step="0.5" style="width:70px"></td>
-        <td><span class="pole-cost">—</span></td>
+        <td><span class="pole-cost">—</span><div class="waste-note"></div></td>
         <td><span class="pole-cy">—</span></td>
         <td><button type="button" class="btn btn-sm btn-danger" onclick="estRemoveRow('hip_0','hipRows','hip')">✕</button></td>
       </tr>
@@ -292,6 +293,7 @@
   </table>
   </div>
   <button type="button" class="btn btn-sm btn-outline" onclick="estAddHipPoleRow()">+ Add Row</button>
+  <button type="button" class="btn-waste" onclick="estAddWasteRow('hip','hipRows')">+ Waste Row</button>
   <input type="hidden" name="hip_count" id="hip_count" value="1">
 </div>
 
@@ -326,7 +328,7 @@
         <td><input type="number" name="cpost_qty_0" placeholder="qty" min="1" style="width:60px"></td>
         <td><input type="number" name="cpost_footer_dia_0" value="0" min="0" step="0.25" style="width:70px"></td>
         <td><input type="number" name="cpost_footer_depth_0" value="0" min="0" step="0.5" style="width:70px"></td>
-        <td><span class="pole-cost">—</span></td>
+        <td><span class="pole-cost">—</span><div class="waste-note"></div></td>
         <td><span class="pole-cy">—</span></td>
         <td><button type="button" class="btn btn-sm btn-danger" onclick="estRemoveRow('cpost_0','cpostRows','cpost')">✕</button></td>
       </tr>
@@ -342,6 +344,7 @@
   </table>
   </div>
   <button type="button" class="btn btn-sm btn-outline" onclick="estAddCpostRow()">+ Add Row</button>
+  <button type="button" class="btn-waste" onclick="estAddWasteRow('cpost','cpostRows')">+ Waste Row</button>
   <input type="hidden" name="cpost_count" id="cpost_count" value="1">
 </div>
 
@@ -373,7 +376,7 @@
         </select></td>
         <td><input type="number" name="cbeam_len_0" placeholder="ft" min="0" step="0.5"></td>
         <td><input type="number" name="cbeam_qty_0" placeholder="qty" min="1" style="width:60px"></td>
-        <td><span class="pole-cost">—</span></td>
+        <td><span class="pole-cost">—</span><div class="waste-note"></div></td>
         <td><button type="button" class="btn btn-sm btn-danger" onclick="estRemoveRow('cbeam_0','cbeamRows','cbeam')">✕</button></td>
       </tr>
     </tbody>
@@ -387,6 +390,7 @@
   </table>
   </div>
   <button type="button" class="btn btn-sm btn-outline" onclick="estAddCbeamRow()">+ Add Row</button>
+  <button type="button" class="btn-waste" onclick="estAddWasteRow('cbeam','cbeamRows')">+ Waste Row</button>
   <input type="hidden" name="cbeam_count" id="cbeam_count" value="1">
 </div>
 
@@ -572,6 +576,11 @@
 .sqft-display{font-weight:600;color:#2e75b6;white-space:nowrap;}
 .pole-cost{font-weight:500;color:#2a7a2a;font-size:.82rem;}
 .pole-cy  {font-weight:500;color:#7a4a00;font-size:.82rem;}
+.waste-row{background:#fffbea \!important;}
+.waste-badge{display:inline-block;background:#e07b00;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:10px;vertical-align:middle;}
+.waste-note{font-size:.71rem;color:#888;font-style:italic;margin-top:2px;line-height:1.3;}
+.btn-waste{background:#e07b00;border:none;color:#fff;font-size:.78rem;padding:.25rem .65rem;border-radius:.3rem;cursor:pointer;margin-left:.4rem;}
+.btn-waste:hover{background:#c06800;}
 .auto-price{font-size:.82rem;color:#888;}
 .live-cost {color:#1a5c9e;font-size:.9rem;}
 .card-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;}
@@ -663,27 +672,84 @@ function syncMaterialDropdown(sizeEl) {
     }
 }
 
-function getPipeCostPerPole(size, lengthFt, material) {
-    if (!size || !lengthFt) return 0;
-    const len = parseFloat(lengthFt) || 0;
-    if (len <= 0) return 0;
-    // For SCH40 sizes filter by material (Galv vs Black)
-    const isSCH40 = size.includes('SCH40');
-    const colorFilter = isSCH40 ? (material === 'Black Pipe' ? 'Black' : 'Galv') : null;
-    let best = null;
-    for (const [key, price] of Object.entries(PRICING)) {
-        if (!price || price <= 0) continue;
-        if (!key.startsWith(size + ' ')) continue;
-        if (colorFilter && !key.includes(' ' + colorFilter + ' ')) continue;
-        const m = key.match(/(\d+)ft$/);
-        if (!m) continue;
-        const stickLen = parseInt(m[1]);
-        const cost = Math.ceil(len / stickLen) * price;
-        if (best === null || cost < best) best = cost;
+/* Cut-optimization pipe pricing
+   calcRowPipeCost(size, poleLen, qty, material) -> { cost, wasteNote } */
+function _cutOptRow(size, poleLen, qty, stickLens, colorFilter) {
+    const stickPrices = {};
+    for (const stickLen of stickLens) {
+        if (stickLen < poleLen) continue;
+        for (const [key, price] of Object.entries(PRICING)) {
+            if (\!price || price <= 0) continue;
+            if (\!key.startsWith(size + ' ')) continue;
+            if (colorFilter && \!key.includes(' ' + colorFilter + ' ')) continue;
+            const m = key.match(/(\d+)ft$/);
+            if (\!m || parseInt(m[1]) \!== stickLen) continue;
+            stickPrices[stickLen] = price; break;
+        }
     }
-    return best || 0;
+    const validLens = Object.keys(stickPrices).map(Number).sort((a,b) => a-b);
+    if (\!validLens.length) return { cost: 0, wasteNote: '' };
+    const shortestLen   = validLens[0];
+    const shortestPrice = stickPrices[shortestLen];
+    let best = null;
+    for (const primaryLen of validLens) {
+        const primaryPrice = stickPrices[primaryLen];
+        const perStick   = Math.floor(primaryLen / poleLen);
+        if (perStick < 1) continue;
+        const fullSticks = Math.floor(qty / perStick);
+        const remainder  = qty % perStick;
+        let cost = fullSticks * primaryPrice;
+        let shortSticks = 0;
+        if (remainder > 0) {
+            const perShort = Math.floor(shortestLen / poleLen);
+            shortSticks = Math.ceil(remainder / perShort);
+            cost += shortSticks * shortestPrice;
+        }
+        if (best === null || cost < best.cost) {
+            const parts = [];
+            if (fullSticks > 0) {
+                const w = primaryLen - perStick * poleLen;
+                parts.push(fullSticks + '×' + primaryLen + 'ft' + (w > 0 ? ' (' + w + 'ft waste ea)' : ''));
+            }
+            if (shortSticks > 0) {
+                const perSh = Math.floor(shortestLen / poleLen);
+                const remUsed = Math.min(remainder, perSh);
+                const w = shortestLen - remUsed * poleLen;
+                parts.push(shortSticks + '×' + shortestLen + 'ft' + (w > 0 ? ' (' + w + 'ft waste ea)' : ''));
+            }
+            best = { cost, wasteNote: parts.join(' + ') };
+        }
+    }
+    return best || { cost: 0, wasteNote: '' };
 }
 
+function calcRowPipeCost(size, poleLen, qty, material) {
+    if (\!size || \!poleLen || qty <= 0) return { cost: 0, wasteNote: '' };
+    const len = parseFloat(poleLen) || 0;
+    if (len <= 0) return { cost: 0, wasteNote: '' };
+    const isHSS   = /^\d+x\d+ HSS/.test(size);
+    const isSCH40 = size.includes('SCH40');
+    if (isHSS) {
+        return _cutOptRow(size, len, qty, [20, 24, 40], null);
+    } else if (isSCH40) {
+        const isBlack     = material === 'Black Pipe';
+        const stickLens   = isBlack ? [21, 42] : [21, 24];
+        const colorFilter = isBlack ? 'Black' : 'Galv';
+        return _cutOptRow(size, len, qty, stickLens, colorFilter);
+    } else {
+        let price = 0;
+        for (const [key, p] of Object.entries(PRICING)) {
+            if (p > 0 && key.startsWith(size) && /24ft/.test(key)) { price = p; break; }
+        }
+        if (\!price) return { cost: 0, wasteNote: '' };
+        const sticks = Math.ceil(len / 24);
+        const waste  = sticks * 24 - len;
+        return {
+            cost: sticks * qty * price,
+            wasteNote: sticks + '×24ft/pole' + (waste > 0 ? ', ' + waste + 'ft waste ea' : '')
+        };
+    }
+}
 function getCYperPole(footerDia, footerDepth) {
     const d = parseFloat(footerDia) || 0;
     const h = parseFloat(footerDepth) || 0;
@@ -788,7 +854,7 @@ function estAddPoleRow(prefix, containerId, hasAttach) {
       ${attachCol}
       <td><input type="number" name="${prefix}_footer_dia_${i}" value="0" min="0" step="0.25" style="width:70px"></td>
       <td><input type="number" name="${prefix}_footer_depth_${i}" value="0" min="0" step="0.5" style="width:70px"></td>
-      <td><span class="pole-cost">—</span></td>
+      <td><span class="pole-cost">—</span><div class="waste-note"></div></td>
       ${cyCol}
       <td><button type="button" class="btn btn-sm btn-danger"
           onclick="estRemoveRow('${prefix}_${i}','${containerId}','${prefix}')">✕</button></td>`;
@@ -810,7 +876,7 @@ function estAddHipPoleRow() {
       <td><input type="number" name="hip_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
       <td><input type="number" name="hip_footer_dia_${i}" value="0" min="0" step="0.25" style="width:70px"></td>
       <td><input type="number" name="hip_footer_depth_${i}" value="0" min="0" step="0.5" style="width:70px"></td>
-      <td><span class="pole-cost">—</span></td>
+      <td><span class="pole-cost">—</span><div class="waste-note"></div></td>
       <td><span class="pole-cy">—</span></td>
       <td><button type="button" class="btn btn-sm btn-danger"
           onclick="estRemoveRow('hip_${i}','hipRows','hip')">✕</button></td>`;
@@ -832,7 +898,7 @@ function estAddCpostRow() {
       <td><input type="number" name="cpost_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
       <td><input type="number" name="cpost_footer_dia_${i}" value="0" min="0" step="0.25" style="width:70px"></td>
       <td><input type="number" name="cpost_footer_depth_${i}" value="0" min="0" step="0.5" style="width:70px"></td>
-      <td><span class="pole-cost">—</span></td>
+      <td><span class="pole-cost">—</span><div class="waste-note"></div></td>
       <td><span class="pole-cy">—</span></td>
       <td><button type="button" class="btn btn-sm btn-danger"
           onclick="estRemoveRow('cpost_${i}','cpostRows','cpost')">✕</button></td>`;
@@ -852,11 +918,46 @@ function estAddCbeamRow() {
       <td><select name="cbeam_wall_${i}">${HSS_WALL_OPTS}</select></td>
       <td><input type="number" name="cbeam_len_${i}" placeholder="ft" min="0" step="0.5"></td>
       <td><input type="number" name="cbeam_qty_${i}" placeholder="qty" min="1" style="width:60px"></td>
-      <td><span class="pole-cost">—</span></td>
+      <td><span class="pole-cost">—</span><div class="waste-note"></div></td>
       <td><button type="button" class="btn btn-sm btn-danger"
           onclick="estRemoveRow('cbeam_${i}','cbeamRows','cbeam')">✕</button></td>`;
     tbody.appendChild(tr);
     estUpdateCount('cbeam','cbeamRows'); estRenumber('cbeamRows');
+}
+
+function estAddWasteRow(prefix, containerId) {
+    const i = poleIdx[prefix]++;
+    const tbody = document.getElementById(containerId);
+    if (\!tbody) return;
+    const tr = document.createElement('tr');
+    tr.className = 'est-row waste-row'; tr.id = prefix + '_' + i;
+    const isHSS   = (prefix === 'cpost' || prefix === 'cbeam');
+    const hasSref = (prefix === 'hip'   || prefix === 'cpost' || prefix === 'cbeam');
+    const isCbeam = (prefix === 'cbeam');
+    const hasCY   = \!isCbeam;
+    let h = '<td class="row-num" style="color:#e07b00;font-weight:700">W</td>';
+    if (hasSref) h += '<td><span style="color:#aaa;font-size:.8rem">—</span></td>';
+    if (isHSS) {
+        h += '<td><select name="' + prefix + '_profile_' + i + '">' + HSS_PROFILE_OPTS + '</select></td>';
+        h += '<td><select name="' + prefix + '_wall_'    + i + '">' + HSS_WALL_OPTS    + '</select></td>';
+    } else {
+        h += '<td><select name="' + prefix + '_size_' + i + '">' + PIPE_OPTS + '</select></td>';
+        h += '<td><span class="waste-badge">FROM WASTE</span>'
+           + '<input type="hidden" name="' + prefix + '_material_' + i + '" value="Galvanized"></td>';
+    }
+    h += '<td><input type="number" name="' + prefix + '_len_' + i + '" placeholder="ft" min="0" step="0.5"></td>';
+    h += '<td><input type="number" name="' + prefix + '_qty_' + i + '" placeholder="qty" min="1" style="width:60px"></td>';
+    if (prefix === 'sail') h += '<td><span style="color:#aaa">—</span></td>';
+    if (\!isCbeam) h += '<td><span style="color:#aaa">—</span></td><td><span style="color:#aaa">—</span></td>';
+    h += '<td><span class="pole-cost" style="color:#888">$0.00</span>'
+       + '<div class="waste-note">from waste — no charge</div></td>';
+    if (hasCY) h += '<td><span style="color:#aaa">—</span></td>';
+    h += '<td><button type="button" class="btn btn-sm btn-danger"'
+       + ' onclick="estRemoveRow(\'' + prefix + '_' + i + '\',\'' + containerId + '\',\'' + prefix + '\')">&#x2715;</button></td>';
+    h += '<input type="hidden" name="' + prefix + '_waste_' + i + '" value="1">';
+    tr.innerHTML = h;
+    tbody.appendChild(tr);
+    estUpdateCount(prefix, containerId); estRenumber(containerId);
 }
 
 function estRemoveRow(id, containerId, prefix) {
@@ -1135,22 +1236,33 @@ function estUpdateAll() {
 }
 
 function estCalcPoleSection(prefix, hasAttach, hasFooters) {
-    const tbody = document.getElementById(prefix + 'Rows'); if (!tbody) return;
+    const tbody = document.getElementById(prefix + 'Rows'); if (\!tbody) return;
     let steel=0, cy=0, welds=0;
     tbody.querySelectorAll('.est-row').forEach(row => {
+        const isWaste  = row.classList.contains('waste-row');
         const size     = row.querySelector(`select[name^="${prefix}_size_"]`)?.value || '';
         const material = row.querySelector(`select[name^="${prefix}_material_"]`)?.value || 'Galvanized';
         const len      = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
         const qty      = parseInt(row.querySelector(`input[name^="${prefix}_qty_"]`)?.value) || 0;
-        const attach   = hasAttach ? (row.querySelector(`select[name^="${prefix}_attach_"]`)?.value || '') : '';
-        const fdia     = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_dia_"]`)?.value) || 0) : 0;
-        const fdep     = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_depth_"]`)?.value) || 0) : 0;
-        const rowCost  = size && len && qty > 0 ? getPipeCostPerPole(size, len, material) * qty : 0;
-        const rowCY   = getCYperPole(fdia, fdep);
-        const costEl = row.querySelector('.pole-cost');
-        const cyEl   = row.querySelector('.pole-cy');
+        const attach   = (\!isWaste && hasAttach)  ? (row.querySelector(`select[name^="${prefix}_attach_"]`)?.value || '') : '';
+        const fdia     = (\!isWaste && hasFooters) ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_dia_"]`)?.value) || 0) : 0;
+        const fdep     = (\!isWaste && hasFooters) ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_depth_"]`)?.value) || 0) : 0;
+        const costEl   = row.querySelector('.pole-cost');
+        const cyEl     = row.querySelector('.pole-cy');
+        const noteEl   = row.querySelector('.waste-note');
+        if (isWaste) {
+            if (costEl) costEl.textContent = '$0.00';
+            if (cyEl)   cyEl.textContent   = '—';
+            if (noteEl) noteEl.textContent = 'from waste — no charge';
+            return;
+        }
+        const rowCY = getCYperPole(fdia, fdep);
+        const { cost: rowCost, wasteNote } = (size && len && qty > 0)
+            ? calcRowPipeCost(size, len, qty, material)
+            : { cost: 0, wasteNote: '' };
         if (costEl) costEl.textContent = rowCost > 0 ? $fmt(rowCost) : '—';
-        if (cyEl)   cyEl.textContent   = rowCY > 0   ? rowCY.toFixed(3) + ' CY' : '—';
+        if (cyEl)   cyEl.textContent   = rowCY   > 0 ? rowCY.toFixed(3) + ' CY' : '—';
+        if (noteEl) noteEl.textContent = wasteNote;
         steel += rowCost; cy += rowCY * qty;
         if (attach === 'Weld Lug') welds += qty;
     });
@@ -1160,22 +1272,34 @@ function estCalcPoleSection(prefix, hasAttach, hasFooters) {
 }
 
 function estCalcHSSSection(prefix, hasFooters) {
-    const tbody = document.getElementById(prefix + 'Rows'); if (!tbody) return;
+    const tbody = document.getElementById(prefix + 'Rows'); if (\!tbody) return;
     let steel=0, cy=0, qty_total=0;
     tbody.querySelectorAll('.est-row').forEach(row => {
-        const profile = row.querySelector(`select[name^="${prefix}_profile_"]`)?.value || '';
-        const wall    = row.querySelector(`select[name^="${prefix}_wall_"]`)?.value   || '';
-        const size    = profile && wall ? `${profile} HSS ${wall}` : '';
-        const len     = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
-        const qty     = parseInt(row.querySelector(`input[name^="${prefix}_qty_"]`)?.value)   || 0;
-        const fdia    = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_dia_"]`)?.value) || 0) : 0;
-        const fdep    = hasFooters ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_depth_"]`)?.value) || 0) : 0;
-        const rowCost = size && len && qty > 0 ? getPipeCostPerPole(size, len) * qty : 0;
-        const rowCY   = getCYperPole(fdia, fdep);
-        const costEl = row.querySelector('.pole-cost');
-        const cyEl   = row.querySelector('.pole-cy');
+        const isWaste  = row.classList.contains('waste-row');
+        const profile  = row.querySelector(`select[name^="${prefix}_profile_"]`)?.value || '';
+        const wall     = row.querySelector(`select[name^="${prefix}_wall_"]`)?.value   || '';
+        const size     = profile && wall ? `${profile} HSS ${wall}` : '';
+        const len      = parseFloat(row.querySelector(`input[name^="${prefix}_len_"]`)?.value) || 0;
+        const qty      = parseInt(row.querySelector(`input[name^="${prefix}_qty_"]`)?.value)   || 0;
+        const fdia     = (\!isWaste && hasFooters) ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_dia_"]`)?.value) || 0) : 0;
+        const fdep     = (\!isWaste && hasFooters) ? (parseFloat(row.querySelector(`input[name^="${prefix}_footer_depth_"]`)?.value) || 0) : 0;
+        const costEl   = row.querySelector('.pole-cost');
+        const cyEl     = row.querySelector('.pole-cy');
+        const noteEl   = row.querySelector('.waste-note');
+        if (isWaste) {
+            if (costEl) costEl.textContent = '$0.00';
+            if (cyEl)   cyEl.textContent   = '—';
+            if (noteEl) noteEl.textContent = 'from waste — no charge';
+            qty_total += qty;
+            return;
+        }
+        const rowCY = getCYperPole(fdia, fdep);
+        const { cost: rowCost, wasteNote } = (size && len && qty > 0)
+            ? calcRowPipeCost(size, len, qty)
+            : { cost: 0, wasteNote: '' };
         if (costEl) costEl.textContent = rowCost > 0 ? $fmt(rowCost) : '—';
         if (cyEl)   cyEl.textContent   = rowCY > 0   ? rowCY.toFixed(3) + ' CY' : '—';
+        if (noteEl) noteEl.textContent = wasteNote;
         steel += rowCost; cy += rowCY * qty; qty_total += qty;
     });
     sectionTotals[prefix] = {steel, cy, qty: qty_total};
@@ -1443,30 +1567,47 @@ function emailEstimate() {
 /* ===================================================
    INIT + LOCAL STORAGE
 =================================================== */
-const LS_KEY = 'sa_estimator_v2';
+const LS_KEY = 'sa_estimator_v3';
 
 function saveFormState() {
     const data = {};
     document.querySelectorAll('#estimatorForm [name]').forEach(function(el) {
         if (el.name) data[el.name] = el.value;
     });
+    ['sail','hip','cpost','cbeam'].forEach(function(p) {
+        const tbody = document.getElementById(p + 'Rows');
+        if (\!tbody) return;
+        const types = [];
+        tbody.querySelectorAll('.est-row').forEach(function(r) {
+            types.push(r.classList.contains('waste-row') ? 'w' : 'r');
+        });
+        data[p + '_rtypes'] = JSON.stringify(types);
+    });
     try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
 function restoreFormState(saved) {
     if (!saved) return;
-    var sections = [
-        { countKey:'struct_count',     addFn: estAddStructRow },
-        { countKey:'sail_count',       addFn: function(){ estAddPoleRow('sail','sailRows',true); } },
-        { countKey:'hip_count',        addFn: estAddHipPoleRow },
-        { countKey:'cpost_count',      addFn: estAddCpostRow },
-        { countKey:'cbeam_count',      addFn: estAddCbeamRow },
-        { countKey:'sup_footer_count', addFn: addSupFooterRow },
-    ];
-    for (var s = 0; s < sections.length; s++) {
-        var n = parseInt(saved[sections[s].countKey] || '1');
-        for (var x = 1; x < n; x++) { try { sections[s].addFn(); } catch(e) {} }
+    function rowType(p, idx) {
+        try { return (JSON.parse(saved[p + '_rtypes'] || '[]')[idx] || 'r'); } catch(e) { return 'r'; }
     }
+    var nStruct = parseInt(saved['struct_count'] || '1');
+    for (var x = 1; x < nStruct; x++) { try { estAddStructRow(); } catch(e) {} }
+    var poleSecs = [
+        { p:'sail',  addR: function(){ estAddPoleRow('sail','sailRows',true); }, addW: function(){ estAddWasteRow('sail','sailRows'); } },
+        { p:'hip',   addR: estAddHipPoleRow,  addW: function(){ estAddWasteRow('hip','hipRows'); } },
+        { p:'cpost', addR: estAddCpostRow,     addW: function(){ estAddWasteRow('cpost','cpostRows'); } },
+        { p:'cbeam', addR: estAddCbeamRow,     addW: function(){ estAddWasteRow('cbeam','cbeamRows'); } },
+    ];
+    for (var s = 0; s < poleSecs.length; s++) {
+        var ps = poleSecs[s];
+        var n = parseInt(saved[ps.p + '_count'] || '1');
+        for (var x = 1; x < n; x++) {
+            try { if (rowType(ps.p, x) === 'w') ps.addW(); else ps.addR(); } catch(e) {}
+        }
+    }
+    var nSup = parseInt(saved['sup_footer_count'] || '1');
+    for (var x = 1; x < nSup; x++) { try { addSupFooterRow(); } catch(e) {} }
     var hfN = parseInt(saved['hf_frame_count'] || '0');
     var cfN = parseInt(saved['cf_frame_count'] || '0');
     var pfN = parseInt(saved['pf_frame_count'] || '0');

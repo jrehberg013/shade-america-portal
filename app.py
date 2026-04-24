@@ -760,40 +760,66 @@ def get_pricing_map(db):
     rows = db.execute("SELECT name, price FROM pricing").fetchall()
     return {r['name']: r['price'] for r in rows}
 
-def pipe_cost_calc(size, length_ft, qty, pm, material='Galvanized'):
+def _cut_opt(pole_len, qty, options):
+    valid = [(sl, p) for sl, p in options if sl >= pole_len and p > 0]
+    if not valid:
+        return 0, 0
+    valid.sort(key=lambda x: x[0])
+    shortest_len, shortest_price = valid[0]
+    best_total = None
+    best_unit  = 0
+    for primary_len, primary_price in valid:
+        per_stick = math.floor(primary_len / pole_len)
+        if per_stick < 1:
+            continue
+        full_sticks = math.floor(qty / per_stick)
+        remainder   = qty % per_stick
+        cost = full_sticks * primary_price
+        if remainder > 0:
+            per_short    = math.floor(shortest_len / pole_len)
+            short_sticks = math.ceil(remainder / per_short)
+            cost += short_sticks * shortest_price
+        if best_total is None or cost < best_total:
+            best_total = cost
+            best_unit  = primary_price
+    return (best_total or 0), best_unit
+
+def pipe_cost_calc(size, length_ft, qty, pm, material="Galvanized"):
     if not size or not length_ft or not qty:
         return 0, 0
     length_ft = float(length_ft)
     qty = int(qty)
     options = []
-    if size in ('4x4', '4x6', '4x8'):
-        for wall in ['1/4"', '3/16"']:
-            for stick_len in [20, 24, 40, 48]:
-                key = f'{size} HSS {wall} {stick_len}ft'
-                if key in pm and pm[key] > 0:
-                    options.append((stick_len, pm[key]))
-    elif 'OD Galv' in size:
-        key = f'{size} 24ft'
-        if key in pm and pm[key] > 0:
-            options.append((24, pm[key]))
+    is_hss = any(size.startswith(p) for p in ("4x4", "4x6", "4x8"))
+    if is_hss:
+        for stick_len in [20, 24, 40]:
+            key = f"{size} {stick_len}ft"
+            if key in pm and pm[key] > 0:
+                options.append((stick_len, pm[key]))
+        if not options:
+            for wall in ["1/4\"", "3/16\""]:
+                for stick_len in [20, 24, 40]:
+                    key = f"{size} HSS {wall} {stick_len}ft"
+                    if key in pm and pm[key] > 0:
+                        options.append((stick_len, pm[key]))
+    elif "OD Galv" in size:
+        for k, v in pm.items():
+            if k.startswith(size) and "24ft" in k and v > 0:
+                options.append((24, v)); break
     else:
-        # SCH40 — filter by material
-        color = 'Black' if material == 'Black Pipe' else 'Galv'
-        for stick_len in [21, 24, 40, 42, 48]:
-            key = f'{size} {color} {stick_len}ft'
+        color = "Black" if material == "Black Pipe" else "Galv"
+        for stick_len in [21, 24, 42]:
+            key = f"{size} {color} {stick_len}ft"
             if key in pm and pm[key] > 0:
                 options.append((stick_len, pm[key]))
     if not options:
         return 0, 0
-    best_cost = None
-    best_unit = 0
-    for stick_len, price in options:
+    if "OD Galv" in size:
+        stick_len, price = options[0]
         sticks_per_pole = math.ceil(length_ft / stick_len)
-        cost_per_pole = sticks_per_pole * price
-        if best_cost is None or cost_per_pole < best_cost:
-            best_cost = cost_per_pole
-            best_unit = cost_per_pole
-    return (best_cost or 0) * qty, best_unit
+        unit = sticks_per_pole * price
+        return unit * qty, unit
+    return _cut_opt(length_ft, qty, options)
 
 def get_powder_rate(size, pm):
     # Handle combined HSS size like '4x4 HSS 1/4"'
@@ -1081,7 +1107,8 @@ def calculate():
             footer_dia = float(f.get(f'{prefix}_footer_dia_{i}', 0) or 0)
             footer_dep = float(f.get(f'{prefix}_footer_depth_{i}', 0) or 0)
             material = f.get(f'{prefix}_material_{i}', 'Galvanized') if not has_wall else 'Black Pipe'
-            if size and length and qty:
+            is_waste = f.get(f'{prefix}_waste_{i}', '') == '1'
+            if size and length and qty and not is_waste:
                 cy = math.pi * (footer_dia/2)**2 * footer_dep / 27 if footer_dia and footer_dep else 0
                 rows.append({'size': size, 'length': length, 'qty': qty,
                              'attach': attach, 'cy': cy * qty, 'material': material})
