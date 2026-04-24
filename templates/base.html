@@ -65,7 +65,10 @@
     <header class="top-bar">
         <button class="mobile-menu-btn" id="mobileMenuBtn">Menu</button>
         <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
-        <div class="top-bar-right">{{ current_user.name or current_user.username }}</div>
+        <div class="top-bar-right">
+            {{ current_user.name or current_user.username }}
+            <span class="app-version">v{{ app_version }}</span>
+        </div>
     </header>
     <main class="content">
         {% with messages = get_flashed_messages(with_categories=true) %}

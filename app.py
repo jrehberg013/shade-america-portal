@@ -55,6 +55,8 @@ LOCATION_MILES = {
     "Key West, FL": 468,
 }
 
+APP_VERSION = '1.3.0'
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'sa-dev-key-change-in-prod')
 
@@ -430,7 +432,7 @@ def get_current_user():
 
 @app.context_processor
 def inject_user():
-    return {'current_user': get_current_user()}
+    return {'current_user': get_current_user(), 'app_version': APP_VERSION}
 
 def login_required(f):
     @wraps(f)

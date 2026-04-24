@@ -62,7 +62,8 @@ img{max-width:100%}
 .main-wrapper{margin-left:var(--sidebar-w);min-height:100vh;display:flex;flex-direction:column}
 .top-bar{height:var(--top-bar-h);background:var(--white);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
 .page-title{font-size:1.1rem;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.top-bar-right{font-size:.85rem;color:var(--muted)}
+.top-bar-right{font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:.6rem;white-space:nowrap}
+.app-version{font-size:.72rem;color:var(--muted);opacity:.6;background:var(--off-white);border:1px solid var(--border);border-radius:8px;padding:1px 7px;letter-spacing:.03em}
 .mobile-menu-btn{display:none;background:none;border:none;font-size:1.3rem;cursor:pointer}
 .content{flex:1;padding:1.5rem;max-width:1200px;width:100%}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:150}
