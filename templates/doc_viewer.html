@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.original_name }}{% endblock %}
+{% block page_title %}{{ doc.original_name }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;flex-direction:column;height:calc(100vh - 120px)">
+
+  <!-- Toolbar -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:var(--card-bg);border-bottom:1px solid var(--border);flex-shrink:0">
+    <a href="{{ back_url }}" class="btn btn-outline btn-sm" style="display:flex;align-items:center;gap:.4rem">
+      ← Back
+    </a>
+    <div style="font-size:.85rem;color:var(--muted);text-align:center;flex:1;margin:0 1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+      {{ doc.original_name }}
+    </div>
+    <button onclick="window.print()" class="btn btn-primary btn-sm" style="display:flex;align-items:center;gap:.4rem">
+      🖨 Print
+    </button>
+  </div>
+
+  <!-- File viewer -->
+  <div style="flex:1;overflow:hidden">
+    {% if doc.mime_type and doc.mime_type.startswith('image/') %}
+      <div style="height:100%;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:1rem">
+        <img src="{{ url_for('serve_doc', doc_id=doc.id) }}"
+             alt="{{ doc.original_name }}"
+             style="max-width:100%;height:auto;border-radius:6px">
+      </div>
+    {% else %}
+      <iframe src="{{ url_for('serve_doc', doc_id=doc.id) }}"
+              style="width:100%;height:100%;border:none"
+              title="{{ doc.original_name }}">
+      </iframe>
+    {% endif %}
+  </div>
+
+</div>
+
+<style>
+  @media print {
+    /* Hide everything except the document when printing */
+    nav, .sidebar, .top-bar, .toolbar { display: none !important; }
+    iframe { height: 100vh !important; }
+  }
+</style>
+{% endblock %}

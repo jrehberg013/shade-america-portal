@@ -3,6 +3,16 @@
 {% block page_title %}{{ job.name }}{% endblock %}
 
 {% block content %}
+
+<!-- Back button -->
+<div style="margin-bottom:1rem">
+  {% if current_user.role == 'field' %}
+  <a href="{{ url_for('field') }}" class="btn btn-outline btn-sm">← Back to Jobs</a>
+  {% else %}
+  <a href="{{ url_for('jobs') }}" class="btn btn-outline btn-sm">← Back to Jobs</a>
+  {% endif %}
+</div>
+
 <div class="job-detail-layout">
     <!-- Left: Job Info -->
     <div class="job-detail-main">
@@ -208,7 +218,7 @@
                         </div>
                     </div>
                     <div class="doc-actions">
-                        <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" class="btn btn-sm btn-outline" target="_blank">View</a>
+                        <a href="{{ url_for('view_doc', doc_id=doc.id) }}" class="btn btn-sm btn-outline">View</a>
                         {% if current_user.role == 'admin' %}
                         <form method="POST" action="{{ url_for('delete_doc', doc_id=doc.id) }}" style="display:inline"
                               onsubmit="return confirm('Delete this file?')">
@@ -227,11 +237,31 @@
     <!-- Right: Photos sidebar -->
     <div class="job-detail-sidebar">
         <div class="card">
-            <div class="card-header"><h3>Field Photos</h3></div>
+            <div class="card-header card-header-row">
+                <h3>Field Photos</h3>
+                {% if current_user.role in ['admin', 'field'] %}
+                <button class="btn btn-sm btn-primary" onclick="togglePhotoUpload()">📸 Add Photo</button>
+                {% endif %}
+            </div>
+
+            <!-- Photo upload form (field + admin) -->
+            {% if current_user.role in ['admin', 'field'] %}
+            <div id="photoUploadArea" style="display:none;padding:.75rem 0">
+                <form method="POST" action="{{ url_for('upload_doc', job_id=job.id) }}" enctype="multipart/form-data">
+                    <input type="hidden" name="doc_type" value="photo">
+                    <label class="upload-btn-label" style="display:block;text-align:center;padding:.75rem;border:2px dashed var(--border);border-radius:8px;cursor:pointer">
+                        <input type="file" name="file" accept="image/*" capture="environment"
+                               onchange="this.form.submit()" class="visually-hidden">
+                        📸 Take / Choose Photo
+                    </label>
+                </form>
+            </div>
+            {% endif %}
+
             <div class="photo-grid">
                 {% for doc in documents if doc.doc_type == 'photo' %}
                 <div class="photo-thumb-wrap">
-                    <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank">
+                    <a href="{{ url_for('view_doc', doc_id=doc.id) }}">
                         <img src="{{ url_for('serve_doc', doc_id=doc.id) }}" alt="{{ doc.original_name }}" class="photo-thumb">
                     </a>
                     {% if current_user.role in ['admin','field'] %}
@@ -258,6 +288,10 @@ function toggleEditJob() {
 }
 function toggleUpload() {
     var el = document.getElementById('uploadArea');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function togglePhotoUpload() {
+    var el = document.getElementById('photoUploadArea');
     el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 </script>

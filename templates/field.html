@@ -3,13 +3,13 @@
 {% block page_title %}My Jobs{% endblock %}
 
 {% block content %}
-<p class="text-muted" style="margin-bottom:1.5rem">Tap a job to view drawings and upload photos.</p>
+<p class="text-muted" style="margin-bottom:1.5rem">Tap a job to view details, drawings and photos.</p>
 
 {% if jobs %}
 <div class="field-job-list">
     {% for job in jobs %}
     <div class="field-job-card">
-        <!-- Tap header to open job detail -->
+        <!-- Tap card to open job detail -->
         <a href="{{ url_for('job_detail', job_id=job.id) }}" class="field-job-tap-link">
         <div class="field-job-header">
             <div>
@@ -25,27 +25,18 @@
         <div class="field-section-label">📐 Drawings</div>
         <div class="field-doc-list">
             {% for doc in job.drawings %}
-            <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank" class="field-doc-link">
+            <a href="{{ url_for('view_doc', doc_id=doc.id) }}" class="field-doc-link">
                 📄 {{ doc.original_name }}
             </a>
             {% endfor %}
         </div>
         {% endif %}
 
-        <!-- Photo Upload -->
-        <div class="field-section-label">📷 Upload Photo</div>
-        <form method="POST" action="{{ url_for('upload_doc', job_id=job.id) }}" enctype="multipart/form-data" class="field-upload-form">
-            <input type="hidden" name="doc_type" value="photo">
-            <label class="upload-btn-label">
-                <input type="file" name="file" accept="image/*" capture="environment"
-                       onchange="this.form.submit()" class="visually-hidden">
-                📸 Take / Choose Photo
-            </label>
-        </form>
-
-        <!-- Photo count indicator (tap card to see full photos) -->
+        <!-- Photo count -->
         {% if job.photos %}
-        <div style="font-size:.8rem;color:var(--muted);margin-top:.4rem">📷 {{ job.photos|length }} photo{{ 's' if job.photos|length != 1 }} — tap job to view</div>
+        <div style="font-size:.8rem;color:var(--muted);margin-top:.4rem">
+            📷 {{ job.photos|length }} photo{{ 's' if job.photos|length != 1 }} — tap job to view &amp; add
+        </div>
         {% endif %}
     </div>
     {% endfor %}

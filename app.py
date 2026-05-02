@@ -490,7 +490,7 @@ def login():
             if user['must_change_password']:
                 session['must_change'] = True
                 return redirect(url_for('change_password'))
-            return redirect(url_for('field') if user['role'] == 'field' else url_for('dashboard'))
+            return redirect(url_for('field_home') if user['role'] == 'field' else url_for('dashboard'))
         flash('Invalid username or password.', 'error')
     return render_template('login.html')
 
@@ -517,7 +517,7 @@ def change_password():
             db.commit()
             session.pop('must_change', None)
             flash('Password updated.', 'success')
-            return redirect(url_for('field') if session.get('role') == 'field' else url_for('dashboard'))
+            return redirect(url_for('field_home') if session.get('role') == 'field' else url_for('dashboard'))
     return render_template('change_password.html', must_change=must_change)
 
 
@@ -690,6 +690,18 @@ def upload_doc(job_id):
         return redirect(url_for('field'))
     return redirect(url_for('job_detail', job_id=job_id))
 
+@app.route('/docs/<int:doc_id>/view')
+@login_required
+def view_doc(doc_id):
+    db = get_db()
+    doc = db.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
+    if not doc:
+        abort(404)
+    if doc['doc_type'] in ('estimate', 'contract', 'other') and session.get('role') != 'admin':
+        abort(403)
+    back_url = request.referrer or url_for('job_detail', job_id=doc['job_id'])
+    return render_template('doc_viewer.html', doc=doc, back_url=back_url)
+
 @app.route('/docs/<int:doc_id>')
 @login_required
 def serve_doc(doc_id):
@@ -728,6 +740,11 @@ def delete_doc(doc_id):
 # ─────────────────────────────────────────────────────────────
 # FIELD VIEW
 # ─────────────────────────────────────────────────────────────
+
+@app.route('/field-home')
+@login_required
+def field_home():
+    return render_template('field_home.html')
 
 @app.route('/field')
 @login_required
@@ -1931,24 +1948,7 @@ def trello_list_names():
 @app.route('/field-preview')
 @admin_required
 def field_preview():
-    db = get_db()
-    raw_jobs = db.execute(
-        "SELECT * FROM jobs WHERE status = 'installation' ORDER BY updated_at DESC"
-    ).fetchall()
-    jobs = []
-    for job in raw_jobs:
-        docs = db.execute(
-            "SELECT * FROM documents WHERE job_id=? ORDER BY uploaded_at DESC", (job['id'],)
-        ).fetchall()
-        sa_docs = [d for d in docs if d['original_name'].upper().startswith('SA-')]
-        all_photos = [d for d in docs if d['doc_type'] == 'photo']
-        jobs.append({
-            'id': job['id'], 'name': job['name'],
-            'location': job['location'], 'status': job['status'],
-            'drawings': [d for d in sa_docs if d['doc_type'] == 'drawing'],
-            'photos':   all_photos,
-        })
-    return render_template('field.html', jobs=jobs, preview_mode=True)
+    return render_template('field_home.html')
 
 
 # ─────────────────────────────────────────────────────────────
