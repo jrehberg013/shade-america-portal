@@ -36,14 +36,14 @@
     <ul class="nav-links">
         {% if current_user.role == 'field' %}
         <li><a href="{{ url_for('field') }}" class="{{ 'active' if request.endpoint == 'field' }}">
-            <span class="nav-label">My Jobs</span></a></li>
+            <span class="nav-label">My Projects</span></a></li>
         <li><a href="{{ url_for('forms_list') }}" class="{{ 'active' if request.endpoint == 'forms_list' }}">
             <span class="nav-label">Forms</span></a></li>
         {% else %}
         <li><a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
             <span class="nav-label">Dashboard</span></a></li>
         <li><a href="{{ url_for('jobs') }}" class="{{ 'active' if request.endpoint in ['jobs','job_detail','new_job'] }}">
-            <span class="nav-label">Jobs</span></a></li>
+            <span class="nav-label">Projects</span></a></li>
         <li><a href="{{ url_for('estimator') }}" class="{{ 'active' if request.endpoint in ['estimator','calculate'] }}">
             <span class="nav-label">Estimator</span></a></li>
         <li><a href="{{ url_for('report') }}" class="{{ 'active' if request.endpoint == 'report' }}">
@@ -58,7 +58,7 @@
         <li><a href="{{ url_for('admin_settings') }}" class="{{ 'active' if request.endpoint == 'admin_settings' }}">
             <span class="nav-label">Settings</span></a></li>
         <li><a href="{{ url_for('field_preview') }}" class="{{ 'active' if request.endpoint == 'field_preview' }}">
-            <span class="nav-label">Field Preview</span></a></li>
+            <span class="nav-label">Field View</span></a></li>
         {% endif %}
         {% endif %}
     </ul>

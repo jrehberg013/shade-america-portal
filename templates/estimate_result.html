@@ -75,7 +75,7 @@
         <tr><td>Hardware / Fasteners</td><td class="td-right">${{ "{:,.2f}".format(result.hardware) }}</td></tr>
         {% endif %}
         {% if result.supplies > 0 %}
-        <tr><td>Job Supplies / Consumables</td><td class="td-right">${{ "{:,.2f}".format(result.supplies) }}</td></tr>
+        <tr><td>Project Supplies / Consumables</td><td class="td-right">${{ "{:,.2f}".format(result.supplies) }}</td></tr>
         {% endif %}
         {% if result.galvanizing > 0 %}
         <tr><td>Galvanizing</td><td class="td-right">${{ "{:,.2f}".format(result.galvanizing) }}</td></tr>
@@ -166,7 +166,7 @@
     {% endif %}
 
     <div class="form-actions" style="margin-top:1.5rem">
-      <a href="{{ url_for('new_job') }}?name={{ result.job_name }}&client={{ result.client }}&estimate={{ result.sell_price|round(2) }}" class="btn btn-primary">Save as Job</a>
+      <a href="{{ url_for('new_job') }}?name={{ result.job_name }}&client={{ result.client }}&estimate={{ result.sell_price|round(2) }}" class="btn btn-primary">Save as Project</a>
       <button onclick="window.print()" class="btn btn-outline">🖨 Print</button>
     </div>
   </div>

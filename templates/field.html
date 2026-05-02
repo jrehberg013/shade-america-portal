@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}My Jobs{% endblock %}
-{% block page_title %}My Jobs{% endblock %}
+{% block title %}My Projects{% endblock %}
+{% block page_title %}My Projects{% endblock %}
 
 {% block content %}
-<p class="text-muted" style="margin-bottom:1.5rem">Tap a job to view details, drawings and photos.</p>
+<p class="text-muted" style="margin-bottom:1.5rem">Tap a project to view details, drawings and photos.</p>
 
 {% if jobs %}
 <div class="field-job-list">
@@ -35,7 +35,7 @@
         <!-- Photo count -->
         {% if job.photos %}
         <div style="font-size:.8rem;color:var(--muted);margin-top:.4rem">
-            📷 {{ job.photos|length }} photo{{ 's' if job.photos|length != 1 }} — tap job to view &amp; add
+            📷 {{ job.photos|length }} photo{{ 's' if job.photos|length != 1 }} — tap project to view &amp; add
         </div>
         {% endif %}
     </div>
@@ -44,7 +44,7 @@
 {% else %}
 <div class="empty-state">
     <div class="empty-icon">💼</div>
-    <p>No active jobs assigned.</p>
+    <p>No active projects assigned.</p>
 </div>
 {% endif %}
 {% endblock %}

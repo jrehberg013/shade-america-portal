@@ -7,9 +7,9 @@
 <!-- Back button -->
 <div style="margin-bottom:1rem">
   {% if current_user.role == 'field' %}
-  <a href="{{ url_for('field') }}" class="btn btn-outline btn-sm">← Back to Jobs</a>
+  <a href="{{ url_for('field') }}" class="btn btn-outline btn-sm">← Back to Projects</a>
   {% else %}
-  <a href="{{ url_for('jobs') }}" class="btn btn-outline btn-sm">← Back to Jobs</a>
+  <a href="{{ url_for('jobs') }}" class="btn btn-outline btn-sm">← Back to Projects</a>
   {% endif %}
 </div>
 
@@ -18,7 +18,7 @@
     <div class="job-detail-main">
         <div class="card">
             <div class="card-header card-header-row">
-                <h2>Job Details</h2>
+                <h2>Project Details</h2>
                 <div style="display:flex;gap:.5rem;align-items:center">
                     <span class="status-badge status-{{ job.status }}">
                         {{ job.status.replace('_', ' ').title() }}
@@ -69,7 +69,7 @@
                 <form method="POST" action="{{ url_for('edit_job', job_id=job.id) }}">
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Job Name</label>
+                            <label>Project Name</label>
                             <input type="text" name="name" class="form-control" value="{{ job.name or '' }}" required>
                         </div>
                         <div class="form-group">

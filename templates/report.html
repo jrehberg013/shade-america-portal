@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shade America — Job Report {{ report_date }}</title>
+    <title>Shade America — Project Report {{ report_date }}</title>
     <style>
         /* ── Base ── */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -204,7 +204,7 @@
 <div class="report-header">
     <img src="/static/logo.png" alt="Shade America" class="report-logo">
     <div class="report-title-block">
-        <div class="report-title">Job Status Report</div>
+        <div class="report-title">Project Status Report</div>
         <div class="report-date">Generated: {{ report_date }}</div>
     </div>
 </div>
@@ -212,11 +212,11 @@
 <!-- Stats summary -->
 <div class="stats-grid">
     <div class="stat-box">
-        <div class="stat-label">Total Jobs</div>
+        <div class="stat-label">Total Projects</div>
         <div class="stat-value">{{ stats.total }}</div>
     </div>
     <div class="stat-box">
-        <div class="stat-label">Active Jobs</div>
+        <div class="stat-label">Active Projects</div>
         <div class="stat-value">{{ stats.active }}</div>
     </div>
     <div class="stat-box">
@@ -244,7 +244,7 @@
 
 <!-- Pipeline by status -->
 <div class="pipeline-section">
-    <div class="section-heading">Jobs by Pipeline Stage</div>
+    <div class="section-heading">Projects by Pipeline Stage</div>
 
     {% for s in statuses %}
     {% set group = jobs_by_status[s] %}
@@ -252,12 +252,12 @@
         <div class="status-label {{ s }}">{{ status_labels[s] }} ({{ group|length }})</div>
 
         {% if not group %}
-        <div class="status-empty">No jobs in this stage</div>
+        <div class="status-empty">No projects in this stage</div>
         {% else %}
         <table class="jobs-table">
             <thead>
                 <tr>
-                    <th style="width:28%">Job Name</th>
+                    <th style="width:28%">Project Name</th>
                     <th style="width:20%">Client</th>
                     <th style="width:22%">Location</th>
                     <th style="width:15%">Estimate</th>

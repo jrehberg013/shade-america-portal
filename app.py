@@ -649,11 +649,25 @@ def edit_job(job_id):
 @app.route('/jobs/<int:job_id>/status', methods=['POST'])
 @manager_required
 def update_status(job_id):
-    status = request.form.get('status')
-    if status in ['deposit_received','design','engineering','permitting','fabrication','installation','completed']:
-        db = get_db()
-        db.execute("UPDATE jobs SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", (status, job_id))
-        db.commit()
+    # Support both form-POST (from job detail page) and JSON (from dashboard drag-and-drop)
+    if request.is_json:
+        status = (request.get_json(silent=True) or {}).get('status')
+    else:
+        status = request.form.get('status')
+    valid = ['deposit_received','design','engineering','permitting','fabrication','installation','completed']
+    if status not in valid:
+        if request.is_json:
+            return jsonify({'error': 'Invalid status'}), 400
+        return redirect(request.referrer or url_for('dashboard'))
+    db = get_db()
+    if not db.execute("SELECT id FROM jobs WHERE id=?", (job_id,)).fetchone():
+        if request.is_json:
+            return jsonify({'error': 'Job not found'}), 404
+        abort(404)
+    db.execute("UPDATE jobs SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", (status, job_id))
+    db.commit()
+    if request.is_json:
+        return jsonify({'ok': True, 'job_id': job_id, 'status': status})
     return redirect(request.referrer or url_for('dashboard'))
 
 
