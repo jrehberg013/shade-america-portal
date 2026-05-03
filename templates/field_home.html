@@ -6,7 +6,9 @@
 <div style="max-width:480px;margin:2rem auto;padding:0 1rem">
 
   <div style="text-align:center;margin-bottom:2rem">
-    <div style="font-size:2rem;margin-bottom:.5rem">☀️</div>
+    <img src="{{ url_for('static', filename='logo.png') }}"
+         alt="Shade America"
+         style="max-width:240px;width:80%;height:auto;margin-bottom:1rem">
     <div style="font-size:1.1rem;font-weight:600;color:var(--text)">
       Welcome, {{ current_user.name or current_user.username }}
     </div>
@@ -15,15 +17,15 @@
   <div style="display:flex;flex-direction:column;gap:1rem">
 
     <a href="{{ url_for('field') }}" class="btn btn-primary" style="padding:1.1rem;font-size:1.05rem;text-align:center;border-radius:10px">
-      💼 My Projects
+      Projects
     </a>
 
     <a href="{{ url_for('forms_list') }}" class="btn btn-outline" style="padding:1.1rem;font-size:1.05rem;text-align:center;border-radius:10px">
-      📋 Forms
+      Forms
     </a>
 
     <a href="{{ url_for('logout') }}" class="btn btn-outline" style="padding:1.1rem;font-size:1.05rem;text-align:center;border-radius:10px;color:var(--muted)">
-      🚪 Logout
+      Logout
     </a>
 
   </div>
