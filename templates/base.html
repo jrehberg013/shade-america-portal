@@ -35,6 +35,8 @@
     </div>
     <ul class="nav-links">
         {% if current_user.role == 'field' %}
+        <li><a href="{{ url_for('field_home') }}" class="{{ 'active' if request.endpoint == 'field_home' }}">
+            <span class="nav-label">Home</span></a></li>
         <li><a href="{{ url_for('field') }}" class="{{ 'active' if request.endpoint == 'field' }}">
             <span class="nav-label">Projects</span></a></li>
         <li><a href="{{ url_for('schedule') }}" class="{{ 'active' if request.endpoint == 'schedule' }}">
