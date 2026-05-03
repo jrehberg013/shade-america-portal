@@ -192,6 +192,15 @@ def init_db():
                 key TEXT PRIMARY KEY,
                 value TEXT DEFAULT ''
             )""",
+            """CREATE TABLE IF NOT EXISTS announcements (
+                id SERIAL PRIMARY KEY,
+                category TEXT NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT,
+                is_urgent INTEGER DEFAULT 0,
+                posted_by INTEGER,
+                posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
         ]
         for stmt in statements:
             cur.execute(stmt)
@@ -262,6 +271,15 @@ def init_db():
             CREATE TABLE IF NOT EXISTS section_descriptions (
                 key TEXT PRIMARY KEY,
                 value TEXT DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS announcements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT,
+                is_urgent INTEGER DEFAULT 0,
+                posted_by INTEGER,
+                posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         conn.commit()
@@ -551,11 +569,15 @@ def dashboard():
     }
     stat_cards = get_stat_cards_config(db)
     forms = db.execute("SELECT id, name, file_size, uploaded_at FROM forms ORDER BY name").fetchall()
+    field_requests = _fetch_announcements(db, category='field_request')
+    news = _fetch_announcements(db, category='news')
     return render_template('dashboard.html',
                            jobs_by_status=jobs_by_status,
                            stats=stats,
                            stat_cards=stat_cards,
-                           forms=forms)
+                           forms=forms,
+                           field_requests=field_requests,
+                           news=news)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -758,13 +780,115 @@ def delete_doc(doc_id):
 
 
 # ─────────────────────────────────────────────────────────────
+# ANNOUNCEMENTS  (helpers + routes)
+# ─────────────────────────────────────────────────────────────
+
+def _greeting_for_now():
+    """Time-of-day greeting based on the server's local hour."""
+    h = _dt_module.datetime.now().hour
+    if h < 12:
+        return 'Good morning'
+    if h < 17:
+        return 'Good afternoon'
+    return 'Good evening'
+
+def _fetch_announcements(db, category=None, limit=None):
+    """Field requests sort urgent-first then newest; news sorts newest-first."""
+    if category == 'field_request':
+        sql = ("SELECT a.*, u.name AS poster_name, u.username AS poster_username "
+               "FROM announcements a LEFT JOIN users u ON u.id = a.posted_by "
+               "WHERE a.category = 'field_request' "
+               "ORDER BY a.is_urgent DESC, a.posted_at DESC")
+    elif category == 'news':
+        sql = ("SELECT a.*, u.name AS poster_name, u.username AS poster_username "
+               "FROM announcements a LEFT JOIN users u ON u.id = a.posted_by "
+               "WHERE a.category = 'news' "
+               "ORDER BY a.posted_at DESC")
+    else:
+        sql = ("SELECT a.*, u.name AS poster_name, u.username AS poster_username "
+               "FROM announcements a LEFT JOIN users u ON u.id = a.posted_by "
+               "ORDER BY a.is_urgent DESC, a.posted_at DESC")
+    rows = db.execute(sql).fetchall()
+    if limit:
+        rows = rows[:limit]
+    return rows
+
+@app.route('/announcements/new', methods=['POST'])
+@manager_required
+def announcement_new():
+    category = request.form.get('category', '').strip()
+    title = request.form.get('title', '').strip()
+    body = request.form.get('body', '').strip()
+    is_urgent = 1 if request.form.get('is_urgent') and category == 'field_request' else 0
+    if category not in ('field_request', 'news'):
+        flash('Invalid category.', 'error')
+        return redirect(request.referrer or url_for('dashboard'))
+    if not title:
+        flash('Title is required.', 'error')
+        return redirect(request.referrer or url_for('dashboard'))
+    db = get_db()
+    db.execute(
+        "INSERT INTO announcements (category, title, body, is_urgent, posted_by) VALUES (?,?,?,?,?)",
+        (category, title, body, is_urgent, session['user_id'])
+    )
+    db.commit()
+    flash('Announcement posted.', 'success')
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/announcements/<int:ann_id>/edit', methods=['GET', 'POST'])
+@manager_required
+def announcement_edit(ann_id):
+    db = get_db()
+    ann = db.execute("SELECT * FROM announcements WHERE id=?", (ann_id,)).fetchone()
+    if not ann:
+        abort(404)
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        body = request.form.get('body', '').strip()
+        is_urgent = 1 if request.form.get('is_urgent') and ann['category'] == 'field_request' else 0
+        if not title:
+            flash('Title is required.', 'error')
+            return redirect(url_for('announcement_edit', ann_id=ann_id))
+        db.execute(
+            "UPDATE announcements SET title=?, body=?, is_urgent=? WHERE id=?",
+            (title, body, is_urgent, ann_id)
+        )
+        db.commit()
+        flash('Announcement updated.', 'success')
+        return redirect(url_for('dashboard'))
+    return render_template('announcement_edit.html', ann=ann)
+
+@app.route('/announcements/<int:ann_id>/delete', methods=['POST'])
+@manager_required
+def announcement_delete(ann_id):
+    db = get_db()
+    db.execute("DELETE FROM announcements WHERE id=?", (ann_id,))
+    db.commit()
+    flash('Announcement deleted.', 'success')
+    return redirect(request.referrer or url_for('dashboard'))
+
+
+# ─────────────────────────────────────────────────────────────
 # FIELD VIEW
 # ─────────────────────────────────────────────────────────────
 
 @app.route('/field-home')
 @login_required
 def field_home():
-    return render_template('field_home.html')
+    db = get_db()
+    field_requests = _fetch_announcements(db, category='field_request', limit=5)
+    news = _fetch_announcements(db, category='news', limit=5)
+    active_count = db.execute(
+        "SELECT COUNT(*) AS c FROM jobs WHERE status='installation'"
+    ).fetchone()['c']
+    now = _dt_module.datetime.now()
+    today_str = now.strftime('%A, %B ') + str(now.day)
+    return render_template('field_home.html',
+                           greeting=_greeting_for_now(),
+                           today_str=today_str,
+                           active_count=active_count,
+                           field_requests=field_requests,
+                           news=news)
 
 @app.route('/schedule')
 @login_required
@@ -2168,7 +2292,7 @@ def report():
         'contract_total': contract_total,
         'balance_owed':   balance_owed,
     }
-    report_date = datetime.datetime.now().strftime('%B %d, %Y  %I:%M %p')
+    report_date = _dt_module.datetime.now().strftime('%B %d, %Y  %I:%M %p')
     db.close()
     return render_template('report.html',
                            jobs_by_status=jobs_by_status,

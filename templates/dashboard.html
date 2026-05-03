@@ -19,6 +19,98 @@
     {% endfor %}
 </div>
 
+<!-- Announcements -->
+<div class="section-header" style="margin-top:1.25rem">
+    <h2>Announcements</h2>
+    <div style="display:flex;gap:.5rem">
+        <button type="button" class="ann-post-btn field" onclick="toggleAnnForm('field_request')">+ Field request</button>
+        <button type="button" class="ann-post-btn news" onclick="toggleAnnForm('news')">+ News</button>
+    </div>
+</div>
+
+<form id="annForm-field_request" method="POST" action="{{ url_for('announcement_new') }}" class="ann-form" style="display:none">
+    <input type="hidden" name="category" value="field_request">
+    <div class="ann-form-row"><input type="text" name="title" placeholder="Title (e.g. Bring extra augers Monday)" required maxlength="120"></div>
+    <div class="ann-form-row"><textarea name="body" placeholder="Details (optional)"></textarea></div>
+    <div class="ann-form-actions">
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;cursor:pointer;margin-right:auto">
+            <input type="checkbox" name="is_urgent" value="1">
+            <span>Mark as urgent</span>
+        </label>
+        <button type="button" class="btn btn-outline btn-sm" onclick="toggleAnnForm('field_request')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Post</button>
+    </div>
+</form>
+
+<form id="annForm-news" method="POST" action="{{ url_for('announcement_new') }}" class="ann-form" style="display:none">
+    <input type="hidden" name="category" value="news">
+    <div class="ann-form-row"><input type="text" name="title" placeholder="Title (e.g. New hire — welcome Maria)" required maxlength="120"></div>
+    <div class="ann-form-row"><textarea name="body" placeholder="Details (optional)"></textarea></div>
+    <div class="ann-form-actions">
+        <button type="button" class="btn btn-outline btn-sm" style="margin-left:auto" onclick="toggleAnnForm('news')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Post</button>
+    </div>
+</form>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.5rem">
+    <div>
+        <div class="ann-section-header" style="--c:#BA7517">
+            <span class="ann-dot"></span><span class="ann-section-label">Field requests</span>
+        </div>
+        {% for ann in field_requests %}
+        <div class="ann-card {{ 'urgent' if ann.is_urgent else 'field' }}">
+            <div class="ann-title-row">
+                <span class="ann-title">{{ ann.title }}</span>
+                {% if ann.is_urgent %}<span class="ann-urgent-pill">URGENT</span>{% endif %}
+            </div>
+            {% if ann.body %}<div class="ann-body">{{ ann.body }}</div>{% endif %}
+            <div class="ann-meta">{{ ann.poster_name or ann.poster_username or 'Office' }} · {{ (ann.posted_at|string)[:10] }}</div>
+            <div class="ann-actions">
+                <a href="{{ url_for('announcement_edit', ann_id=ann.id) }}">Edit</a>
+                <form method="POST" action="{{ url_for('announcement_delete', ann_id=ann.id) }}" style="display:inline" onsubmit="return confirm('Delete this announcement?')">
+                    <button type="submit">Delete</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div style="font-size:.85rem;color:#9aa1a8;padding:.5rem 0">No field requests posted.</div>
+        {% endfor %}
+    </div>
+    <div>
+        <div class="ann-section-header" style="--c:#185FA5">
+            <span class="ann-dot"></span><span class="ann-section-label">News</span>
+        </div>
+        {% for ann in news %}
+        <div class="ann-card news">
+            <div class="ann-title-row">
+                <span class="ann-title">{{ ann.title }}</span>
+            </div>
+            {% if ann.body %}<div class="ann-body">{{ ann.body }}</div>{% endif %}
+            <div class="ann-meta">{{ ann.poster_name or ann.poster_username or 'Office' }} · {{ (ann.posted_at|string)[:10] }}</div>
+            <div class="ann-actions">
+                <a href="{{ url_for('announcement_edit', ann_id=ann.id) }}">Edit</a>
+                <form method="POST" action="{{ url_for('announcement_delete', ann_id=ann.id) }}" style="display:inline" onsubmit="return confirm('Delete this announcement?')">
+                    <button type="submit">Delete</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div style="font-size:.85rem;color:#9aa1a8;padding:.5rem 0">No news posted.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function toggleAnnForm(category) {
+    const f = document.getElementById('annForm-' + category);
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+    // Hide the other form to avoid two forms open at once
+    const other = document.getElementById('annForm-' + (category === 'field_request' ? 'news' : 'field_request'));
+    if (other) other.style.display = 'none';
+    if (f.style.display === 'block') f.querySelector('input[name="title"]').focus();
+}
+</script>
+
 <!-- Pipeline Board -->
 <div class="section-header">
     <h2>Project Pipeline</h2>

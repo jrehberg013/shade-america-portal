@@ -55,6 +55,32 @@ img{max-width:100%}
 .nav-links a.active{border-left:3px solid var(--green)}
 .nav-icon{font-size:1rem;width:1.2rem;text-align:center}
 .nav-badge{display:inline-block;font-size:.62rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:.12rem .42rem;margin-left:.5rem;border-radius:6px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.65);vertical-align:middle}
+
+/* ── Announcements (sleek style) ── */
+.ann-section-header{display:flex;align-items:center;gap:.45rem;margin-bottom:.6rem;padding:0 .15rem}
+.ann-section-header .ann-dot{width:6px;height:6px;background:var(--c, #888);border-radius:50%;display:inline-block;flex-shrink:0}
+.ann-section-header .ann-section-label{font-size:.72rem;font-weight:500;color:var(--c, #888);text-transform:uppercase;letter-spacing:.06em}
+.ann-card{padding:.25rem 0 .25rem .75rem;margin-bottom:.85rem;border-left:3px solid #ccc}
+.ann-card.field{border-left-color:#BA7517}
+.ann-card.news{border-left-color:#185FA5}
+.ann-card.urgent{border-left-color:#A32D2D}
+.ann-card .ann-title-row{display:flex;align-items:center;gap:.4rem;margin-bottom:.15rem}
+.ann-card .ann-title{font-size:.93rem;font-weight:500;color:var(--text)}
+.ann-card .ann-urgent-pill{font-size:.62rem;padding:.1rem .45rem;background:#A32D2D;color:#fff;border-radius:999px;font-weight:600;letter-spacing:.02em}
+.ann-card .ann-body{font-size:.85rem;color:var(--muted);line-height:1.5}
+.ann-card .ann-meta{font-size:.72rem;color:#9aa1a8;margin-top:.3rem}
+.ann-card .ann-actions{font-size:.75rem;color:#9aa1a8;margin-top:.35rem;display:flex;gap:.7rem}
+.ann-card .ann-actions a, .ann-card .ann-actions button{color:#6b7280;background:none;border:none;padding:0;cursor:pointer;font-size:inherit;text-decoration:none}
+.ann-card .ann-actions a:hover, .ann-card .ann-actions button:hover{color:var(--text);text-decoration:underline}
+.ann-post-btn{font-size:.82rem;padding:.4rem .85rem;border:0.5px solid;border-radius:8px;font-weight:500;cursor:pointer;background:#fff;display:inline-flex;align-items:center;gap:.3rem}
+.ann-post-btn.field{border-color:#FAC775;color:#BA7517}
+.ann-post-btn.news{border-color:#B5D4F4;color:#185FA5}
+.ann-post-btn:hover{filter:brightness(.95)}
+.ann-form{padding:.75rem;border:1px dashed #d1d5db;border-radius:8px;margin-bottom:1rem;background:#fafbfc}
+.ann-form input[type="text"], .ann-form textarea{width:100%;padding:.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;font-family:inherit}
+.ann-form textarea{min-height:60px;resize:vertical}
+.ann-form .ann-form-row{margin-bottom:.5rem}
+.ann-form .ann-form-actions{display:flex;gap:.5rem;align-items:center;margin-top:.4rem}
 .nav-bottom{padding:1rem 1.25rem;border-top:1px solid rgba(255,255,255,.08)}
 .logout-link{display:flex;align-items:center;gap:.75rem;font-size:.9rem;opacity:.7;transition:opacity .15s}
 .logout-link:hover{opacity:1}
