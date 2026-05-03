@@ -13,22 +13,21 @@
     <div style="font-size:.85rem;color:var(--muted);text-align:center;flex:1;margin:0 1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
       {{ doc.original_name }}
     </div>
-    <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank" rel="noopener"
-       class="btn btn-primary btn-sm" style="display:flex;align-items:center;gap:.4rem">
-      🖨 Print / Open
-    </a>
+    <button onclick="printDocument()" class="btn btn-primary btn-sm" style="display:flex;align-items:center;gap:.4rem">
+      🖨 Print
+    </button>
   </div>
 
   <!-- File viewer -->
   <div style="flex:1;overflow:hidden">
     {% if doc.mime_type and doc.mime_type.startswith('image/') %}
       <div style="height:100%;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:1rem">
-        <img src="{{ url_for('serve_doc', doc_id=doc.id) }}"
+        <img id="docImage" src="{{ url_for('serve_doc', doc_id=doc.id) }}"
              alt="{{ doc.original_name }}"
              style="max-width:100%;height:auto;border-radius:6px">
       </div>
     {% else %}
-      <iframe src="{{ url_for('serve_doc', doc_id=doc.id) }}"
+      <iframe id="docFrame" src="{{ url_for('serve_doc', doc_id=doc.id) }}"
               style="width:100%;height:100%;border:none"
               title="{{ doc.original_name }}">
       </iframe>
@@ -37,11 +36,34 @@
 
 </div>
 
+<script>
+function printDocument() {
+    // Try to print just the PDF inside the iframe (same-origin, so this works)
+    var iframe = document.getElementById('docFrame');
+    if (iframe && iframe.contentWindow) {
+        try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            return;
+        } catch (e) {
+            // Fall through to window.print()
+        }
+    }
+    // For images or if iframe.print() failed: print the page (CSS hides everything except the doc)
+    window.print();
+}
+</script>
+
 <style>
   @media print {
     /* Hide everything except the document when printing */
-    nav, .sidebar, .top-bar, .toolbar { display: none !important; }
-    iframe { height: 100vh !important; }
+    nav, .sidebar, .top-bar, header, .top-bar-right, .flash-messages,
+    .mobile-menu-btn, .page-title { display: none !important; }
+    main, .content, .main-wrapper { margin: 0 !important; padding: 0 !important; }
+    iframe { width: 100% !important; height: 100vh !important; border: none !important; }
+    img#docImage { max-width: 100% !important; height: auto !important; }
+    /* Hide the in-page toolbar too */
+    button, a.btn { display: none !important; }
   }
 </style>
 {% endblock %}
