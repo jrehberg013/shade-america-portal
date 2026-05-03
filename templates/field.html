@@ -21,22 +21,14 @@
         </div>
         </a>
 
-        <!-- Drawings -->
-        {% if job.drawings %}
-        <div class="field-section-label">📐 Drawings</div>
-        <div class="field-doc-list">
-            {% for doc in job.drawings %}
-            <a href="{{ url_for('view_doc', doc_id=doc.id) }}" class="field-doc-link">
-                📄 {{ doc.original_name }}
-            </a>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        <!-- Photo count -->
-        {% if job.photos %}
+        {% set drawing_count = job.drawings|length if job.drawings else 0 %}
+        {% set photo_count   = job.photos|length   if job.photos   else 0 %}
+        {% if drawing_count or photo_count %}
         <div style="font-size:.8rem;color:var(--muted);margin-top:.4rem">
-            📷 {{ job.photos|length }} photo{{ 's' if job.photos|length != 1 }} — tap project to view &amp; add
+            {% if drawing_count %}📐 {{ drawing_count }} drawing{{ 's' if drawing_count != 1 }}{% endif %}
+            {% if drawing_count and photo_count %} · {% endif %}
+            {% if photo_count %}📷 {{ photo_count }} photo{{ 's' if photo_count != 1 }}{% endif %}
+            — tap project to view
         </div>
         {% endif %}
     </div>

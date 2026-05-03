@@ -269,7 +269,7 @@
             <div class="doc-list">
                 {% for doc in documents if current_user.role != 'field' or doc.original_name[:3].upper() == 'SA-' %}
                 <div class="doc-item">
-                    <div class="doc-info">
+                    <a href="{{ url_for('view_doc', doc_id=doc.id) }}" class="doc-info" style="text-decoration:none;color:inherit;flex:1;display:flex;align-items:center;gap:.6rem;cursor:pointer">
                         <span class="doc-icon">
                             {% if doc.doc_type == 'drawing' %}&#128208;
                             {% elif doc.doc_type == 'photo' %}&#128247;
@@ -278,19 +278,18 @@
                             {% else %}&#128206;{% endif %}
                         </span>
                         <div>
-                            <div class="doc-name">{{ doc.original_name }}</div>
+                            <div class="doc-name" style="color:#1a5c9e;text-decoration:underline">{{ doc.original_name }}</div>
                             <div class="doc-meta">{{ doc.doc_type.title() }} &middot; {{ (doc.uploaded_at|string)[:10] if doc.uploaded_at else '' }}</div>
                         </div>
-                    </div>
+                    </a>
+                    {% if current_user.role == 'admin' %}
                     <div class="doc-actions">
-                        <a href="{{ url_for('view_doc', doc_id=doc.id) }}" class="btn btn-sm btn-outline">View</a>
-                        {% if current_user.role == 'admin' %}
                         <form method="POST" action="{{ url_for('delete_doc', doc_id=doc.id) }}" style="display:inline"
                               onsubmit="return confirm('Delete this file?')">
                             <button type="submit" class="btn btn-sm btn-danger">Del</button>
                         </form>
-                        {% endif %}
                     </div>
+                    {% endif %}
                 </div>
                 {% else %}
                 <div class="text-muted text-center" style="padding:1rem">No documents uploaded yet.</div>

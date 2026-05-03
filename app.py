@@ -2359,7 +2359,20 @@ def trello_list_names():
 @app.route('/field-preview')
 @admin_required
 def field_preview():
-    return render_template('field_home.html')
+    db = get_db()
+    field_requests = _fetch_announcements(db, category='field_request', limit=5)
+    news = _fetch_announcements(db, category='news', limit=5)
+    active_count = db.execute(
+        "SELECT COUNT(*) AS c FROM jobs WHERE status='installation'"
+    ).fetchone()['c']
+    now = _dt_module.datetime.now()
+    today_str = now.strftime('%A, %B ') + str(now.day)
+    return render_template('field_home.html',
+                           greeting=_greeting_for_now(),
+                           today_str=today_str,
+                           active_count=active_count,
+                           field_requests=field_requests,
+                           news=news)
 
 
 # ─────────────────────────────────────────────────────────────
