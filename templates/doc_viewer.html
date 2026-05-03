@@ -13,9 +13,10 @@
     <div style="font-size:.85rem;color:var(--muted);text-align:center;flex:1;margin:0 1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
       {{ doc.original_name }}
     </div>
-    <button onclick="window.print()" class="btn btn-primary btn-sm" style="display:flex;align-items:center;gap:.4rem">
-      🖨 Print
-    </button>
+    <a href="{{ url_for('serve_doc', doc_id=doc.id) }}" target="_blank" rel="noopener"
+       class="btn btn-primary btn-sm" style="display:flex;align-items:center;gap:.4rem">
+      🖨 Print / Open
+    </a>
   </div>
 
   <!-- File viewer -->

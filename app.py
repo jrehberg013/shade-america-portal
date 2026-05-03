@@ -1528,6 +1528,15 @@ def forms_upload():
     flash(f'Form "{name}" uploaded.', 'success')
     return redirect(url_for('dashboard'))
 
+@app.route('/forms/<int:form_id>/view')
+@login_required
+def view_form(form_id):
+    db = get_db()
+    form = db.execute("SELECT id, name FROM forms WHERE id=?", (form_id,)).fetchone()
+    if not form:
+        abort(404)
+    return render_template('forms_viewer.html', form=form)
+
 @app.route('/forms/<int:form_id>')
 @login_required
 def serve_form(form_id):
