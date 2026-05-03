@@ -201,6 +201,17 @@ def init_db():
                 posted_by INTEGER,
                 posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )""",
+            """CREATE TABLE IF NOT EXISTS location_geocode (
+                address TEXT PRIMARY KEY,
+                lat REAL,
+                lon REAL,
+                geocoded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS weather_cache (
+                cache_key TEXT PRIMARY KEY,
+                forecast_json TEXT,
+                cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
         ]
         for stmt in statements:
             cur.execute(stmt)
@@ -280,6 +291,17 @@ def init_db():
                 is_urgent INTEGER DEFAULT 0,
                 posted_by INTEGER,
                 posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS location_geocode (
+                address TEXT PRIMARY KEY,
+                lat REAL,
+                lon REAL,
+                geocoded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS weather_cache (
+                cache_key TEXT PRIMARY KEY,
+                forecast_json TEXT,
+                cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         conn.commit()
@@ -907,6 +929,191 @@ def announcement_delete(ann_id):
     db.commit()
     flash('Announcement deleted.', 'success')
     return redirect(request.referrer or url_for('dashboard'))
+
+
+# ─────────────────────────────────────────────────────────────
+# WEATHER  (Open-Meteo, free, no key)
+# ─────────────────────────────────────────────────────────────
+# WMO weather code → emoji + short label
+_WMO_ICONS = {
+    0:  ('☀️', 'Clear'),
+    1:  ('🌤️', 'Mostly clear'),
+    2:  ('⛅', 'Partly cloudy'),
+    3:  ('☁️', 'Overcast'),
+    45: ('🌫️', 'Fog'),
+    48: ('🌫️', 'Fog'),
+    51: ('🌦️', 'Drizzle'),
+    53: ('🌦️', 'Drizzle'),
+    55: ('🌦️', 'Drizzle'),
+    61: ('🌧️', 'Rain'),
+    63: ('🌧️', 'Rain'),
+    65: ('🌧️', 'Heavy rain'),
+    71: ('🌨️', 'Snow'),
+    73: ('🌨️', 'Snow'),
+    75: ('🌨️', 'Heavy snow'),
+    77: ('🌨️', 'Snow'),
+    80: ('🌦️', 'Rain showers'),
+    81: ('🌧️', 'Rain showers'),
+    82: ('⛈️', 'Heavy showers'),
+    85: ('🌨️', 'Snow showers'),
+    86: ('🌨️', 'Snow showers'),
+    95: ('⛈️', 'Thunderstorm'),
+    96: ('⛈️', 'Thunderstorm'),
+    99: ('⛈️', 'Thunderstorm'),
+}
+
+def _weather_query_for_job(job):
+    """Prefer structured fields when present (more reliable); fall back to combined location."""
+    try:
+        city  = (job['city']  or '').strip() if 'city'  in job.keys() else ''
+        state = (job['state'] or '').strip() if 'state' in job.keys() else ''
+        zip_c = (job['zip_code'] or '').strip() if 'zip_code' in job.keys() else ''
+    except (TypeError, KeyError):
+        city = state = zip_c = ''
+    if city and state:
+        return f'{city}, {state}'
+    if zip_c:
+        return zip_c
+    return (job['location'] or '').strip() if (job['location'] if 'location' in job.keys() else None) else ''
+
+def _geocode(address):
+    """Return (lat, lon) or None. Cached in location_geocode."""
+    address = (address or '').strip()
+    if not address:
+        return None
+    db = get_db()
+    row = db.execute("SELECT lat, lon FROM location_geocode WHERE address=?", (address,)).fetchone()
+    if row and row['lat'] is not None:
+        return (float(row['lat']), float(row['lon']))
+    # Try Open-Meteo geocoding first (good for cities)
+    lat = lon = None
+    try:
+        q = urllib.parse.quote(address)
+        url = f'https://geocoding-api.open-meteo.com/v1/search?name={q}&count=1&language=en&format=json'
+        with urllib.request.urlopen(url, timeout=6) as r:
+            data = json.loads(r.read())
+        results = data.get('results') or []
+        if results:
+            lat = float(results[0]['latitude'])
+            lon = float(results[0]['longitude'])
+    except Exception:
+        pass
+    # Fallback: Nominatim (good for full street addresses)
+    if lat is None:
+        try:
+            q = urllib.parse.quote(address)
+            url = f'https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1'
+            req = urllib.request.Request(url, headers={'User-Agent': 'shade-america-portal/1.0'})
+            with urllib.request.urlopen(req, timeout=6) as r:
+                data = json.loads(r.read())
+            if data:
+                lat = float(data[0]['lat'])
+                lon = float(data[0]['lon'])
+        except Exception:
+            pass
+    if lat is None:
+        # Cache the failure too so we don't keep retrying every page load
+        try:
+            db.execute("INSERT INTO location_geocode (address, lat, lon) VALUES (?, NULL, NULL) "
+                       "ON CONFLICT (address) DO UPDATE SET geocoded_at = CURRENT_TIMESTAMP", (address,))
+            db.commit()
+        except Exception:
+            pass
+        return None
+    try:
+        db.execute("INSERT INTO location_geocode (address, lat, lon) VALUES (?, ?, ?) "
+                   "ON CONFLICT (address) DO UPDATE SET lat = EXCLUDED.lat, lon = EXCLUDED.lon, geocoded_at = CURRENT_TIMESTAMP",
+                   (address, lat, lon))
+        db.commit()
+    except Exception:
+        pass
+    return (lat, lon)
+
+def _get_forecast(lat, lon):
+    """Return parsed forecast dict or None. Cached for 1 hour by lat/lon."""
+    if lat is None or lon is None:
+        return None
+    cache_key = f'{round(lat,3)},{round(lon,3)}'
+    db = get_db()
+    row = db.execute("SELECT forecast_json, cached_at FROM weather_cache WHERE cache_key=?", (cache_key,)).fetchone()
+    if row and row['forecast_json']:
+        try:
+            cached_at = row['cached_at']
+            if isinstance(cached_at, str):
+                cached_at = _dt_module.datetime.fromisoformat(cached_at.replace('Z','').split('.')[0])
+            if (_dt_module.datetime.now() - cached_at).total_seconds() < 3600:
+                return json.loads(row['forecast_json'])
+        except Exception:
+            pass
+    try:
+        url = (f'https://api.open-meteo.com/v1/forecast?'
+               f'latitude={lat}&longitude={lon}'
+               f'&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max'
+               f'&current=weathercode,temperature_2m'
+               f'&temperature_unit=fahrenheit&timezone=auto&forecast_days=7')
+        with urllib.request.urlopen(url, timeout=6) as r:
+            data = json.loads(r.read())
+    except Exception:
+        return None
+    daily = data.get('daily', {}) or {}
+    dates = daily.get('time', [])
+    codes = daily.get('weathercode', [])
+    highs = daily.get('temperature_2m_max', [])
+    lows  = daily.get('temperature_2m_min', [])
+    pops  = daily.get('precipitation_probability_max', [])
+    days = []
+    for i in range(len(dates)):
+        wmo = codes[i] if i < len(codes) else 0
+        icon, label = _WMO_ICONS.get(wmo, ('☀️', ''))
+        days.append({
+            'date': dates[i],
+            'high': round(highs[i]) if i < len(highs) and highs[i] is not None else None,
+            'low':  round(lows[i])  if i < len(lows)  and lows[i]  is not None else None,
+            'pop':  pops[i] if i < len(pops) else None,
+            'icon': icon,
+            'label': label,
+        })
+    current = data.get('current', {}) or {}
+    today_wmo = current.get('weathercode', 0)
+    icon, label = _WMO_ICONS.get(today_wmo, ('☀️', ''))
+    forecast = {
+        'today': {
+            'icon': icon,
+            'label': label,
+            'temp': round(current.get('temperature_2m')) if current.get('temperature_2m') is not None else None,
+            'high': days[0]['high'] if days else None,
+            'low':  days[0]['low']  if days else None,
+        },
+        'days': days,
+    }
+    try:
+        db.execute("INSERT INTO weather_cache (cache_key, forecast_json, cached_at) VALUES (?, ?, CURRENT_TIMESTAMP) "
+                   "ON CONFLICT (cache_key) DO UPDATE SET forecast_json = EXCLUDED.forecast_json, cached_at = CURRENT_TIMESTAMP",
+                   (cache_key, json.dumps(forecast)))
+        db.commit()
+    except Exception:
+        pass
+    return forecast
+
+@app.route('/api/weather/<int:job_id>')
+@login_required
+def api_weather(job_id):
+    db = get_db()
+    job = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        return jsonify({})
+    if (job['status'] or '') != 'installation':
+        return jsonify({})
+    address = _weather_query_for_job(job)
+    if not address:
+        return jsonify({})
+    coords = _geocode(address)
+    if not coords:
+        return jsonify({})
+    forecast = _get_forecast(coords[0], coords[1])
+    if not forecast:
+        return jsonify({})
+    return jsonify(forecast)
 
 
 # ─────────────────────────────────────────────────────────────

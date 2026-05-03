@@ -132,6 +132,45 @@
             {% endif %}
         </div>
 
+        <!-- 7-day Weather (only on installation-status jobs) -->
+        {% if job.status == 'installation' %}
+        <div class="card" id="weatherCard" style="display:none">
+            <div class="card-header"><h3>7-day weather at job site</h3></div>
+            <div id="weatherStrip" style="display:flex;gap:.4rem;padding:.75rem .25rem;overflow-x:auto"></div>
+        </div>
+        <script>
+        (function() {
+            const card = document.getElementById('weatherCard');
+            const strip = document.getElementById('weatherStrip');
+            if (!card || !strip) return;
+            fetch('/api/weather/{{ job.id }}')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data || !data.days || !data.days.length) return;
+                    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                    strip.innerHTML = data.days.map(function(d) {
+                        const dt = new Date(d.date + 'T00:00:00');
+                        const dn = dayNames[dt.getDay()];
+                        const dnum = dt.getDate();
+                        const high = (d.high != null) ? d.high + '°' : '—';
+                        const low  = (d.low  != null) ? d.low  + '°' : '—';
+                        const pop  = (d.pop  != null && d.pop > 20) ? '<div style="font-size:.7rem;color:#185FA5;margin-top:.15rem">' + d.pop + '%</div>' : '';
+                        return '<div style="flex:1;min-width:64px;text-align:center;padding:.5rem .25rem;border:0.5px solid #e5e7eb;border-radius:8px;background:#fafbfc">' +
+                               '<div style="font-size:.72rem;color:#6b7280;font-weight:500">' + dn + '</div>' +
+                               '<div style="font-size:.7rem;color:#9ca3af;margin-bottom:.25rem">' + dnum + '</div>' +
+                               '<div style="font-size:1.4rem;line-height:1">' + d.icon + '</div>' +
+                               '<div style="font-size:.78rem;color:#111;font-weight:500;margin-top:.25rem">' + high + '</div>' +
+                               '<div style="font-size:.72rem;color:#6b7280">' + low + '</div>' +
+                               pop +
+                               '</div>';
+                    }).join('');
+                    card.style.display = 'block';
+                })
+                .catch(function() { /* silent fail */ });
+        })();
+        </script>
+        {% endif %}
+
         <!-- Trello Sync (admin/manager only) -->
         {% if current_user.role in ['admin','manager'] %}
         <div class="card">
