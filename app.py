@@ -285,6 +285,14 @@ def init_db():
         conn.commit()
         db = _DB(conn)
 
+    # ── Migrations: add address columns to jobs (idempotent) ──
+    for col_def in ['street_address TEXT', 'city TEXT', 'state TEXT', 'zip_code TEXT']:
+        try:
+            db.execute(f'ALTER TABLE jobs ADD COLUMN {col_def}')
+            db.commit()
+        except Exception:
+            pass  # column already exists
+
     # Seed users
     users = [
         ('james',   'SA-James#1',   'James',   'admin', 1),
@@ -591,13 +599,26 @@ def jobs():
     all_jobs = db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
     return render_template('jobs.html', jobs=all_jobs)
 
+def _build_location(street, city, state, zip_code):
+    """Build a single combined location string from structured address parts."""
+    street, city, state, zip_code = (s.strip() for s in (street or '', city or '', state or '', zip_code or ''))
+    parts = []
+    if street:
+        parts.append(street)
+    if city:
+        parts.append(city)
+    state_zip = ' '.join(p for p in (state, zip_code) if p)
+    if state_zip:
+        parts.append(state_zip)
+    return ', '.join(parts)
+
 @app.route('/jobs/new', methods=['GET', 'POST'])
 @manager_required
 def new_job():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         if not name:
-            flash('Job name is required.', 'error')
+            flash('Project name is required.', 'error')
             return redirect(url_for('new_job'))
         db = get_db()
         try:
@@ -605,13 +626,19 @@ def new_job():
         except ValueError:
             est = 0
         trello_url = request.form.get('trello_url', '').strip()
+        street   = request.form.get('street_address', '').strip()
+        city     = request.form.get('city', '').strip()
+        state    = request.form.get('state', '').strip().upper()
+        zip_code = request.form.get('zip_code', '').strip()
+        location = _build_location(street, city, state, zip_code)
         db.execute(
-            "INSERT INTO jobs (name,client,phone,location,status,estimate_total,notes,trello_url,created_by) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO jobs (name,client,phone,location,street_address,city,state,zip_code,status,estimate_total,notes,trello_url,created_by) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (name,
              request.form.get('client', ''),
              request.form.get('phone', ''),
-             request.form.get('location', ''),
+             location,
+             street, city, state, zip_code,
              request.form.get('status', 'deposit_received'),
              est,
              request.form.get('notes', ''),
@@ -619,7 +646,7 @@ def new_job():
              session['user_id'])
         )
         db.commit()
-        flash(f'Job "{name}" created.', 'success')
+        flash(f'Project "{name}" created.', 'success')
         return redirect(url_for('dashboard'))
     prefill = {
         'name':           request.args.get('name', ''),
@@ -648,24 +675,38 @@ def job_detail(job_id):
 @manager_required
 def edit_job(job_id):
     db = get_db()
-    if not db.execute("SELECT id FROM jobs WHERE id=?", (job_id,)).fetchone():
+    existing = db.execute("SELECT location FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not existing:
         abort(404)
     name           = request.form.get('name', '').strip()
     client         = request.form.get('client', '').strip()
     phone          = request.form.get('phone', '').strip()
-    location       = request.form.get('location', '').strip()
     notes          = request.form.get('notes', '').strip()
     estimate_total = request.form.get('estimate_total', '').strip()
+    street   = request.form.get('street_address', '').strip()
+    city     = request.form.get('city', '').strip()
+    state    = request.form.get('state', '').strip().upper()
+    zip_code = request.form.get('zip_code', '').strip()
+    # Only rebuild combined location if at least one structured field is filled,
+    # so old projects keep their existing location string until edited intentionally.
+    if any([street, city, state, zip_code]):
+        location = _build_location(street, city, state, zip_code)
+    else:
+        location = existing['location']
     try:
         estimate_total = float(estimate_total) if estimate_total else None
     except ValueError:
         estimate_total = None
     db.execute(
-        "UPDATE jobs SET name=?, client=?, phone=?, location=?, notes=?, estimate_total=? WHERE id=?",
-        (name, client, phone, location, notes, estimate_total, job_id)
+        "UPDATE jobs SET name=?, client=?, phone=?, location=?, "
+        "street_address=?, city=?, state=?, zip_code=?, "
+        "notes=?, estimate_total=? WHERE id=?",
+        (name, client, phone, location,
+         street, city, state, zip_code,
+         notes, estimate_total, job_id)
     )
     db.commit()
-    flash('Job details updated.', 'success')
+    flash('Project details updated.', 'success')
     return redirect(url_for('job_detail', job_id=job_id))
 
 @app.route('/jobs/<int:job_id>/status', methods=['POST'])
