@@ -239,21 +239,28 @@
         <div class="card">
             <div class="card-header card-header-row">
                 <h3>Field Photos</h3>
-                {% if current_user.role in ['admin', 'field'] %}
-                <button class="btn btn-sm btn-primary" onclick="togglePhotoUpload()">📸 Add Photo</button>
-                {% endif %}
             </div>
 
             <!-- Photo upload form (field + admin) -->
             {% if current_user.role in ['admin', 'field'] %}
-            <div id="photoUploadArea" style="display:none;padding:.75rem 0">
-                <form method="POST" action="{{ url_for('upload_doc', job_id=job.id) }}" enctype="multipart/form-data">
+            <div style="padding:.75rem 0">
+                <form id="photoForm" method="POST" action="{{ url_for('upload_doc', job_id=job.id) }}" enctype="multipart/form-data">
                     <input type="hidden" name="doc_type" value="photo">
-                    <label class="upload-btn-label" style="display:block;text-align:center;padding:.75rem;border:2px dashed var(--border);border-radius:8px;cursor:pointer">
-                        <input type="file" name="file" accept="image/*" capture="environment"
-                               onchange="this.form.submit()" class="visually-hidden">
-                        📸 Take / Choose Photo
-                    </label>
+                    <input type="file" id="photoCamera" name="file" accept="image/*" capture="environment" style="display:none" onchange="onPhotosSelected(event)">
+                    <input type="file" id="photoLibrary" name="file" accept="image/*" multiple style="display:none" onchange="onPhotosSelected(event)">
+
+                    <div id="photoChoose" style="display:flex;gap:.5rem">
+                        <button type="button" onclick="document.getElementById('photoCamera').click()" class="btn btn-primary" style="flex:1">📸 Take Photo</button>
+                        <button type="button" onclick="document.getElementById('photoLibrary').click()" class="btn btn-outline" style="flex:1">🖼️ Choose Photos</button>
+                    </div>
+
+                    <div id="photoPreview" style="display:none;margin-top:.75rem">
+                        <div id="photoPreviewGrid" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem"></div>
+                        <div id="photoUploadActions" style="display:flex;gap:.5rem">
+                            <button type="submit" id="photoUploadBtn" class="btn btn-primary" style="flex:1">Upload</button>
+                            <button type="button" onclick="cancelPhotos()" class="btn btn-outline" style="flex:1">Cancel</button>
+                        </div>
+                    </div>
                 </form>
             </div>
             {% endif %}
@@ -290,9 +297,96 @@ function toggleUpload() {
     var el = document.getElementById('uploadArea');
     el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
-function togglePhotoUpload() {
-    var el = document.getElementById('photoUploadArea');
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+// ── PHOTO UPLOAD: take or choose, preview, remove, upload ──
+const MAX_PHOTOS = 40;
+// Selected photos held in a DataTransfer so we can mutate the file list
+const photoBuffer = new DataTransfer();
+
+function onPhotosSelected(e) {
+    const picked = Array.from(e.target.files || []);
+    const isCamera = e.target.id === 'photoCamera';
+    // Camera = single shot, replaces buffer; Library = additive, capped at MAX_PHOTOS
+    if (isCamera) {
+        photoBuffer.items.clear();
+    }
+    for (const f of picked) {
+        if (photoBuffer.files.length >= MAX_PHOTOS) {
+            alert('Please select ' + MAX_PHOTOS + ' photos or fewer at a time.');
+            break;
+        }
+        photoBuffer.items.add(f);
+    }
+    // Reset input so picking the same file again still triggers onchange
+    e.target.value = '';
+    renderPhotoPreview();
 }
+
+function renderPhotoPreview() {
+    const grid = document.getElementById('photoPreviewGrid');
+    const previewWrap = document.getElementById('photoPreview');
+    const chooseWrap = document.getElementById('photoChoose');
+    const uploadBtn = document.getElementById('photoUploadBtn');
+    grid.innerHTML = '';
+    if (photoBuffer.files.length === 0) {
+        previewWrap.style.display = 'none';
+        chooseWrap.style.display = 'flex';
+        // Sync the actual form input(s) — clear them
+        document.getElementById('photoCamera').files = photoBuffer.files;
+        document.getElementById('photoLibrary').files = photoBuffer.files;
+        return;
+    }
+    previewWrap.style.display = 'block';
+    Array.from(photoBuffer.files).forEach((file, idx) => {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:relative;width:80px;height:80px;border-radius:6px;overflow:hidden;border:1px solid var(--border)';
+        const img = document.createElement('img');
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+        const reader = new FileReader();
+        reader.onload = ev => { img.src = ev.target.result; };
+        reader.readAsDataURL(file);
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '✕';
+        x.title = 'Remove';
+        x.style.cssText = 'position:absolute;top:2px;right:2px;width:22px;height:22px;border:none;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;font-size:.75rem;line-height:1;cursor:pointer;padding:0';
+        x.onclick = () => removePhoto(idx);
+        wrap.appendChild(img);
+        wrap.appendChild(x);
+        grid.appendChild(wrap);
+    });
+    uploadBtn.textContent = 'Upload (' + photoBuffer.files.length + ')';
+    // Sync the library input with the buffer so the form submits the right files
+    document.getElementById('photoLibrary').files = photoBuffer.files;
+    // Keep Choose buttons hidden while previewing
+    chooseWrap.style.display = 'none';
+}
+
+function removePhoto(idx) {
+    const remaining = Array.from(photoBuffer.files);
+    remaining.splice(idx, 1);
+    photoBuffer.items.clear();
+    remaining.forEach(f => photoBuffer.items.add(f));
+    renderPhotoPreview();
+}
+
+function cancelPhotos() {
+    photoBuffer.items.clear();
+    renderPhotoPreview();
+}
+
+// Make sure we submit via the library input (it has 'multiple'); clear the camera input
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('photoForm');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+        if (photoBuffer.files.length === 0) {
+            e.preventDefault();
+            return;
+        }
+        // Move all files to the library input (which has multiple), clear camera
+        document.getElementById('photoLibrary').files = photoBuffer.files;
+        document.getElementById('photoCamera').value = '';
+    });
+});
 </script>
 {% endblock %}

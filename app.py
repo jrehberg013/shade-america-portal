@@ -684,24 +684,32 @@ def upload_doc(job_id):
     doc_type = request.form.get('doc_type', 'photo')
     if doc_type != 'photo' and session.get('role') != 'admin':
         abort(403)
-    file = request.files.get('file')
-    if not file or not file.filename:
+    files = [f for f in request.files.getlist('file') if f and f.filename]
+    if not files:
         flash('No file selected.', 'error')
         return redirect(url_for('job_detail', job_id=job_id))
-    file_data = file.read()
-    if len(file_data) > MAX_FILE_MB * 1024 * 1024:
-        flash(f'File too large (max {MAX_FILE_MB} MB).', 'error')
+    if len(files) > 40:
+        flash('Please select 40 photos or fewer at a time.', 'error')
         return redirect(url_for('job_detail', job_id=job_id))
-    db.execute(
-        "INSERT INTO documents (job_id,original_name,doc_type,file_data,mime_type,file_size,uploaded_by) "
-        "VALUES (?,?,?,?,?,?,?)",
-        (job_id, secure_filename(file.filename), doc_type, _bin(file_data),
-         file.content_type or 'application/octet-stream', len(file_data), session['user_id'])
-    )
+    saved = 0
+    skipped_too_big = []
+    for file in files:
+        file_data = file.read()
+        if len(file_data) > MAX_FILE_MB * 1024 * 1024:
+            skipped_too_big.append(file.filename)
+            continue
+        db.execute(
+            "INSERT INTO documents (job_id,original_name,doc_type,file_data,mime_type,file_size,uploaded_by) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (job_id, secure_filename(file.filename), doc_type, _bin(file_data),
+             file.content_type or 'application/octet-stream', len(file_data), session['user_id'])
+        )
+        saved += 1
     db.commit()
-    flash('File uploaded.', 'success')
-    if session.get('role') == 'field':
-        return redirect(url_for('field'))
+    if saved:
+        flash(f'{saved} file{"s" if saved != 1 else ""} uploaded.', 'success')
+    if skipped_too_big:
+        flash(f'Skipped (too large, max {MAX_FILE_MB} MB): {", ".join(skipped_too_big)}', 'error')
     return redirect(url_for('job_detail', job_id=job_id))
 
 @app.route('/docs/<int:doc_id>/view')
@@ -746,8 +754,6 @@ def delete_doc(doc_id):
     db.execute("DELETE FROM documents WHERE id=?", (doc_id,))
     db.commit()
     flash('File deleted.', 'success')
-    if session.get('role') == 'field':
-        return redirect(url_for('field'))
     return redirect(url_for('job_detail', job_id=job_id))
 
 
