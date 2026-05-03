@@ -37,6 +37,8 @@
         {% if current_user.role == 'field' %}
         <li><a href="{{ url_for('field') }}" class="{{ 'active' if request.endpoint == 'field' }}">
             <span class="nav-label">My Projects</span></a></li>
+        <li><a href="{{ url_for('schedule') }}" class="{{ 'active' if request.endpoint == 'schedule' }}">
+            <span class="nav-label">Schedule <span class="nav-badge">Coming Soon</span></span></a></li>
         <li><a href="{{ url_for('forms_list') }}" class="{{ 'active' if request.endpoint == 'forms_list' }}">
             <span class="nav-label">Forms</span></a></li>
         {% else %}
@@ -52,6 +54,8 @@
             <span class="nav-label">Pricing</span></a></li>
         <li><a href="{{ url_for('hip_calc') }}" class="{{ 'active' if request.endpoint == 'hip_calc' }}">
             <span class="nav-label">Hip Calc</span></a></li>
+        <li><a href="{{ url_for('schedule') }}" class="{{ 'active' if request.endpoint == 'schedule' }}">
+            <span class="nav-label">Schedule <span class="nav-badge">Coming Soon</span></span></a></li>
         {% if current_user.role == 'admin' %}
         <li><a href="{{ url_for('admin_users') }}" class="{{ 'active' if request.endpoint == 'admin_users' }}">
             <span class="nav-label">Users</span></a></li>

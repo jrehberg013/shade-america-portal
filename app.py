@@ -760,6 +760,11 @@ def delete_doc(doc_id):
 def field_home():
     return render_template('field_home.html')
 
+@app.route('/schedule')
+@login_required
+def schedule():
+    return render_template('schedule.html')
+
 @app.route('/field')
 @login_required
 def field():
