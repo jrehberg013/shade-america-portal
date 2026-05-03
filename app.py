@@ -308,12 +308,17 @@ def init_db():
         db = _DB(conn)
 
     # ── Migrations: add address columns to jobs (idempotent) ──
+    # PostgreSQL fails the whole transaction on a failed ALTER, so we have to
+    # rollback after each failure or subsequent statements blow up.
     for col_def in ['street_address TEXT', 'city TEXT', 'state TEXT', 'zip_code TEXT']:
         try:
             db.execute(f'ALTER TABLE jobs ADD COLUMN {col_def}')
             db.commit()
         except Exception:
-            pass  # column already exists
+            try:
+                db._conn.rollback()
+            except Exception:
+                pass
 
     # Seed users
     users = [
