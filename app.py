@@ -212,6 +212,36 @@ def init_db():
                 forecast_json TEXT,
                 cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )""",
+            """CREATE TABLE IF NOT EXISTS schedule_jobs (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                address TEXT,
+                notes TEXT,
+                color TEXT DEFAULT 'yellow',
+                trello_url TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS schedule_slots (
+                id SERIAL PRIMARY KEY,
+                job_id INTEGER NOT NULL,
+                crew TEXT NOT NULL,
+                slot_date DATE,
+                is_holding INTEGER DEFAULT 1,
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS schedule_archive (
+                id SERIAL PRIMARY KEY,
+                slot_date DATE,
+                crew TEXT,
+                job_name TEXT,
+                job_address TEXT,
+                job_notes TEXT,
+                color TEXT,
+                archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                archived_by INTEGER
+            )""",
         ]
         for stmt in statements:
             cur.execute(stmt)
@@ -302,6 +332,36 @@ def init_db():
                 cache_key TEXT PRIMARY KEY,
                 forecast_json TEXT,
                 cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS schedule_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                address TEXT,
+                notes TEXT,
+                color TEXT DEFAULT 'yellow',
+                trello_url TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS schedule_slots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id INTEGER NOT NULL,
+                crew TEXT NOT NULL,
+                slot_date DATE,
+                is_holding INTEGER DEFAULT 1,
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS schedule_archive (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                slot_date DATE,
+                crew TEXT,
+                job_name TEXT,
+                job_address TEXT,
+                job_notes TEXT,
+                color TEXT,
+                archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                archived_by INTEGER
             );
         """)
         conn.commit()
@@ -1121,6 +1181,21 @@ def api_weather(job_id):
     return jsonify(forecast)
 
 
+@app.route('/api/weather/address')
+@login_required
+def api_weather_by_address():
+    address = request.args.get('addr', '').strip()
+    if not address:
+        return jsonify({})
+    coords = _geocode(address)
+    if not coords:
+        return jsonify({})
+    forecast = _get_forecast(coords[0], coords[1])
+    if not forecast:
+        return jsonify({})
+    return jsonify(forecast)
+
+
 # ─────────────────────────────────────────────────────────────
 # FIELD VIEW
 # ─────────────────────────────────────────────────────────────
@@ -1146,7 +1221,316 @@ def field_home():
 @app.route('/schedule')
 @login_required
 def schedule():
-    return render_template('schedule.html')
+    db = get_db()
+    role = session.get('role', 'field')
+
+    # Load all schedule jobs and their slots
+    jobs = db.execute('SELECT * FROM schedule_jobs ORDER BY updated_at DESC').fetchall()
+    slots = db.execute('SELECT * FROM schedule_slots ORDER BY slot_date ASC, sort_order ASC').fetchall()
+
+    # Build slot map: date -> crew -> [jobs]
+    from collections import defaultdict
+    import datetime as _dt
+
+    holding = []  # jobs in holding (no scheduled date or is_holding=1)
+    dated = defaultdict(lambda: defaultdict(list))  # date -> crew -> jobs
+
+    job_map = {j['id']: j for j in jobs}
+
+    for slot in slots:
+        job = job_map.get(slot['job_id'])
+        if not job:
+            continue
+        entry = {
+            'slot_id': slot['id'],
+            'job_id': job['id'],
+            'name': job['name'],
+            'address': job['address'] or '',
+            'notes': job['notes'] or '',
+            'color': job['color'] or 'yellow',
+            'crew': slot['crew'],
+            'slot_date': str(slot['slot_date']) if slot['slot_date'] else None,
+            'is_holding': slot['is_holding'],
+        }
+        if slot['is_holding'] or not slot['slot_date']:
+            if not any(h['slot_id'] == entry['slot_id'] for h in holding):
+                holding.append(entry)
+        else:
+            dated[str(slot['slot_date'])][slot['crew']].append(entry)
+
+    # Get unique sorted dates
+    dates = sorted(dated.keys())
+
+    # Archive
+    archive = db.execute(
+        'SELECT * FROM schedule_archive ORDER BY slot_date DESC, archived_at DESC LIMIT 100'
+    ).fetchall() if role == 'admin' else []
+
+    db.close()
+
+    crews = ['Josh & Crew', 'Justin & Crew', 'LR & Crew']
+
+    return render_template('schedule.html',
+        role=role,
+        holding=holding,
+        dated=dated,
+        dates=dates,
+        crews=crews,
+        archive=archive,
+    )
+
+
+@app.route('/api/schedule/job', methods=['POST'])
+@admin_required
+def schedule_add_job():
+    data = request.get_json(force=True) or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name required'}), 400
+    db = get_db()
+    if USE_PG:
+        db.execute(
+            'INSERT INTO schedule_jobs (name, address, notes, color, trello_url) VALUES (%s,%s,%s,%s,%s)',
+            (name, data.get('address',''), data.get('notes',''), data.get('color','yellow'), data.get('trello_url',''))
+        )
+        db.commit()
+        job = db.execute('SELECT * FROM schedule_jobs WHERE name=%s ORDER BY id DESC LIMIT 1', (name,)).fetchone()
+    else:
+        db.execute(
+            'INSERT INTO schedule_jobs (name, address, notes, color, trello_url) VALUES (?,?,?,?,?)',
+            (name, data.get('address',''), data.get('notes',''), data.get('color','yellow'), data.get('trello_url',''))
+        )
+        db.commit()
+        job = db.execute('SELECT * FROM schedule_jobs ORDER BY id DESC LIMIT 1').fetchone()
+
+    # Add to holding for each crew? No — add one holding slot with no crew
+    if USE_PG:
+        db.execute(
+            'INSERT INTO schedule_slots (job_id, crew, is_holding) VALUES (%s,%s,%s)',
+            (job['id'], 'holding', 1)
+        )
+    else:
+        db.execute(
+            'INSERT INTO schedule_slots (job_id, crew, is_holding) VALUES (?,?,?)',
+            (job['id'], 'holding', 1)
+        )
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'id': job['id']})
+
+
+@app.route('/api/schedule/job/<int:job_id>', methods=['PUT'])
+@admin_required
+def schedule_update_job(job_id):
+    data = request.get_json(force=True) or {}
+    db = get_db()
+    if USE_PG:
+        db.execute(
+            'UPDATE schedule_jobs SET name=%s, address=%s, notes=%s, color=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s',
+            (data.get('name',''), data.get('address',''), data.get('notes',''), data.get('color','yellow'), job_id)
+        )
+    else:
+        db.execute(
+            'UPDATE schedule_jobs SET name=?, address=?, notes=?, color=?, updated_at=CURRENT_TIMESTAMP WHERE id=?',
+            (data.get('name',''), data.get('address',''), data.get('notes',''), data.get('color','yellow'), job_id)
+        )
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/schedule/slot', methods=['POST'])
+@admin_required
+def schedule_add_slot():
+    data = request.get_json(force=True) or {}
+    job_id = data.get('job_id')
+    crew = data.get('crew', '')
+    slot_date = data.get('slot_date')
+    is_holding = 1 if not slot_date else 0
+    db = get_db()
+    if USE_PG:
+        db.execute(
+            'INSERT INTO schedule_slots (job_id, crew, slot_date, is_holding) VALUES (%s,%s,%s,%s)',
+            (job_id, crew, slot_date or None, is_holding)
+        )
+    else:
+        db.execute(
+            'INSERT INTO schedule_slots (job_id, crew, slot_date, is_holding) VALUES (?,?,?,?)',
+            (job_id, crew, slot_date or None, is_holding)
+        )
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/schedule/slot/<int:slot_id>', methods=['PUT'])
+@admin_required
+def schedule_update_slot(slot_id):
+    data = request.get_json(force=True) or {}
+    crew = data.get('crew')
+    slot_date = data.get('slot_date')
+    is_holding = 1 if not slot_date else 0
+    db = get_db()
+    if USE_PG:
+        db.execute(
+            'UPDATE schedule_slots SET crew=%s, slot_date=%s, is_holding=%s WHERE id=%s',
+            (crew, slot_date or None, is_holding, slot_id)
+        )
+    else:
+        db.execute(
+            'UPDATE schedule_slots SET crew=?, slot_date=?, is_holding=? WHERE id=?',
+            (crew, slot_date or None, is_holding, slot_id)
+        )
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/schedule/slot/<int:slot_id>', methods=['DELETE'])
+@admin_required
+def schedule_delete_slot(slot_id):
+    db = get_db()
+    db.execute('DELETE FROM schedule_slots WHERE id=?', (slot_id,)) if not USE_PG else db.execute('DELETE FROM schedule_slots WHERE id=%s', (slot_id,))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/schedule/job/<int:job_id>', methods=['DELETE'])
+@admin_required
+def schedule_delete_job(job_id):
+    db = get_db()
+    db.execute('DELETE FROM schedule_slots WHERE job_id=?', (job_id,)) if not USE_PG else db.execute('DELETE FROM schedule_slots WHERE job_id=%s', (job_id,))
+    db.execute('DELETE FROM schedule_jobs WHERE id=?', (job_id,)) if not USE_PG else db.execute('DELETE FROM schedule_jobs WHERE id=%s', (job_id,))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/schedule/archive-date', methods=['POST'])
+@admin_required
+def schedule_archive_date():
+    data = request.get_json(force=True) or {}
+    slot_date = data.get('slot_date')
+    db = get_db()
+    ph = '%s' if USE_PG else '?'
+    slots = db.execute(f'SELECT * FROM schedule_slots WHERE slot_date={ph} AND is_holding=0', (slot_date,)).fetchall()
+    for slot in slots:
+        job = db.execute(f'SELECT * FROM schedule_jobs WHERE id={ph}', (slot['job_id'],)).fetchone()
+        if not job:
+            continue
+        db.execute(
+            f'INSERT INTO schedule_archive (slot_date, crew, job_name, job_address, job_notes, color, archived_by) VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph})',
+            (slot_date, slot['crew'], job['name'], job['address'], job['notes'], job['color'], session['user_id'])
+        )
+        db.execute(f'DELETE FROM schedule_slots WHERE id={ph}', (slot['id'],))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/schedule/archive', methods=['GET'])
+@admin_required
+def schedule_archive():
+    db = get_db()
+    rows = db.execute('SELECT * FROM schedule_archive ORDER BY slot_date DESC, archived_at DESC LIMIT 200').fetchall()
+    db.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/api/schedule/trello-sync', methods=['POST'])
+@admin_required
+def schedule_trello_sync():
+    """Pull cards from Trello Installation list into schedule holding area."""
+    import re as _re
+    api_key = os.environ.get('TRELLO_API_KEY', '')
+    token   = os.environ.get('TRELLO_TOKEN', '')
+    if not api_key or not token:
+        return jsonify({'error': 'Trello not configured'}), 400
+    auth = f'key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}'
+
+    try:
+        boards_url = f'https://api.trello.com/1/members/me/boards?{auth}&fields=name,id&filter=open'
+        with urllib.request.urlopen(boards_url, timeout=10) as r:
+            boards = json.loads(r.read())
+
+        installation_list_id = None
+        board_id = None
+        for board in boards:
+            if board['name'] in ['Shade America', 'Installation']:
+                lists_url = f'https://api.trello.com/1/boards/{board["id"]}/lists?{auth}&filter=open&fields=name,id'
+                with urllib.request.urlopen(lists_url, timeout=10) as r:
+                    lists = json.loads(r.read())
+                for lst in lists:
+                    if 'installation' in lst['name'].lower():
+                        installation_list_id = lst['id']
+                        board_id = board['id']
+                        break
+            if installation_list_id:
+                break
+
+        if not installation_list_id:
+            return jsonify({'error': 'Installation list not found'}), 404
+
+        cards_url = f'https://api.trello.com/1/lists/{installation_list_id}/cards?{auth}&fields=name,desc,url,idShort'
+        with urllib.request.urlopen(cards_url, timeout=10) as r:
+            cards = json.loads(r.read())
+
+        # Get address custom field id
+        cf_def_url = f'https://api.trello.com/1/boards/{board_id}/customFields?{auth}'
+        with urllib.request.urlopen(cf_def_url, timeout=10) as r:
+            cf_defs = json.loads(r.read())
+        address_field_id = None
+        for cf in cf_defs:
+            if 'address' in cf['name'].lower():
+                address_field_id = cf['id']
+                break
+
+        db = get_db()
+        added = 0
+        for card in cards:
+            card_name = card.get('name', '').strip()
+            card_url  = card.get('url', '')
+            short_link = _re.search(r'trello\.com/c/([^/]+)', card_url)
+            short_link = short_link.group(1) if short_link else ''
+            address = ''
+
+            if address_field_id and short_link:
+                try:
+                    cf_val_url = f'https://api.trello.com/1/cards/{short_link}/customFieldItems?{auth}'
+                    with urllib.request.urlopen(cf_val_url, timeout=10) as r:
+                        cf_items = json.loads(r.read())
+                    for item in cf_items:
+                        if item.get('idCustomField') == address_field_id:
+                            address = (item.get('value') or {}).get('text', '')
+                            break
+                except Exception:
+                    pass
+
+            # Check if already in schedule
+            existing = db.execute(
+                f'SELECT id FROM schedule_jobs WHERE trello_url={ph}', (card_url,)
+            ).fetchone()
+            if existing:
+                continue
+
+            db.execute(
+                f'INSERT INTO schedule_jobs (name, address, notes, color, trello_url) VALUES ({ph},{ph},{ph},{ph},{ph})',
+                (card_name, address, card.get('desc', ''), 'yellow', card_url)
+            )
+            db.commit()
+            job = db.execute('SELECT id FROM schedule_jobs WHERE trello_url={ph} ORDER BY id DESC LIMIT 1'.format(ph=ph), (card_url,)).fetchone()
+            db.execute(
+                f'INSERT INTO schedule_slots (job_id, crew, is_holding) VALUES ({ph},{ph},{ph})',
+                (job['id'], 'holding', 1)
+            )
+            db.commit()
+            added += 1
+
+        db.close()
+        return jsonify({'ok': True, 'added': added})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/field')
 @login_required
@@ -2359,20 +2743,21 @@ def trello_list_names():
 @app.route('/field-preview')
 @admin_required
 def field_preview():
-    db = get_db()
-    field_requests = _fetch_announcements(db, category='field_request', limit=5)
-    news = _fetch_announcements(db, category='news', limit=5)
-    active_count = db.execute(
-        "SELECT COUNT(*) AS c FROM jobs WHERE status='installation'"
-    ).fetchone()['c']
-    now = _dt_module.datetime.now()
-    today_str = now.strftime('%A, %B ') + str(now.day)
-    return render_template('field_home.html',
-                           greeting=_greeting_for_now(),
-                           today_str=today_str,
-                           active_count=active_count,
-                           field_requests=field_requests,
-                           news=news)
+    """Enter field view mode — temporarily sets session role to field."""
+    session['_real_role'] = session['role']
+    session['role'] = 'field'
+    session.modified = True
+    return redirect(url_for('field_home'))
+
+
+@app.route('/field-preview/exit')
+@login_required
+def field_preview_exit():
+    """Exit field view mode — restore original admin role."""
+    real_role = session.pop('_real_role', 'admin')
+    session['role'] = real_role
+    session.modified = True
+    return redirect(url_for('dashboard'))
 
 
 # ─────────────────────────────────────────────────────────────
