@@ -2746,6 +2746,7 @@ def field_preview():
     """Enter field view mode — temporarily sets session role to field."""
     session['_real_role'] = session['role']
     session['role'] = 'field'
+    session.modified = True
     return redirect(url_for('field_home'))
 
 
@@ -2755,6 +2756,7 @@ def field_preview_exit():
     """Exit field view mode — restore original admin role."""
     real_role = session.pop('_real_role', 'admin')
     session['role'] = real_role
+    session.modified = True
     return redirect(url_for('dashboard'))
 
 
