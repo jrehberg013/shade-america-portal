@@ -3,32 +3,549 @@
 {% block page_title %}Schedule{% endblock %}
 
 {% block content %}
-<div style="max-width:520px;margin:3rem auto;padding:2rem 1.5rem;text-align:center">
+{% set is_admin = current_user.role in ['admin', 'manager'] %}
 
-  <div style="font-size:3rem;margin-bottom:1rem">🗓️</div>
+<style>
+.sched-wrap { display: flex; flex-direction: column; gap: 1rem; }
 
-  <h2 style="margin-bottom:.5rem;color:var(--text)">Schedule — Coming Soon</h2>
+/* ── Toolbar ── */
+.sched-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
+.sched-toolbar-left { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.sched-btn { padding: 6px 14px; border-radius: 7px; border: 1px solid var(--border, #ddd); background: var(--card-bg, #fff); color: var(--text, #222); font-size: .82rem; cursor: pointer; font-weight: 500; }
+.sched-btn-green { background: #3B6D11; color: #fff; border-color: #3B6D11; }
+.sched-btn-blue  { background: #185FA5; color: #fff; border-color: #185FA5; }
+.sched-btn-sm    { padding: 4px 10px; font-size: .78rem; }
 
-  <p style="color:var(--muted);font-size:1rem;line-height:1.6;margin-bottom:1.5rem">
-    The team schedule will live here. You'll be able to see upcoming installs by crew,
-    with weather forecasts for each job site.
-  </p>
+/* ── Holding area ── */
+.holding-section { background: #FAEEDA; border-radius: 10px; border: 1px solid #EF9F27; padding: 1rem; }
+.holding-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #854F0B; margin-bottom: .6rem; display: flex; align-items: center; justify-content: space-between; }
+.holding-jobs { display: flex; flex-wrap: wrap; gap: .5rem; }
 
-  <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:1.25rem;text-align:left">
-    <div style="font-weight:600;color:var(--text);margin-bottom:.5rem">What's planned:</div>
-    <ul style="color:var(--muted);font-size:.92rem;line-height:1.7;padding-left:1.25rem;margin:0">
-      <li>Today and this week's jobs at a glance</li>
-      <li>Filter by your crew</li>
-      <li>Tap a scheduled job to open the project</li>
-      <li>Weather forecast for each job's location</li>
-      <li>Time-off tracker</li>
-    </ul>
+/* ── Schedule grid ── */
+.sched-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.sched-table { width: 100%; border-collapse: collapse; font-size: .82rem; table-layout: fixed; min-width: 600px; }
+.sched-table th { background: var(--card-bg, #f5f7fa); padding: 8px 10px; text-align: left; font-size: .75rem; font-weight: 600; color: var(--muted, #888); border: 1px solid var(--border, #e8eaed); }
+.sched-table td { border: 1px solid var(--border, #e8eaed); vertical-align: top; padding: 0; }
+.date-cell { padding: 8px 10px; background: var(--card-bg, #f5f7fa); font-weight: 600; font-size: .78rem; color: var(--muted, #888); white-space: nowrap; width: 88px; }
+.job-cell  { padding: 6px 8px; min-height: 64px; background: var(--card-bg, #fff); }
+.arc-cell  { width: 36px; text-align: center; vertical-align: middle; background: var(--card-bg, #f5f7fa); }
+
+/* ── Job cards ── */
+.job-card { border-radius: 7px; padding: 6px 9px; margin-bottom: 5px; font-size: .8rem; cursor: pointer; border-left: 3px solid transparent; transition: box-shadow .15s; }
+.job-card:hover { box-shadow: 0 1px 6px rgba(0,0,0,.1); }
+.job-card.yellow { background: #FAEEDA; color: #633806; border-left-color: #BA7517; }
+.job-card.blue   { background: #E6F1FB; color: #042C53; border-left-color: #185FA5; }
+.job-card.green  { background: #EAF3DE; color: #173404; border-left-color: #3B6D11; }
+.job-card.pink   { background: #FBEAF0; color: #4B1528; border-left-color: #993556; }
+.job-card.gray   { background: #F1EFE8; color: #2C2C2A; border-left-color: #888780; }
+.job-name  { font-weight: 600; margin-bottom: 1px; font-size: .8rem; }
+.job-addr  { font-size: .72rem; opacity: .75; margin-bottom: 1px; }
+.job-notes { font-size: .72rem; opacity: .8; }
+
+/* ── Expanded card (admin edit) ── */
+.job-expanded { display: none; margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(0,0,0,.12); }
+.job-card.active .job-expanded { display: block; }
+.job-expanded .field-lbl { font-size: .7rem; opacity: .7; margin-bottom: 2px; font-weight: 600; }
+.job-expanded input, .job-expanded textarea, .job-expanded select {
+    width: 100%; font-size: .78rem; margin-bottom: 5px; padding: 4px 7px;
+    border-radius: 5px; border: 1px solid rgba(0,0,0,.2);
+    background: rgba(255,255,255,.75); color: inherit;
+}
+.job-expanded textarea { height: 52px; resize: none; }
+.job-actions { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.action-btn { font-size: .72rem; padding: 3px 9px; border-radius: 5px; border: 1px solid rgba(0,0,0,.15); cursor: pointer; background: rgba(255,255,255,.65); color: inherit; }
+.action-btn.red { color: #A32D2D; }
+
+/* ── Field read-only expanded (weather) ── */
+.field-expanded { display: none; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,.1); }
+.job-card.active .field-expanded { display: block; }
+.weather-loading { font-size: .72rem; opacity: .7; }
+.weather-7day { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.wx-day { text-align: center; font-size: .68rem; min-width: 38px; }
+.wx-icon { font-size: 1.1rem; }
+.wx-label { opacity: .7; margin-bottom: 1px; }
+.wx-temps { font-weight: 600; }
+
+/* ── Color dots ── */
+.color-row { display: flex; gap: 6px; margin-bottom: 5px; }
+.cdot { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; flex-shrink: 0; }
+.cdot.sel { border-color: rgba(0,0,0,.6); transform: scale(1.2); }
+
+/* ── Archive icon btn ── */
+.arc-btn { background: none; border: none; cursor: pointer; color: var(--muted, #aaa); font-size: 1rem; padding: 4px; border-radius: 5px; }
+.arc-btn:hover { background: #fdecea; color: #A32D2D; }
+
+/* ── Add date row ── */
+.add-date-row { display: flex; align-items: center; gap: .5rem; margin-top: .75rem; }
+
+/* ── Modal ── */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal { background: var(--card-bg, #fff); border-radius: 12px; border: 1px solid var(--border, #ddd); padding: 1.25rem; width: 320px; max-width: 95vw; }
+.modal h3 { font-size: .95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text, #222); }
+.modal label { font-size: .78rem; color: var(--muted, #888); display: block; margin-bottom: 3px; font-weight: 600; }
+.modal input, .modal textarea, .modal select { width: 100%; margin-bottom: .7rem; font-size: .85rem; }
+.modal textarea { height: 70px; resize: none; }
+.modal-btns { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .25rem; }
+
+/* ── Archive panel ── */
+.archive-panel { display: none; }
+.archive-panel.open { display: block; }
+.archive-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.archive-table th { background: var(--card-bg,#f5f7fa); padding: 7px 10px; text-align: left; font-size: .72rem; color: var(--muted,#888); border-bottom: 1px solid var(--border,#eee); }
+.archive-table td { padding: 7px 10px; border-bottom: 1px solid var(--border,#f0f0f0); vertical-align: top; }
+</style>
+
+<div class="sched-wrap">
+
+{# ─── ADMIN VIEW ─── #}
+{% if is_admin %}
+
+<div class="sched-toolbar">
+  <div class="sched-toolbar-left">
+    <button class="sched-btn sched-btn-green" onclick="openModal('addJobModal')">+ Add job</button>
+    <button class="sched-btn sched-btn-blue" onclick="trelloSync(this)">↻ Sync from Trello</button>
+    <button class="sched-btn" onclick="toggleArchive()">📁 Archive</button>
   </div>
-
-  <div style="margin-top:2rem">
-    <a href="{{ url_for('field_home') if current_user.role == 'field' else url_for('dashboard') }}"
-       class="btn btn-outline">← Back</a>
-  </div>
-
 </div>
+
+{# ── Holding Area ── #}
+<div class="holding-section">
+  <div class="holding-label">
+    <span>📌 Holding area</span>
+    <span style="font-size:.7rem;opacity:.7;font-weight:400">Tap a job to edit</span>
+  </div>
+  <div class="holding-jobs" id="holdingJobs">
+    {% for item in holding %}
+    <div class="job-card {{ item.color }}" style="min-width:160px;flex:1;max-width:260px"
+         onclick="toggleCard(this)"
+         data-slot-id="{{ item.slot_id }}"
+         data-job-id="{{ item.job_id }}"
+         data-name="{{ item.name|e }}"
+         data-address="{{ item.address|e }}"
+         data-notes="{{ item.notes|e }}"
+         data-color="{{ item.color }}">
+      <div class="job-name">{{ item.name }}</div>
+      {% if item.address %}<div class="job-addr">{{ item.address }}</div>{% endif %}
+      {% if item.notes %}<div class="job-notes">{{ item.notes[:60] }}{% if item.notes|length > 60 %}…{% endif %}</div>{% endif %}
+      <div class="job-expanded">
+        <div class="field-lbl">Job name</div>
+        <input type="text" class="ef-name" value="{{ item.name|e }}" onclick="event.stopPropagation()">
+        <div class="field-lbl">Address</div>
+        <input type="text" class="ef-address" value="{{ item.address|e }}" onclick="event.stopPropagation()">
+        <div class="field-lbl">Notes</div>
+        <textarea class="ef-notes" onclick="event.stopPropagation()">{{ item.notes|e }}</textarea>
+        <div class="field-lbl">Color</div>
+        <div class="color-row" onclick="event.stopPropagation()">
+          <div class="cdot {{ 'sel' if item.color=='yellow' }}" style="background:#FAEEDA;border-color:#BA7517" data-color="yellow" onclick="pickColor(this)"></div>
+          <div class="cdot {{ 'sel' if item.color=='blue' }}" style="background:#E6F1FB;border-color:#185FA5" data-color="blue" onclick="pickColor(this)"></div>
+          <div class="cdot {{ 'sel' if item.color=='green' }}" style="background:#EAF3DE;border-color:#3B6D11" data-color="green" onclick="pickColor(this)"></div>
+          <div class="cdot {{ 'sel' if item.color=='pink' }}" style="background:#FBEAF0;border-color:#993556" data-color="pink" onclick="pickColor(this)"></div>
+          <div class="cdot {{ 'sel' if item.color=='gray' }}" style="background:#F1EFE8;border-color:#888780" data-color="gray" onclick="pickColor(this)"></div>
+        </div>
+        <div class="field-lbl">Copy to date & crew</div>
+        <input type="date" class="ef-copy-date" onclick="event.stopPropagation()">
+        <select class="ef-copy-crew" onclick="event.stopPropagation()">
+          <option value="">Select crew…</option>
+          <option>Josh & Crew</option>
+          <option>Justin & Crew</option>
+          <option>LR & Crew</option>
+        </select>
+        <div class="job-actions">
+          <button class="action-btn" onclick="event.stopPropagation();copyToDate(this)">Copy to date</button>
+          <button class="action-btn" onclick="event.stopPropagation();saveJob(this)">Save</button>
+          <button class="action-btn red" onclick="event.stopPropagation();removeSlot(this)">Remove</button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% if not holding %}
+    <div style="font-size:.82rem;opacity:.6;padding:.25rem">No jobs in holding. Add a job or sync from Trello.</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Schedule Grid ── #}
+<div class="sched-table-wrap">
+<table class="sched-table">
+  <thead>
+    <tr>
+      <th style="width:88px">Date</th>
+      <th>Josh & Crew</th>
+      <th>Justin & Crew</th>
+      <th>LR & Crew</th>
+      <th style="width:36px"></th>
+    </tr>
+  </thead>
+  <tbody id="schedBody">
+  {% for d in dates %}
+  {% set day_jobs = dated[d] %}
+  <tr data-date="{{ d }}">
+    <td class="date-cell">
+      {{ d | replace('-','/')|string }}
+    </td>
+    {% for crew in crews %}
+    <td class="job-cell" data-crew="{{ crew }}">
+      {% for item in day_jobs.get(crew, []) %}
+      <div class="job-card {{ item.color }}"
+           onclick="toggleCard(this)"
+           data-slot-id="{{ item.slot_id }}"
+           data-job-id="{{ item.job_id }}"
+           data-name="{{ item.name|e }}"
+           data-address="{{ item.address|e }}"
+           data-notes="{{ item.notes|e }}"
+           data-color="{{ item.color }}">
+        <div class="job-name">{{ item.name }}</div>
+        {% if item.address %}<div class="job-addr">{{ item.address }}</div>{% endif %}
+        {% if item.notes %}<div class="job-notes">{{ item.notes[:60] }}{% if item.notes|length > 60 %}…{% endif %}</div>{% endif %}
+        <div class="job-expanded">
+          <div class="field-lbl">Job name</div>
+          <input type="text" class="ef-name" value="{{ item.name|e }}" onclick="event.stopPropagation()">
+          <div class="field-lbl">Address</div>
+          <input type="text" class="ef-address" value="{{ item.address|e }}" onclick="event.stopPropagation()">
+          <div class="field-lbl">Notes</div>
+          <textarea class="ef-notes" onclick="event.stopPropagation()">{{ item.notes|e }}</textarea>
+          <div class="field-lbl">Color</div>
+          <div class="color-row" onclick="event.stopPropagation()">
+            <div class="cdot {{ 'sel' if item.color=='yellow' }}" style="background:#FAEEDA;border-color:#BA7517" data-color="yellow" onclick="pickColor(this)"></div>
+            <div class="cdot {{ 'sel' if item.color=='blue' }}" style="background:#E6F1FB;border-color:#185FA5" data-color="blue" onclick="pickColor(this)"></div>
+            <div class="cdot {{ 'sel' if item.color=='green' }}" style="background:#EAF3DE;border-color:#3B6D11" data-color="green" onclick="pickColor(this)"></div>
+            <div class="cdot {{ 'sel' if item.color=='pink' }}" style="background:#FBEAF0;border-color:#993556" data-color="pink" onclick="pickColor(this)"></div>
+            <div class="cdot {{ 'sel' if item.color=='gray' }}" style="background:#F1EFE8;border-color:#888780" data-color="gray" onclick="pickColor(this)"></div>
+          </div>
+          <div class="field-lbl">Copy to another date & crew</div>
+          <input type="date" class="ef-copy-date" onclick="event.stopPropagation()">
+          <select class="ef-copy-crew" onclick="event.stopPropagation()">
+            <option value="">Select crew…</option>
+            <option>Josh & Crew</option>
+            <option>Justin & Crew</option>
+            <option>LR & Crew</option>
+          </select>
+          <div class="job-actions">
+            <button class="action-btn" onclick="event.stopPropagation();copyToDate(this)">Copy to date</button>
+            <button class="action-btn" onclick="event.stopPropagation();saveJob(this)">Save</button>
+            <button class="action-btn red" onclick="event.stopPropagation();removeSlot(this)">Remove</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </td>
+    {% endfor %}
+    <td class="arc-cell">
+      <button class="arc-btn" title="Archive this date row" onclick="archiveDate('{{ d }}', this)">🗄</button>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="add-date-row">
+  <button class="sched-btn sched-btn-sm" onclick="openModal('addDateModal')">+ Add date row</button>
+  <span style="font-size:.75rem;color:var(--muted,#aaa)">Archive a row to remove it from the schedule and save it for reference</span>
+</div>
+
+{# ── Archive Panel ── #}
+<div class="archive-panel" id="archivePanel">
+  <h3 style="font-size:.88rem;font-weight:600;margin-bottom:.75rem">📁 Archived rows</h3>
+  <div class="sched-table-wrap">
+  <table class="archive-table">
+    <thead><tr><th>Date</th><th>Crew</th><th>Job</th><th>Address</th><th>Notes</th></tr></thead>
+    <tbody>
+    {% for row in archive %}
+    <tr>
+      <td>{{ row.slot_date }}</td>
+      <td>{{ row.crew }}</td>
+      <td>{{ row.job_name }}</td>
+      <td>{{ row.job_address or '' }}</td>
+      <td>{{ row.job_notes or '' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" style="text-align:center;opacity:.5;padding:1rem">No archived rows yet</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{# ─── FIELD VIEW ─── #}
+{% else %}
+
+<p style="font-size:.85rem;color:var(--muted,#888);margin-bottom:.5rem">Tap a job to see weather forecast.</p>
+
+{# Holding #}
+{% if holding %}
+<div style="margin-bottom:1rem">
+  <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#aaa);margin-bottom:.5rem">Upcoming</div>
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+    {% for item in holding %}
+    <div class="job-card {{ item.color }}" style="min-width:180px;flex:1;max-width:300px"
+         onclick="toggleFieldCard(this,'{{ item.address|e }}')"
+         data-address="{{ item.address|e }}">
+      <div class="job-name">{{ item.name }}</div>
+      {% if item.address %}<div class="job-addr">📍 {{ item.address }}</div>{% endif %}
+      {% if item.notes %}<div class="job-notes">{{ item.notes }}</div>{% endif %}
+      <div class="field-expanded">
+        <div class="weather-loading">Loading weather…</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% for d in dates %}
+{% set day_jobs = dated[d] %}
+<div style="margin-bottom:1rem">
+  <div style="font-size:.78rem;font-weight:700;color:var(--muted,#888);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem">{{ d }}</div>
+  {% for crew in crews %}
+  {% if day_jobs.get(crew) %}
+  <div style="font-size:.72rem;font-weight:600;color:var(--muted,#aaa);margin:.3rem 0 .2rem">{{ crew }}</div>
+  {% for item in day_jobs[crew] %}
+  <div class="job-card {{ item.color }}" style="margin-bottom:5px"
+       onclick="toggleFieldCard(this,'{{ item.address|e }}')"
+       data-address="{{ item.address|e }}">
+    <div class="job-name">{{ item.name }}</div>
+    {% if item.address %}<div class="job-addr">📍 {{ item.address }}</div>{% endif %}
+    {% if item.notes %}<div class="job-notes">{{ item.notes }}</div>{% endif %}
+    <div class="field-expanded">
+      <div class="weather-loading">Loading weather…</div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+  {% endfor %}
+</div>
+{% else %}
+{% if not holding %}
+<div style="text-align:center;padding:2rem;color:var(--muted,#aaa)">No schedule posted yet.</div>
+{% endif %}
+{% endfor %}
+
+{% endif %}
+
+</div>{# end sched-wrap #}
+
+{# ── Modals (admin only) ── #}
+{% if is_admin %}
+<div class="modal-bg" id="addJobModal" onclick="if(event.target===this)closeModal('addJobModal')">
+  <div class="modal">
+    <h3>Add job to holding area</h3>
+    <label>Job name *</label>
+    <input type="text" id="newJobName" placeholder="e.g. Smith – 123 Main St">
+    <label>Address</label>
+    <input type="text" id="newJobAddress" placeholder="Street, City, State">
+    <label>Notes</label>
+    <textarea id="newJobNotes" placeholder="Crew details, instructions…"></textarea>
+    <label>Color</label>
+    <div class="color-row" id="newJobColorRow">
+      <div class="cdot sel" style="background:#FAEEDA;border-color:#BA7517" data-color="yellow" onclick="pickColor(this)"></div>
+      <div class="cdot" style="background:#E6F1FB;border-color:#185FA5" data-color="blue" onclick="pickColor(this)"></div>
+      <div class="cdot" style="background:#EAF3DE;border-color:#3B6D11" data-color="green" onclick="pickColor(this)"></div>
+      <div class="cdot" style="background:#FBEAF0;border-color:#993556" data-color="pink" onclick="pickColor(this)"></div>
+      <div class="cdot" style="background:#F1EFE8;border-color:#888780" data-color="gray" onclick="pickColor(this)"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="sched-btn sched-btn-sm" onclick="closeModal('addJobModal')">Cancel</button>
+      <button class="sched-btn sched-btn-sm sched-btn-green" onclick="addJob()">Add to holding</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="addDateModal" onclick="if(event.target===this)closeModal('addDateModal')">
+  <div class="modal">
+    <h3>Add date row</h3>
+    <label>Date</label>
+    <input type="date" id="newDateVal">
+    <div class="modal-btns">
+      <button class="sched-btn sched-btn-sm" onclick="closeModal('addDateModal')">Cancel</button>
+      <button class="sched-btn sched-btn-sm sched-btn-green" onclick="addDateRow()">Add row</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+// ── Helpers ──
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function toggleArchive(){
+  document.getElementById('archivePanel').classList.toggle('open');
+}
+
+// ── Toggle admin card ──
+function toggleCard(card){
+  const was = card.classList.contains('active');
+  document.querySelectorAll('.job-card.active').forEach(c=>c.classList.remove('active'));
+  if(!was) card.classList.add('active');
+}
+
+// ── Color picker ──
+function pickColor(dot){
+  dot.closest('.color-row').querySelectorAll('.cdot').forEach(d=>d.classList.remove('sel'));
+  dot.classList.add('sel');
+  const card = dot.closest('.job-card');
+  if(card){
+    const colors = ['yellow','blue','green','pink','gray'];
+    colors.forEach(c=>card.classList.remove(c));
+    card.classList.add(dot.dataset.color);
+  }
+}
+
+// ── Save job ──
+async function saveJob(btn){
+  const card = btn.closest('.job-card');
+  const jobId = card.dataset.jobId;
+  const name = card.querySelector('.ef-name').value.trim();
+  const address = card.querySelector('.ef-address').value.trim();
+  const notes = card.querySelector('.ef-notes').value.trim();
+  const colorDot = card.querySelector('.cdot.sel');
+  const color = colorDot ? colorDot.dataset.color : 'yellow';
+  btn.textContent = 'Saving…';
+  await fetch(`/api/schedule/job/${jobId}`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, address, notes, color})
+  });
+  card.querySelector('.job-name').textContent = name;
+  const addrEl = card.querySelector('.job-addr');
+  if(addrEl) addrEl.textContent = address;
+  card.dataset.name = name; card.dataset.address = address; card.dataset.notes = notes; card.dataset.color = color;
+  btn.textContent = 'Save';
+  card.classList.remove('active');
+}
+
+// ── Copy to date ──
+async function copyToDate(btn){
+  const card = btn.closest('.job-card');
+  const jobId = card.dataset.jobId;
+  const dateVal = card.querySelector('.ef-copy-date').value;
+  const crew = card.querySelector('.ef-copy-crew').value;
+  if(!dateVal || !crew){ alert('Please pick a date and crew.'); return; }
+  btn.textContent = 'Copying…';
+  await fetch('/api/schedule/slot', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({job_id: jobId, slot_date: dateVal, crew: crew})
+  });
+  btn.textContent = 'Copied! ✓';
+  setTimeout(()=>{ btn.textContent='Copy to date'; location.reload(); }, 800);
+}
+
+// ── Remove slot ──
+async function removeSlot(btn){
+  if(!confirm('Remove this job from the schedule?')) return;
+  const card = btn.closest('.job-card');
+  const slotId = card.dataset.slotId;
+  await fetch(`/api/schedule/slot/${slotId}`, {method:'DELETE'});
+  card.remove();
+}
+
+// ── Add job ──
+async function addJob(){
+  const name = document.getElementById('newJobName').value.trim();
+  if(!name){ alert('Job name is required.'); return; }
+  const address = document.getElementById('newJobAddress').value.trim();
+  const notes = document.getElementById('newJobNotes').value.trim();
+  const colorDot = document.querySelector('#newJobColorRow .cdot.sel');
+  const color = colorDot ? colorDot.dataset.color : 'yellow';
+  await fetch('/api/schedule/job', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, address, notes, color})
+  });
+  closeModal('addJobModal');
+  location.reload();
+}
+
+// ── Add date row ──
+function addDateRow(){
+  const d = document.getElementById('newDateVal').value;
+  if(!d){ alert('Please pick a date.'); return; }
+  const tbody = document.getElementById('schedBody');
+  const existing = tbody.querySelector(`tr[data-date="${d}"]`);
+  if(existing){ closeModal('addDateModal'); return; }
+  const [y,m,day] = d.split('-');
+  const label = `${m}/${day}/${y}`;
+  const crews = ['Josh & Crew','Justin & Crew','LR & Crew'];
+  const tr = document.createElement('tr');
+  tr.dataset.date = d;
+  tr.innerHTML = `<td class="date-cell">${label}</td>` +
+    crews.map(c=>`<td class="job-cell" data-crew="${c}"></td>`).join('') +
+    `<td class="arc-cell"><button class="arc-btn" onclick="archiveDate('${d}',this)">🗄</button></td>`;
+  // Insert in date order
+  const rows = [...tbody.querySelectorAll('tr[data-date]')];
+  const after = rows.find(r=>r.dataset.date > d);
+  if(after) tbody.insertBefore(tr, after);
+  else tbody.appendChild(tr);
+  closeModal('addDateModal');
+}
+
+// ── Archive date row ──
+async function archiveDate(date, btn){
+  if(!confirm(`Archive all jobs for ${date}? They will be saved in the archive.`)) return;
+  btn.textContent = '…';
+  await fetch('/api/schedule/archive-date', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({slot_date: date})
+  });
+  const row = document.querySelector(`tr[data-date="${date}"]`);
+  if(row) row.remove();
+}
+
+// ── Trello sync ──
+async function trelloSync(btn){
+  btn.textContent = 'Syncing…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/schedule/trello-sync', {method:'POST'});
+    const data = await r.json();
+    if(data.ok){
+      btn.textContent = `✓ Added ${data.added}`;
+      setTimeout(()=>location.reload(), 800);
+    } else {
+      btn.textContent = data.error || 'Error';
+      btn.disabled = false;
+    }
+  } catch(e){
+    btn.textContent = 'Error';
+    btn.disabled = false;
+  }
+}
+
+// ── Field: tap card to show weather ──
+const _wxCache = {};
+async function toggleFieldCard(card, address){
+  const was = card.classList.contains('active');
+  document.querySelectorAll('.job-card.active').forEach(c=>c.classList.remove('active'));
+  if(was) return;
+  card.classList.add('active');
+  if(!address) return;
+  const expanded = card.querySelector('.field-expanded');
+  if(!expanded) return;
+  if(_wxCache[address]){
+    expanded.innerHTML = _wxCache[address];
+    return;
+  }
+  expanded.innerHTML = '<div class="weather-loading">Loading weather…</div>';
+  try {
+    const r = await fetch(`/api/weather/address?addr=${encodeURIComponent(address)}`);
+    const data = await r.json();
+    if(data && data.days && data.days.length){
+      let html = '<div class="weather-7day">';
+      data.days.slice(0,7).forEach(d=>{
+        html += `<div class="wx-day"><div class="wx-label">${d.label||''}</div><div class="wx-icon">${d.icon||'🌤'}</div><div class="wx-temps">${d.high!=null?d.high+'°':''}${d.low!=null?'/'+d.low+'°':''}</div></div>`;
+      });
+      html += '</div>';
+      _wxCache[address] = html;
+      expanded.innerHTML = html;
+    } else {
+      expanded.innerHTML = '<div class="weather-loading">Weather unavailable</div>';
+    }
+  } catch(e){
+    expanded.innerHTML = '<div class="weather-loading">Weather unavailable</div>';
+  }
+}
+</script>
 {% endblock %}
