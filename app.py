@@ -1187,7 +1187,21 @@ def api_weather_by_address():
     address = request.args.get('addr', '').strip()
     if not address:
         return jsonify({})
-    coords = _geocode(address)
+    # Try to extract city, state from full address for better geocoding
+    # e.g. "123 Main St, Venice, FL 34293" -> try "Venice, FL" first
+    query = address
+    parts = [p.strip() for p in address.split(',')]
+    if len(parts) >= 3:
+        # Last two parts are likely city and state/zip
+        city = parts[-2].strip()
+        state_zip = parts[-1].strip().split()[0] if parts[-1].strip() else ''
+        if city and state_zip:
+            query = f"{city}, {state_zip}"
+    elif len(parts) == 2:
+        query = address
+    coords = _geocode(query)
+    if not coords:
+        coords = _geocode(address)
     if not coords:
         return jsonify({})
     forecast = _get_forecast(coords[0], coords[1])
