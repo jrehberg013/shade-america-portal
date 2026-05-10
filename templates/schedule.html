@@ -152,6 +152,7 @@
           <option>LR & Crew</option>
         </select>
         <div class="job-actions">
+          <button class="action-btn" onclick="event.stopPropagation();moveToDate(this)">Move to date</button>
           <button class="action-btn" onclick="event.stopPropagation();copyToDate(this)">Copy to date</button>
           <button class="action-btn" onclick="event.stopPropagation();saveJob(this)">Save</button>
           <button class="action-btn red" onclick="event.stopPropagation();removeSlot(this)">Remove</button>
@@ -182,7 +183,7 @@
   {% set day_jobs = dated[d] %}
   <tr data-date="{{ d }}">
     <td class="date-cell">
-      {{ d | replace('-','/')|string }}
+      {% set dp = d.split("-") %}{{ dp[1] }}/{{ dp[2] }}
     </td>
     {% for crew in crews %}
     <td class="job-cell" data-crew="{{ crew }}">
@@ -297,7 +298,7 @@
 {% for d in dates %}
 {% set day_jobs = dated[d] %}
 <div style="margin-bottom:1rem">
-  <div style="font-size:.78rem;font-weight:700;color:var(--muted,#888);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem">{{ d }}</div>
+  <div style="font-size:.78rem;font-weight:700;color:var(--muted,#888);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem" data-fdate="{{ d }}">{{ d }}</div>
   {% for crew in crews %}
   {% if day_jobs.get(crew) %}
   <div style="font-size:.72rem;font-weight:600;color:var(--muted,#aaa);margin:.3rem 0 .2rem">{{ crew }}</div>
@@ -354,12 +355,18 @@
 
 <div class="modal-bg" id="addDateModal" onclick="if(event.target===this)closeModal('addDateModal')">
   <div class="modal">
-    <h3>Add date row</h3>
-    <label>Date</label>
-    <input type="date" id="newDateVal">
-    <div class="modal-btns">
+    <h3>Add date rows</h3>
+    <label>From date</label>
+    <input type="date" id="newDateFrom">
+    <label>To date <span style="font-weight:400;opacity:.6">(same as From for single day)</span></label>
+    <input type="date" id="newDateTo">
+    <label style="margin-top:.25rem">
+      <input type="checkbox" id="skipWeekends" checked style="width:auto;margin-bottom:0;margin-right:4px">
+      Skip weekends
+    </label>
+    <div class="modal-btns" style="margin-top:.75rem">
       <button class="sched-btn sched-btn-sm" onclick="closeModal('addDateModal')">Cancel</button>
-      <button class="sched-btn sched-btn-sm sched-btn-green" onclick="addDateRow()">Add row</button>
+      <button class="sched-btn sched-btn-sm sched-btn-green" onclick="addDateRow()">Add rows</button>
     </div>
   </div>
 </div>
@@ -367,6 +374,20 @@
 
 <script>
 // ── Helpers ──
+// Reformat date cells to friendly format
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.date-cell').forEach(function(cell){
+    const tr = cell.closest('tr');
+    if(!tr || !tr.dataset.date) return;
+    const d = new Date(tr.dataset.date+'T12:00:00');
+    cell.innerHTML = d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}).replace(',','<br>');
+  });
+  // Reformat field view date headings
+  document.querySelectorAll('[data-fdate]').forEach(function(el){
+    const d = new Date(el.dataset.fdate+'T12:00:00');
+    el.textContent = d.toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric'});
+  });
+});
 function openModal(id){ document.getElementById(id).classList.add('open'); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 function toggleArchive(){
@@ -415,7 +436,26 @@ async function saveJob(btn){
   card.classList.remove('active');
 }
 
-// ── Copy to date ──
+// ── Move to date (removes from holding) ──
+async function moveToDate(btn){
+  const card = btn.closest('.job-card');
+  const jobId = card.dataset.jobId;
+  const slotId = card.dataset.slotId;
+  const dateVal = card.querySelector('.ef-copy-date').value;
+  const crew = card.querySelector('.ef-copy-crew').value;
+  if(!dateVal || !crew){ alert('Please pick a date and crew.'); return; }
+  btn.textContent = 'Moving…';
+  // Update existing slot to the new date/crew (removes from holding)
+  await fetch(`/api/schedule/slot/${slotId}`, {
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({slot_date: dateVal, crew: crew})
+  });
+  btn.textContent = 'Moved! ✓';
+  setTimeout(()=>location.reload(), 800);
+}
+
+// ── Copy to date (keeps in holding) ──
 async function copyToDate(btn){
   const card = btn.closest('.job-card');
   const jobId = card.dataset.jobId;
@@ -458,26 +498,38 @@ async function addJob(){
   location.reload();
 }
 
-// ── Add date row ──
+// ── Add date row(s) ──
 function addDateRow(){
-  const d = document.getElementById('newDateVal').value;
-  if(!d){ alert('Please pick a date.'); return; }
+  const from = document.getElementById('newDateFrom').value;
+  const to   = document.getElementById('newDateTo').value || from;
+  const skipWe = document.getElementById('skipWeekends').checked;
+  if(!from){ alert('Please pick a date.'); return; }
   const tbody = document.getElementById('schedBody');
-  const existing = tbody.querySelector(`tr[data-date="${d}"]`);
-  if(existing){ closeModal('addDateModal'); return; }
-  const [y,m,day] = d.split('-');
-  const label = `${m}/${day}/${y}`;
   const crews = ['Josh & Crew','Justin & Crew','LR & Crew'];
-  const tr = document.createElement('tr');
-  tr.dataset.date = d;
-  tr.innerHTML = `<td class="date-cell">${label}</td>` +
-    crews.map(c=>`<td class="job-cell" data-crew="${c}"></td>`).join('') +
-    `<td class="arc-cell"><button class="arc-btn" onclick="archiveDate('${d}',this)">🗄</button></td>`;
-  // Insert in date order
-  const rows = [...tbody.querySelectorAll('tr[data-date]')];
-  const after = rows.find(r=>r.dataset.date > d);
-  if(after) tbody.insertBefore(tr, after);
-  else tbody.appendChild(tr);
+
+  let cur = new Date(from+'T12:00:00');
+  const end = new Date(to+'T12:00:00');
+
+  while(cur <= end){
+    const dow = cur.getDay(); // 0=Sun, 6=Sat
+    if(!skipWe || (dow !== 0 && dow !== 6)){
+      const d = cur.toISOString().split('T')[0];
+      const existing = tbody.querySelector(`tr[data-date="${d}"]`);
+      if(!existing){
+        const label = cur.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+        const tr = document.createElement('tr');
+        tr.dataset.date = d;
+        tr.innerHTML = `<td class="date-cell">${label}</td>` +
+          crews.map(c=>`<td class="job-cell" data-crew="${c}"></td>`).join('') +
+          `<td class="arc-cell"><button class="arc-btn" onclick="archiveDate('${d}',this)">🗄</button></td>`;
+        const rows = [...tbody.querySelectorAll('tr[data-date]')];
+        const after = rows.find(r=>r.dataset.date > d);
+        if(after) tbody.insertBefore(tr, after);
+        else tbody.appendChild(tr);
+      }
+    }
+    cur.setDate(cur.getDate()+1);
+  }
   closeModal('addDateModal');
 }
 
