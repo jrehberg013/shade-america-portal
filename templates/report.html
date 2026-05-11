@@ -257,15 +257,19 @@
         <table class="jobs-table">
             <thead>
                 <tr>
-                    <th style="width:28%">Project Name</th>
-                    <th style="width:20%">Client</th>
-                    <th style="width:22%">Location</th>
-                    <th style="width:15%">Estimate</th>
-                    <th style="width:15%">Contract</th>
+                    <th style="width:25%">Project Name</th>
+                    <th style="width:18%">Client</th>
+                    <th style="width:20%">Location</th>
+                    <th style="width:12%">Contract</th>
+                    <th style="width:12%">Deposit Paid</th>
+                    <th style="width:13%">Balance Due</th>
                 </tr>
             </thead>
             <tbody>
                 {% for job in group %}
+                {% set contract = job.contract_value|float if job.contract_value else 0 %}
+                {% set deposit = job.deposit_paid|float if job.deposit_paid else 0 %}
+                {% set balance = contract - deposit %}
                 <tr>
                     <td>
                         <div class="job-name">{{ job.name }}</div>
@@ -281,15 +285,22 @@
                     </td>
                     <td>{{ job.location or '—' }}</td>
                     <td class="money">
-                        {% if job.estimate_total %}
-                        ${{ "{:,.0f}".format(job.estimate_total|float) }}
+                        {% if contract %}
+                        ${{ "{:,.0f}".format(contract) }}
                         {% else %}
                         <span class="no-val">—</span>
                         {% endif %}
                     </td>
                     <td class="money">
-                        {% if job.contract_value %}
-                        ${{ "{:,.0f}".format(job.contract_value|float) }}
+                        {% if deposit %}
+                        ${{ "{:,.0f}".format(deposit) }}
+                        {% else %}
+                        <span class="no-val">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="money" style="{% if balance > 0 %}color:#c05a00;font-weight:600{% endif %}">
+                        {% if contract %}
+                        ${{ "{:,.0f}".format(balance) }}
                         {% else %}
                         <span class="no-val">—</span>
                         {% endif %}
