@@ -274,12 +274,12 @@
                         {% endif %}
                     </td>
                     <td>
-                        {{ job.client or '<span class="no-val">—</span>' }}
+                        {{ job.client or '—' }}
                         {% if job.phone %}
                         <div class="job-sub">{{ job.phone }}</div>
                         {% endif %}
                     </td>
-                    <td>{{ job.location or '<span class="no-val">—</span>' }}</td>
+                    <td>{{ job.location or '—' }}</td>
                     <td class="money">
                         {% if job.estimate_total %}
                         ${{ "{:,.0f}".format(job.estimate_total|float) }}
