@@ -232,6 +232,13 @@
                     {% endfor %}
                 </div>
             </form>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border,#e8eaed)">
+                <a href="{{ url_for('schedule') }}" class="btn btn-sm btn-outline">📅 View on Schedule</a>
+                <form method="POST" action="{{ url_for('remove_from_pipeline', job_id=job.id) }}"
+                      onsubmit="return confirm('Remove {{ job.name }} from the pipeline? This will delete the project.')">
+                    <button type="submit" class="btn btn-sm btn-danger">🗑 Remove from Pipeline</button>
+                </form>
+            </div>
         </div>
         {% endif %}
 

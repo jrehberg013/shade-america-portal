@@ -43,6 +43,8 @@
             <span class="nav-label">Schedule</span></a></li>
         <li><a href="{{ url_for('forms_list') }}" class="{{ 'active' if request.endpoint == 'forms_list' }}">
             <span class="nav-label">Forms</span></a></li>
+        <li><a href="{{ url_for('policies_page') }}" class="{{ 'active' if request.endpoint == 'policies_page' }}">
+            <span class="nav-label">Policies</span></a></li>
         {% else %}
         <li><a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
             <span class="nav-label">Dashboard</span></a></li>

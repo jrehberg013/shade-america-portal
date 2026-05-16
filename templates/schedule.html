@@ -82,7 +82,7 @@
   <button class="sched-btn sched-btn-green" onclick="openModal('addJobModal')">+ Add job</button>
   <button class="sched-btn sched-btn-blue" onclick="importInstall(this)">⬇ Import from Installation</button>
   <button class="sched-btn" onclick="openModal('addDateModal')">+ Add date rows</button>
-  <button class="sched-btn" onclick="window.print()">🖨 Print / PDF</button>
+  <button class="sched-btn" onclick="downloadSchedulePDF(this)">⬇ Download PDF</button>
   <button class="sched-btn" onclick="shareWhatsApp()">📲 WhatsApp</button>
   <a href="{{ url_for('schedule_archive_page') }}" class="sched-btn">📁 Archive</a>
 </div>
@@ -166,15 +166,16 @@
             <div class="cdot {{ 'sel' if item.color=='pink' else '' }}" style="background:#FBEAF0;border-color:#993556" data-color="pink" onclick="pickColor(this)"></div>
             <div class="cdot {{ 'sel' if item.color=='gray' else '' }}" style="background:#F1EFE8;border-color:#888780" data-color="gray" onclick="pickColor(this)"></div>
           </div>
-          <div class="ef-lbl">Copy to another date &amp; crew</div>
+          <div class="ef-lbl">Move / Copy to date &amp; crew</div>
           <input type="date" class="ef-move-date" onclick="event.stopPropagation()">
           <select class="ef-move-crew" onclick="event.stopPropagation()">
             <option value="">Select crew…</option>
             <option>Josh &amp; Crew</option><option>Justin &amp; Crew</option><option>LR &amp; Crew</option>
           </select>
           <div class="job-actions">
-            <button class="action-btn blue" onclick="event.stopPropagation();moveToHolding(this)">↩ To holding</button>
-            <button class="action-btn" onclick="event.stopPropagation();copyToDate(this)">Copy to date</button>
+            <button class="action-btn blue" onclick="event.stopPropagation();moveToDate(this)">Move to date</button>
+            <button class="action-btn blue" onclick="event.stopPropagation();moveToHolding(this)">↩ Holding</button>
+            <button class="action-btn" onclick="event.stopPropagation();copyToDate(this)">Copy</button>
             <button class="action-btn" onclick="event.stopPropagation();saveJob(this)">Save</button>
             <button class="action-btn red" onclick="event.stopPropagation();removeSlot(this)">Remove</button>
           </div>
@@ -256,7 +257,12 @@
       <div class="job-name">{{ item.name }}</div>
       {% if item.address %}<div class="job-addr">📍 {{ item.address }}</div>{% endif %}
       {% if item.notes %}<div class="job-notes">{{ item.notes }}</div>{% endif %}
-      <div class="field-expanded"><div class="wx-loading">Loading weather…</div></div>
+      <div class="field-expanded">
+        <div class="wx-loading">Loading weather…</div>
+        {% if item.portal_job_id %}
+        <div style="margin-top:.5rem"><a href="{{ url_for('job_detail', job_id=item.portal_job_id) }}" onclick="event.stopPropagation()" style="font-size:.75rem;text-decoration:underline;color:inherit;opacity:.8">📋 View full project details</a></div>
+        {% endif %}
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -277,7 +283,12 @@
     <div class="job-name">{{ item.name }}</div>
     {% if item.address %}<div class="job-addr">📍 {{ item.address }}</div>{% endif %}
     {% if item.notes %}<div class="job-notes">{{ item.notes }}</div>{% endif %}
-    <div class="field-expanded"><div class="wx-loading">Loading weather…</div></div>
+    <div class="field-expanded">
+      <div class="wx-loading">Loading weather…</div>
+      {% if item.portal_job_id %}
+      <div style="margin-top:.5rem"><a href="{{ url_for('job_detail', job_id=item.portal_job_id) }}" onclick="event.stopPropagation()" style="font-size:.75rem;text-decoration:underline;color:inherit;opacity:.8">📋 View full project details</a></div>
+      {% endif %}
+    </div>
   </div>
   {% endfor %}
   {% endif %}{% endfor %}
@@ -378,7 +389,25 @@ async function copyToDate(btn){
   setTimeout(()=>location.reload(), 500);
 }
 
-async function moveToHolding(btn){
+async function downloadSchedulePDF(btn){
+  btn.textContent = '⏳ Generating…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/schedule/pdf');
+    if(!r.ok) throw new Error('Failed');
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'schedule.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e){ alert('PDF download failed. Use Print / Save as PDF instead.'); }
+  btn.textContent = '⬇ Download PDF';
+  btn.disabled = false;
+}
+
+
   const card = btn.closest('.job-card');
   btn.textContent = 'Moving…';
   await fetch('/api/schedule/slot/' + card.dataset.slotId + '/hold', {method:'POST'});

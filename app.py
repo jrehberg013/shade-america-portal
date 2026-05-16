@@ -508,6 +508,16 @@ def init_db():
     except Exception:
         pass
 
+    # Migrate: create policies table on existing DBs
+    try:
+        if USE_PG:
+            db.execute("CREATE TABLE IF NOT EXISTS policies (key TEXT PRIMARY KEY, value TEXT DEFAULT '')")
+        else:
+            db.execute("CREATE TABLE IF NOT EXISTS policies (key TEXT PRIMARY KEY, value TEXT DEFAULT '')")
+        db.commit()
+    except Exception:
+        pass
+
     # Migrate: update powder prices on existing databases
     for pname, price in [('5" SCH40', 15), ('6" SCH40', 15), ('8" SCH40', 15),
                           ('4x4 HSS', 15), ('4x6 HSS', 15), ('4x8 HSS', 15)]:
@@ -806,7 +816,21 @@ def edit_job(job_id):
     flash('Project details updated.', 'success')
     return redirect(url_for('job_detail', job_id=job_id))
 
-@app.route('/jobs/<int:job_id>/status', methods=['POST'])
+@app.route('/jobs/<int:job_id>/remove-pipeline', methods=['POST'])
+@manager_required
+def remove_from_pipeline(job_id):
+    db = get_db()
+    job = db.execute("SELECT name FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        abort(404)
+    name = job['name']
+    db.execute("DELETE FROM documents WHERE job_id=?", (job_id,))
+    db.execute("DELETE FROM jobs WHERE id=?", (job_id,))
+    db.commit()
+    flash(f'"{name}" has been removed from the pipeline.', 'success')
+    return redirect(url_for('jobs'))
+
+
 @manager_required
 def update_status(job_id):
     # Support both form-POST (from job detail page) and JSON (from dashboard drag-and-drop)
@@ -1225,12 +1249,16 @@ def schedule():
     dates_rows = db.execute('SELECT slot_date FROM schedule_dates ORDER BY slot_date ASC').fetchall()
     dates = [str(r['slot_date']) for r in dates_rows]
 
-    # Get all slots with job info
+    # Get all slots with job info — also try to find matching portal job by name
     slots = db.execute(
         'SELECT ss.*, sj.name, sj.address, sj.notes, sj.color, sj.source '
         'FROM schedule_slots ss JOIN schedule_jobs sj ON ss.job_id = sj.id '
         'ORDER BY ss.slot_date ASC, ss.sort_order ASC'
     ).fetchall()
+
+    # Build a name→job_id map for portal jobs (for "View full details" link)
+    portal_jobs = db.execute("SELECT id, name FROM jobs").fetchall()
+    portal_job_map = {j['name'].lower(): j['id'] for j in portal_jobs}
 
     from collections import defaultdict
     holding = []
@@ -1248,6 +1276,7 @@ def schedule():
             'slot_date': str(slot['slot_date']) if slot['slot_date'] else None,
             'is_holding': slot['is_holding'],
             'source': slot['source'] or 'manual',
+            'portal_job_id': portal_job_map.get((slot['name'] or '').lower()),
         }
         if slot['is_holding'] or not slot['slot_date']:
             holding.append(entry)
@@ -1567,7 +1596,104 @@ def schedule_import_installation():
     return jsonify({'ok': True, 'added': added})
 
 
-@app.route('/api/weather/address')
+
+
+@app.route('/api/schedule/pdf')
+@login_required
+def schedule_pdf():
+    """Generate a simple PDF of the current schedule using only stdlib."""
+    import datetime
+    db = get_db()
+    dates = [r['slot_date'] for r in db.execute(
+        "SELECT slot_date FROM schedule_dates ORDER BY slot_date").fetchall()]
+    slots = db.execute(
+        "SELECT ss.slot_date, ss.crew, sj.name, sj.address FROM schedule_slots ss"
+        " JOIN schedule_jobs sj ON sj.id=ss.job_id"
+        " WHERE ss.is_holding=0 ORDER BY ss.slot_date, ss.crew, ss.sort_order").fetchall()
+    # Build text content
+    lines = ['SHADE AMERICA SCHEDULE', '=' * 40, '']
+    dated = {}
+    for s in slots:
+        d = str(s['slot_date'])
+        dated.setdefault(d, {}).setdefault(s['crew'], []).append(s)
+    crews = ['Josh & Crew', 'Justin & Crew', 'LR & Crew']
+    for d in dates:
+        try:
+            dt = datetime.date.fromisoformat(str(d))
+            label = dt.strftime('%a, %b %-d')
+        except Exception:
+            label = str(d)
+        lines.append(label)
+        lines.append('-' * 30)
+        has_jobs = False
+        for crew in crews:
+            jobs_for = dated.get(str(d), {}).get(crew, [])
+            if jobs_for:
+                has_jobs = True
+                lines.append(f'  {crew}:')
+                for j in jobs_for:
+                    addr = f'  {j["address"]}' if j['address'] else ''
+                    lines.append(f'    • {j["name"]}{addr}')
+        if not has_jobs:
+            lines.append('  (no jobs scheduled)')
+        lines.append('')
+    content = '\n'.join(lines)
+    # Minimal PDF built by hand (plain text embedded)
+    pdf = _build_text_pdf(content)
+    db.close()
+    return send_file(
+        io.BytesIO(pdf),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name='schedule.pdf'
+    )
+
+def _build_text_pdf(text):
+    """Build a bare-minimum valid PDF containing plain text, no external libs needed."""
+    lines = text.split('\n')
+    # Build page content stream
+    content_lines = []
+    content_lines.append('BT')
+    content_lines.append('/F1 9 Tf')
+    content_lines.append('40 780 Td')
+    content_lines.append('14 TL')  # line height
+    for line in lines:
+        safe = line.replace('\\','\\\\').replace('(','\\(').replace(')','\\)')
+        content_lines.append(f'({safe}) Tj T*')
+    content_lines.append('ET')
+    stream_body = '\n'.join(content_lines)
+    stream_bytes = stream_body.encode('latin-1', errors='replace')
+    # Build PDF objects
+    objects = []
+    # obj 1: catalog
+    objects.append(b'1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
+    # obj 2: pages
+    objects.append(b'2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n')
+    # obj 3: page
+    objects.append(b'3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n')
+    # obj 4: content stream
+    stream_len = len(stream_bytes)
+    obj4 = f'4 0 obj\n<< /Length {stream_len} >>\nstream\n'.encode() + stream_bytes + b'\nendstream\nendobj\n'
+    objects.append(obj4)
+    # obj 5: font
+    objects.append(b'5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n')
+    # Assemble
+    header = b'%PDF-1.4\n'
+    body = b''
+    offsets = []
+    pos = len(header)
+    for obj in objects:
+        offsets.append(pos)
+        body += obj
+        pos += len(obj)
+    xref_pos = len(header) + len(body)
+    xref = f'xref\n0 {len(objects)+1}\n0000000000 65535 f \n'.encode()
+    for off in offsets:
+        xref += f'{off:010d} 00000 n \n'.encode()
+    trailer = f'trailer\n<< /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n'.encode()
+    return header + body + xref + trailer
+
+
 @login_required
 def api_weather_by_address():
     address = request.args.get('addr', '').strip()
@@ -2294,9 +2420,34 @@ def admin_settings():
     stat_cards = get_stat_cards_config(db)
     desc_rows  = db.execute("SELECT key, value FROM section_descriptions").fetchall()
     section_descs = {r['key']: r['value'] for r in desc_rows}
+    pol_row = db.execute("SELECT value FROM policies WHERE key='main'").fetchone()
+    policies = pol_row['value'] if pol_row else ''
     db.close()
     return render_template('admin_settings.html', forms=forms, stat_cards=stat_cards,
-                           section_descs=section_descs)
+                           section_descs=section_descs, policies=policies)
+
+@app.route('/admin/policies', methods=['POST'])
+@admin_required
+def save_policies():
+    data = request.get_json(silent=True) or {}
+    text = data.get('text', '')
+    db = get_db()
+    if db.execute("SELECT key FROM policies WHERE key='main'").fetchone():
+        db.execute("UPDATE policies SET value=? WHERE key='main'", (text,))
+    else:
+        db.execute("INSERT INTO policies (key, value) VALUES ('main', ?)", (text,))
+    db.commit()
+    return jsonify({'ok': True})
+
+@app.route('/policies')
+@login_required
+def policies_page():
+    db = get_db()
+    pol_row = db.execute("SELECT value FROM policies WHERE key='main'").fetchone()
+    policies = pol_row['value'] if pol_row else ''
+    return render_template('policies.html', policies=policies)
+
+
 
 @app.route('/admin/stat-cards', methods=['POST'])
 @admin_required
