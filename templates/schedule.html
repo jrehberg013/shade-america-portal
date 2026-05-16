@@ -404,7 +404,7 @@ function downloadSchedulePDF(btn){
     .finally(function(){ btn.textContent = '⬇ Download PDF'; btn.disabled = false; });
 }
 
-
+async function moveToHolding(btn){
   const card = btn.closest('.job-card');
   btn.textContent = 'Moving…';
   await fetch('/api/schedule/slot/' + card.dataset.slotId + '/hold', {method:'POST'});
