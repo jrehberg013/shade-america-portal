@@ -1979,6 +1979,14 @@ def estimate_restore(est_id):
     db.commit()
     return jsonify({'ok': True})
 
+@app.route('/api/estimates/<int:est_id>/delete', methods=['POST'])
+@manager_required
+def estimate_delete(est_id):
+    db = get_db()
+    db.execute("DELETE FROM estimates WHERE id=?", (est_id,))
+    db.commit()
+    return jsonify({'ok': True})
+
 @app.route('/api/estimates/archived', methods=['GET'])
 @manager_required
 def estimates_archived():

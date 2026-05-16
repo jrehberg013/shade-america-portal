@@ -64,6 +64,7 @@
 
     <!-- Archive button (only when loaded) -->
     <button type="button" id="estArchiveBtn" class="btn btn-sm btn-outline" style="display:none;color:#b91c1c;border-color:#b91c1c" onclick="estArchive()">🗄 Archive</button>
+    <button type="button" id="estDeleteBtn" class="btn btn-sm btn-outline" style="display:none;color:#b91c1c;border-color:#b91c1c" onclick="estDelete()">🗑 Delete</button>
 
     <!-- Status message -->
     <span id="estMsg" style="font-size:.82rem;color:#2a7a4f;margin-left:.25rem"></span>
@@ -1748,6 +1749,14 @@ async function estArchive() {
     window.location.href = '/estimator';
 }
 
+async function estDelete() {
+    var id = document.getElementById('currentEstId').value;
+    if (!id) return;
+    if (!confirm('Permanently delete this estimate? This cannot be undone.')) return;
+    await fetch('/api/estimates/' + id + '/delete', {method:'POST'});
+    window.location.href = '/estimator';
+}
+
 async function estShowArchived() {
     var panel = document.getElementById('estArchivedList');
     if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
@@ -1761,6 +1770,7 @@ async function estShowArchived() {
             return '<div style="display:flex;align-items:center;gap:.5rem;font-size:.83rem">'
                 + '<span style="flex:1">' + e.project_name + '</span>'
                 + '<button type="button" class="btn btn-sm btn-outline" style="font-size:.75rem;padding:2px 8px" onclick="estRestore(' + e.id + ',this)">Restore</button>'
+                + '<button type="button" class="btn btn-sm btn-outline" style="font-size:.75rem;padding:2px 8px;color:#b91c1c;border-color:#b91c1c" onclick="estDeleteArchived(' + e.id + ',this)">Delete</button>'
                 + '</div>';
         }).join('');
     }
@@ -1773,6 +1783,13 @@ async function estRestore(id, btn) {
     window.location.href = '/estimator?load=' + id;
 }
 
+async function estDeleteArchived(id, btn) {
+    if (!confirm('Permanently delete this estimate? This cannot be undone.')) return;
+    btn.textContent = '…';
+    await fetch('/api/estimates/' + id + '/delete', {method:'POST'});
+    btn.closest('div').remove();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     var form = document.getElementById('estimatorForm');
     form.addEventListener('input',  estUpdateAll);
@@ -1780,9 +1797,12 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('input',  saveFormState);
     form.addEventListener('change', saveFormState);
 
-    // Show archive button if an estimate is loaded
+    // Show archive/delete buttons if an estimate is loaded
     var id = document.getElementById('currentEstId').value;
-    if (id) document.getElementById('estArchiveBtn').style.display = '';
+    if (id) {
+        document.getElementById('estArchiveBtn').style.display = '';
+        document.getElementById('estDeleteBtn').style.display = '';
+    }
 
     // If server passed load data, use it
     if (window._estLoadData) {
