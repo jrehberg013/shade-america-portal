@@ -1608,97 +1608,95 @@ def schedule_import_installation():
 @app.route('/api/schedule/pdf')
 @login_required
 def schedule_pdf():
-    """Generate a simple PDF of the current schedule using only stdlib."""
+    """Return a print-ready HTML page that looks like the schedule."""
     import datetime
     db = get_db()
     dates = [r['slot_date'] for r in db.execute(
         "SELECT slot_date FROM schedule_dates ORDER BY slot_date").fetchall()]
     slots = db.execute(
-        "SELECT ss.slot_date, ss.crew, sj.name, sj.address FROM schedule_slots ss"
+        "SELECT ss.slot_date, ss.crew, sj.name, sj.address, sj.notes, sj.color FROM schedule_slots ss"
         " JOIN schedule_jobs sj ON sj.id=ss.job_id"
         " WHERE ss.is_holding=0 ORDER BY ss.slot_date, ss.crew, ss.sort_order").fetchall()
-    # Build text content
-    lines = ['SHADE AMERICA SCHEDULE', '=' * 40, '']
+    holding = db.execute(
+        "SELECT sj.name, sj.address, sj.color FROM schedule_slots ss"
+        " JOIN schedule_jobs sj ON sj.id=ss.job_id"
+        " WHERE ss.is_holding=1 ORDER BY ss.sort_order").fetchall()
     dated = {}
     for s in slots:
         d = str(s['slot_date'])
         dated.setdefault(d, {}).setdefault(s['crew'], []).append(s)
     crews = ['Josh & Crew', 'Justin & Crew', 'LR & Crew']
+    day_names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+    months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+    COLOR_BG = {'yellow':'#FAEEDA','blue':'#E6F1FB','green':'#EAF3DE','pink':'#FBEAF0','gray':'#F1EFE8'}
+    COLOR_BD = {'yellow':'#BA7517','blue':'#185FA5','green':'#3B6D11','pink':'#993556','gray':'#888780'}
+
+    def card_html(name, address, color):
+        bg = COLOR_BG.get(color, '#FAEEDA')
+        bd = COLOR_BD.get(color, '#BA7517')
+        addr = f'<div style="font-size:9px;opacity:.7;margin-top:2px">📍 {address}</div>' if address else ''
+        return f'<div style="background:{bg};border-left:3px solid {bd};border-radius:5px;padding:5px 7px;margin-bottom:4px;font-size:10px;font-weight:600">{name}{addr}</div>'
+
+    # Build rows
+    rows_html = ''
     for d in dates:
         try:
             dt = datetime.date.fromisoformat(str(d))
-            label = dt.strftime('%a, %b %-d')
+            label = f'<strong>{day_names[dt.weekday()]}</strong><br>{dt.day}-{months[dt.month-1]}'
         except Exception:
             label = str(d)
-        lines.append(label)
-        lines.append('-' * 30)
-        has_jobs = False
+        cells = f'<td style="padding:6px 8px;font-size:10px;color:#888;white-space:nowrap;background:#f5f7fa;border:1px solid #e8eaed;width:70px">{label}</td>'
         for crew in crews:
-            jobs_for = dated.get(str(d), {}).get(crew, [])
-            if jobs_for:
-                has_jobs = True
-                lines.append(f'  {crew}:')
-                for j in jobs_for:
-                    addr = f'  {j["address"]}' if j['address'] else ''
-                    lines.append(f'    • {j["name"]}{addr}')
-        if not has_jobs:
-            lines.append('  (no jobs scheduled)')
-        lines.append('')
-    content = '\n'.join(lines)
-    # Minimal PDF built by hand (plain text embedded)
-    pdf = _build_text_pdf(content)
-    db.close()
-    return send_file(
-        io.BytesIO(pdf),
-        mimetype='application/pdf',
-        as_attachment=True,
-        download_name='schedule.pdf'
-    )
+            jobs = dated.get(str(d), {}).get(crew, [])
+            inner = ''.join(card_html(j['name'], j['address'], j['color']) for j in jobs)
+            cells += f'<td style="padding:6px 8px;vertical-align:top;border:1px solid #e8eaed;min-height:40px">{inner}</td>'
+        rows_html += f'<tr>{cells}</tr>'
 
-def _build_text_pdf(text):
-    """Build a bare-minimum valid PDF containing plain text, no external libs needed."""
-    lines = text.split('\n')
-    # Build page content stream
-    content_lines = []
-    content_lines.append('BT')
-    content_lines.append('/F1 9 Tf')
-    content_lines.append('40 780 Td')
-    content_lines.append('14 TL')  # line height
-    for line in lines:
-        safe = line.replace('\\','\\\\').replace('(','\\(').replace(')','\\)')
-        content_lines.append(f'({safe}) Tj T*')
-    content_lines.append('ET')
-    stream_body = '\n'.join(content_lines)
-    stream_bytes = stream_body.encode('latin-1', errors='replace')
-    # Build PDF objects
-    objects = []
-    # obj 1: catalog
-    objects.append(b'1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
-    # obj 2: pages
-    objects.append(b'2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n')
-    # obj 3: page
-    objects.append(b'3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n')
-    # obj 4: content stream
-    stream_len = len(stream_bytes)
-    obj4 = f'4 0 obj\n<< /Length {stream_len} >>\nstream\n'.encode() + stream_bytes + b'\nendstream\nendobj\n'
-    objects.append(obj4)
-    # obj 5: font
-    objects.append(b'5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n')
-    # Assemble
-    header = b'%PDF-1.4\n'
-    body = b''
-    offsets = []
-    pos = len(header)
-    for obj in objects:
-        offsets.append(pos)
-        body += obj
-        pos += len(obj)
-    xref_pos = len(header) + len(body)
-    xref = f'xref\n0 {len(objects)+1}\n0000000000 65535 f \n'.encode()
-    for off in offsets:
-        xref += f'{off:010d} 00000 n \n'.encode()
-    trailer = f'trailer\n<< /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n'.encode()
-    return header + body + xref + trailer
+    holding_html = ''
+    for h in holding:
+        holding_html += card_html(h['name'], h['address'], h['color'])
+
+    generated = datetime.datetime.now().strftime('%B %d, %Y')
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Shade America Schedule</title>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 20px; color: #222; }}
+  h1 {{ font-size: 18px; margin-bottom: 4px; }}
+  .sub {{ font-size: 11px; color: #888; margin-bottom: 14px; }}
+  table {{ width: 100%; border-collapse: collapse; }}
+  th {{ background: #f5f7fa; padding: 7px 8px; text-align: left; font-size: 11px; color: #888; border: 1px solid #e8eaed; }}
+  .holding-label {{ font-size: 11px; font-weight: 700; text-transform: uppercase; color: #854F0B; margin-bottom: 6px; }}
+  .holding-wrap {{ background: #FAEEDA; border: 1px solid #EF9F27; border-radius: 8px; padding: 10px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; }}
+  @media print {{
+    @page {{ margin: 15mm; }}
+    button {{ display: none !important; }}
+    table {{ page-break-inside: auto; }}
+    tr {{ page-break-inside: avoid; page-break-after: auto; }}
+    thead {{ display: table-header-group; }}
+    .holding-wrap {{ page-break-after: avoid; }}
+  }}
+</style>
+</head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+  <div><h1>Shade America — Schedule</h1><div class="sub">Generated {generated}</div></div>
+  <button onclick="window.print()" style="padding:7px 16px;background:#185FA5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print / Save PDF</button>
+</div>
+<div class="holding-label">📌 Holding Area</div>
+<div class="holding-wrap">{holding_html or '<span style="font-size:11px;opacity:.6">No jobs in holding</span>'}</div>
+<table>
+  <thead><tr>
+    <th style="width:70px">Date</th>
+    <th>Josh &amp; Crew</th><th>Justin &amp; Crew</th><th>LR &amp; Crew</th>
+  </tr></thead>
+  <tbody>{rows_html}</tbody>
+</table>
+</body></html>"""
+
+    db.close()
+    return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 
 @login_required
