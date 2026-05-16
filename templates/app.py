@@ -373,6 +373,15 @@ def init_db():
                 archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 archived_by INTEGER
             );
+            CREATE TABLE IF NOT EXISTS estimates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_name TEXT NOT NULL,
+                form_data TEXT,
+                is_archived INTEGER DEFAULT 0,
+                created_by INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
         conn.commit()
         db = _DB(conn)
@@ -514,6 +523,24 @@ def init_db():
             db.execute("CREATE TABLE IF NOT EXISTS policies (key TEXT PRIMARY KEY, value TEXT DEFAULT '')")
         else:
             db.execute("CREATE TABLE IF NOT EXISTS policies (key TEXT PRIMARY KEY, value TEXT DEFAULT '')")
+        db.commit()
+    except Exception:
+        pass
+
+    # Migrate: create estimates table on existing DBs
+    try:
+        if USE_PG:
+            db.execute("""CREATE TABLE IF NOT EXISTS estimates (
+                id SERIAL PRIMARY KEY, project_name TEXT NOT NULL,
+                form_data TEXT, is_archived INTEGER DEFAULT 0,
+                created_by INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        else:
+            db.execute("""CREATE TABLE IF NOT EXISTS estimates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, project_name TEXT NOT NULL,
+                form_data TEXT, is_archived INTEGER DEFAULT 0,
+                created_by INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
         db.commit()
     except Exception:
         pass
@@ -1868,6 +1895,15 @@ def estimator():
     location_cities = sorted(LOCATION_MILES.keys())
     desc_rows  = db.execute("SELECT key, value FROM section_descriptions").fetchall()
     section_descs = {r['key']: r['value'] for r in desc_rows}
+    estimates = db.execute(
+        "SELECT id, project_name, updated_at FROM estimates WHERE is_archived=0 ORDER BY updated_at DESC"
+    ).fetchall()
+    load_id = request.args.get('load')
+    load_data = None
+    if load_id:
+        row = db.execute("SELECT form_data FROM estimates WHERE id=?", (load_id,)).fetchone()
+        if row and row['form_data']:
+            load_data = row['form_data']
     return render_template('estimator.html',
                            pricing_json=json.dumps(pm),
                            fabric_rate=fabric_rate,
@@ -1879,8 +1915,78 @@ def estimator():
                            purlin_tubing_names=purlin_tubing_names,
                            location_cities=location_cities,
                            location_miles_json=json.dumps(LOCATION_MILES),
-                           section_descs=section_descs)
+                           section_descs=section_descs,
+                           estimates=estimates,
+                           load_data=load_data)
 
+
+
+# ─────────────────────────────────────────────────────────────
+# ESTIMATES — save / load / archive
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/api/estimates', methods=['POST'])
+@manager_required
+def estimate_save():
+    data = request.get_json(silent=True) or {}
+    project_name = (data.get('project_name') or '').strip()
+    form_data    = data.get('form_data', '{}')
+    est_id       = data.get('id')
+    if not project_name:
+        return jsonify({'error': 'Project name required'}), 400
+    db = get_db()
+    if est_id:
+        db.execute(
+            "UPDATE estimates SET project_name=?, form_data=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (project_name, form_data, est_id)
+        )
+        db.commit()
+        return jsonify({'ok': True, 'id': est_id})
+    else:
+        db.execute(
+            "INSERT INTO estimates (project_name, form_data, created_by) VALUES (?,?,?)",
+            (project_name, form_data, session['user_id'])
+        )
+        db.commit()
+        if USE_PG:
+            new_id = db.execute("SELECT id FROM estimates ORDER BY id DESC LIMIT 1").fetchone()['id']
+        else:
+            new_id = db.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        return jsonify({'ok': True, 'id': new_id})
+
+@app.route('/api/estimates/<int:est_id>', methods=['GET'])
+@manager_required
+def estimate_load(est_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM estimates WHERE id=?", (est_id,)).fetchone()
+    if not row:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify({'id': row['id'], 'project_name': row['project_name'], 'form_data': row['form_data']})
+
+@app.route('/api/estimates/<int:est_id>/archive', methods=['POST'])
+@manager_required
+def estimate_archive(est_id):
+    db = get_db()
+    db.execute("UPDATE estimates SET is_archived=1 WHERE id=?", (est_id,))
+    db.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/estimates/<int:est_id>/restore', methods=['POST'])
+@manager_required
+def estimate_restore(est_id):
+    db = get_db()
+    db.execute("UPDATE estimates SET is_archived=0 WHERE id=?", (est_id,))
+    db.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/estimates/archived', methods=['GET'])
+@manager_required
+def estimates_archived():
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, project_name, updated_at FROM estimates WHERE is_archived=1 ORDER BY updated_at DESC"
+    ).fetchall()
+    return jsonify([{'id': r['id'], 'project_name': r['project_name'], 'updated_at': str(r['updated_at'])} for r in rows])
 
 # ─────────────────────────────────────────────────────────────
 # HIP SHADE CALCULATOR
