@@ -389,22 +389,19 @@ async function copyToDate(btn){
   setTimeout(()=>location.reload(), 500);
 }
 
-async function downloadSchedulePDF(btn){
+function downloadSchedulePDF(btn){
   btn.textContent = '⏳ Generating…';
   btn.disabled = true;
-  try {
-    const r = await fetch('/api/schedule/pdf');
-    if(!r.ok) throw new Error('Failed');
-    const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'schedule.pdf';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch(e){ alert('PDF download failed. Use Print / Save as PDF instead.'); }
-  btn.textContent = '⬇ Download PDF';
-  btn.disabled = false;
+  fetch('/api/schedule/pdf')
+    .then(function(r){ if(!r.ok) throw new Error('Failed'); return r.blob(); })
+    .then(function(blob){
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'schedule.pdf'; a.click();
+      URL.revokeObjectURL(url);
+    })
+    .catch(function(){ alert('PDF download failed. Use Print / Save as PDF instead.'); })
+    .finally(function(){ btn.textContent = '⬇ Download PDF'; btn.disabled = false; });
 }
 
 
