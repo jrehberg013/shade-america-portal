@@ -55,7 +55,7 @@ LOCATION_MILES = {
     "Key West, FL": 468,
 }
 
-APP_VERSION = '1.3.0'
+APP_VERSION = '1.3.1'
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'sa-dev-key-change-in-prod')
