@@ -774,8 +774,15 @@ def job_detail(job_id):
         "SELECT * FROM documents WHERE job_id=? ORDER BY uploaded_at DESC", (job_id,)
     ).fetchall()
     if not is_admin:
-        docs = [d for d in docs if d['doc_type'] in ('drawing', 'photo')]
-    return render_template('job_detail.html', job=job, documents=docs, is_admin=is_admin)
+        docs = [d for d in docs if d["doc_type"] in ("drawing", "photo")]
+    safe_job = dict(job)
+    for col in ("street_address", "city", "state", "zip_code", "trello_url", "notes", "location", "client", "phone", "created_at", "updated_at"):
+        if col not in safe_job or safe_job[col] is None:
+            safe_job[col] = ""
+    for col in ("contract_value", "deposit_paid", "estimate_total"):
+        if col not in safe_job or safe_job[col] is None:
+            safe_job[col] = 0
+    return render_template("job_detail.html", job=safe_job, documents=docs, is_admin=is_admin)
 
 
 @app.route('/jobs/<int:job_id>/edit', methods=['POST'])
