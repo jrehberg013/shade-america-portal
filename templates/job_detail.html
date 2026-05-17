@@ -222,7 +222,7 @@
         {% if current_user.role != 'field' %}
         <div class="card">
             <div class="card-header"><h3>Update Status</h3></div>
-            <form method="POST" action="{{ url_for('update_status', job_id=job.id) }}" class="status-form">
+            <form method="POST" action="/jobs/{{ job.id }}/status" class="status-form">
                 <div class="status-buttons">
                     {% for s, label in [('deposit_received','Deposit Received'),('design','Design / Drawings'),('engineering','Engineering'),('permitting','Permitting'),('fabrication','Fabrication'),('installation','Installation'),('completed','Completed')] %}
                     <button type="submit" name="status" value="{{ s }}"
@@ -232,6 +232,13 @@
                     {% endfor %}
                 </div>
             </form>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border,#e8eaed)">
+                <a href="{{ url_for('schedule') }}" class="btn btn-sm btn-outline">📅 View on Schedule</a>
+                <form method="POST" action="/jobs/{{ job.id }}/remove-pipeline"
+                      onsubmit="return confirm('Remove {{ job.name }} from the pipeline? This will delete the project.')">
+                    <button type="submit" class="btn btn-sm btn-danger">🗑 Remove from Pipeline</button>
+                </form>
+            </div>
         </div>
         {% endif %}
 

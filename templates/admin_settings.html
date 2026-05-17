@@ -123,7 +123,37 @@ function scSave(){
 }
 </script>
 
-<\!-- Section Descriptions -->
+<\!-- Policies for Field Staff -->
+<div class="section-header" style="margin-top:2rem">
+    <h2>Field Staff Policies</h2>
+</div>
+<div class="card" style="padding:1.25rem">
+    <p style="font-size:.85rem;color:#666;margin-bottom:1rem">Write company policies that field staff see when they tap "Policies" in their menu. Supports plain text — use blank lines to separate paragraphs.</p>
+    <textarea id="policies-text" rows="10"
+        style="width:100%;padding:.6rem .75rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:.85rem;resize:vertical;font-family:inherit"
+        placeholder="e.g. Safety requirements, work hours, code of conduct…">{{ policies or '' }}</textarea>
+    <div style="margin-top:.75rem;display:flex;align-items:center;gap:1rem">
+        <button type="button" onclick="savePolicies()" class="btn btn-primary">Save Policies</button>
+        <span id="pol-msg" style="font-size:.85rem;color:#2a7a4f"></span>
+    </div>
+</div>
+
+<script>
+function savePolicies(){
+    const text = document.getElementById('policies-text').value;
+    fetch('/admin/policies', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({text: text})
+    }).then(r=>r.json()).then(d=>{
+        const msg = document.getElementById('pol-msg');
+        msg.textContent = d.ok ? 'Saved!' : 'Error saving.';
+        setTimeout(()=>msg.textContent='', 3000);
+    });
+}
+</script>
+
+
 <div class="section-header" style="margin-top:2rem">
     <h2>Estimator Section Descriptions</h2>
 </div>

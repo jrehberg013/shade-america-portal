@@ -595,6 +595,7 @@
   </div>
   <div class="form-actions" style="margin-top:1.25rem">
     <button type="submit" class="btn btn-primary btn-lg">Calculate Full Estimate →</button>
+    <button type="button" class="btn btn-outline btn-sm" onclick="clearFormState()" style="margin-left:.75rem;color:#888">Clear Saved Data</button>
   </div>
 </div>
 
@@ -1270,6 +1271,7 @@ function estUpdateAll() {
     });
 
     estUpdateSummary(totalSqft, fabricCost);
+    if (typeof saveFormState === "function") saveFormState();
 }
 
 function estCalcPoleSection(prefix, hasAttach, hasFooters) {
@@ -1604,10 +1606,24 @@ function emailEstimate() {
 /* ===================================================
    INIT + LOCAL STORAGE
 =================================================== */
-// localStorage removed — use 💾 Save button to save estimates to server
+const LS_KEY = 'sa_estimator_v3';
 
-function saveFormState() { /* no-op — localStorage removed */ }
-
+function saveFormState() {
+    const data = {};
+    document.querySelectorAll('#estimatorForm [name]').forEach(function(el) {
+        if (el.name) data[el.name] = el.value;
+    });
+    ['sail','hip','cpost','cbeam'].forEach(function(p) {
+        const tbody = document.getElementById(p + 'Rows');
+        if (!tbody) return;
+        const types = [];
+        tbody.querySelectorAll('.est-row').forEach(function(r) {
+            types.push(r.classList.contains('waste-row') ? 'w' : 'r');
+        });
+        data[p + '_rtypes'] = JSON.stringify(types);
+    });
+    try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
+}
 
 function restoreFormState(saved) {
     if (!saved) return;
@@ -1644,7 +1660,8 @@ function restoreFormState(saved) {
 }
 
 function clearFormState() {
-    if (!confirm('Reset the form? All unsaved data will be lost.')) return;
+    if (!confirm('Clear all saved estimator data and reset the form?')) return;
+    try { localStorage.removeItem(LS_KEY); } catch(e) {}
     location.reload();
 }
 
@@ -1777,6 +1794,9 @@ document.addEventListener('DOMContentLoaded', function() {
     var form = document.getElementById('estimatorForm');
     form.addEventListener('input',  estUpdateAll);
     form.addEventListener('change', estUpdateAll);
+    form.addEventListener('input',  saveFormState);
+    form.addEventListener('change', saveFormState);
+
     // Show archive/delete buttons if an estimate is loaded
     var id = document.getElementById('currentEstId').value;
     if (id) {
@@ -1791,10 +1811,16 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    // Add default frames for blank new estimate
-    estAddHipFrame();
-    estAddCantFrame();
-    estAddPurlinFrame();
+    // Restore localStorage state or add default frames
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch(e) {}
+    if (saved) {
+        restoreFormState(saved);
+    } else {
+        estAddHipFrame();
+        estAddCantFrame();
+        estAddPurlinFrame();
+    }
     estUpdateAll();
 });
 

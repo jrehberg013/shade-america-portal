@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Schedule Archive{% endblock %}
+{% block page_title %}Schedule Archive{% endblock %}
+
+{% block content %}
+<style>
+.arc-wrap { display:flex; flex-direction:column; gap:1rem; }
+.arc-toolbar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.arc-btn { padding:6px 14px; border-radius:7px; border:1px solid var(--border,#ddd); background:var(--card-bg,#fff); color:var(--text,#222); font-size:.82rem; cursor:pointer; font-weight:500; text-decoration:none; display:inline-block; }
+.arc-btn-blue { background:#185FA5; color:#fff !important; border-color:#185FA5; }
+.filter-bar { display:flex; gap:.5rem; flex-wrap:wrap; align-items:flex-end; background:var(--card-bg,#f5f7fa); border:1px solid var(--border,#e8eaed); border-radius:8px; padding:.75rem; }
+.filter-group { display:flex; flex-direction:column; gap:3px; }
+.filter-group label { font-size:.72rem; font-weight:600; color:var(--muted,#888); }
+.filter-group input, .filter-group select { font-size:.82rem; padding:5px 8px; border-radius:5px; border:1px solid var(--border,#ddd); background:var(--card-bg,#fff); }
+.arc-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.arc-table th { background:var(--card-bg,#f5f7fa); padding:8px 10px; text-align:left; font-size:.75rem; font-weight:600; color:var(--muted,#888); border-bottom:2px solid var(--border,#e8eaed); }
+.arc-table td { padding:8px 10px; border-bottom:1px solid var(--border,#f0f0f0); vertical-align:top; }
+.arc-table tr:hover td { background:var(--card-bg,#fafafa); }
+.color-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; vertical-align:middle; }
+.restore-btn { font-size:.72rem; padding:3px 9px; border-radius:5px; border:1px solid var(--border,#ddd); cursor:pointer; background:var(--card-bg,#fff); color:var(--text,#222); }
+.restore-btn:hover { background:#EAF3DE; color:#3B6D11; border-color:#3B6D11; }
+.empty-state { text-align:center; padding:3rem; color:var(--muted,#aaa); font-size:.9rem; }
+</style>
+
+<div class="arc-wrap">
+  <div class="arc-toolbar">
+    <a href="{{ url_for('schedule') }}" class="arc-btn">← Back to Schedule</a>
+    <span style="font-size:.85rem;color:var(--muted,#888)">{{ rows|length }} archived rows</span>
+  </div>
+
+  <form method="get" class="filter-bar">
+    <div class="filter-group">
+      <label>Search</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="Job name, address…" style="min-width:180px">
+    </div>
+    <div class="filter-group">
+      <label>Crew</label>
+      <select name="crew">
+        <option value="">All crews</option>
+        {% for c in crews %}
+        <option value="{{ c }}" {{ 'selected' if crew_f == c }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>From date</label>
+      <input type="date" name="date_from" value="{{ date_from }}">
+    </div>
+    <div class="filter-group">
+      <label>To date</label>
+      <input type="date" name="date_to" value="{{ date_to }}">
+    </div>
+    <button type="submit" class="arc-btn arc-btn-blue">Search</button>
+    <a href="{{ url_for('schedule_archive_page') }}" class="arc-btn">Clear</a>
+  </form>
+
+  {% if rows %}
+  <div style="overflow-x:auto">
+  <table class="arc-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Crew</th>
+        <th>Job</th>
+        <th>Address</th>
+        <th>Notes</th>
+        <th>Archived</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+    <tr>
+      <td style="white-space:nowrap;font-weight:500">{{ row.slot_date }}</td>
+      <td style="white-space:nowrap">{{ row.crew or '—' }}</td>
+      <td>
+        {% set colors = {'yellow':'#BA7517','blue':'#185FA5','green':'#3B6D11','pink':'#993556','gray':'#888'} %}
+        <span class="color-dot" style="background:{{ colors.get(row.color,'#BA7517') }}"></span>
+        {{ row.job_name or '—' }}
+      </td>
+      <td>{{ row.job_address or '—' }}</td>
+      <td style="max-width:200px;font-size:.75rem;opacity:.8">{{ row.job_notes or '' }}</td>
+      <td style="white-space:nowrap;font-size:.75rem;opacity:.7">{{ (row.archived_at|string)[:10] }}</td>
+      <td>
+        <button class="restore-btn" onclick="restore({{ row.id }}, this)">↩ Restore</button>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    {% if q or crew_f or date_from or date_to %}
+    No archived rows match your search.
+    {% else %}
+    No archived rows yet. When you archive a date row from the schedule it will appear here.
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+async function restore(id, btn){
+  if(!confirm('Restore this job to the holding area?')) return;
+  btn.textContent = '…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/schedule/archive/' + id + '/restore', {method:'POST'});
+    const d = await r.json();
+    if(d.ok){
+      btn.textContent = '✓ Restored';
+      btn.closest('tr').style.opacity = '.4';
+    } else {
+      btn.textContent = 'Error';
+      btn.disabled = false;
+    }
+  } catch(e){
+    btn.textContent = 'Error';
+    btn.disabled = false;
+  }
+}
+</script>
+{% endblock %}
