@@ -3270,7 +3270,9 @@ def report():
         'contract_total': contract_total,
         'balance_owed':   balance_owed,
     }
-    report_date = _dt_module.datetime.now().strftime('%B %d, %Y  %I:%M %p')
+    import pytz as _pytz_report
+    _eastern = _pytz_report.timezone('US/Eastern')
+    report_date = _dt_module.datetime.now(_eastern).strftime('%B %d, %Y  %I:%M %p %Z')
     db.close()
     return render_template('report.html',
                            jobs_by_status=jobs_by_status,
