@@ -567,7 +567,7 @@ _DEFAULT_STAT_CARDS = json.dumps([
     {"key": "total",           "label": "Total Jobs",        "color": ""},
     {"key": "contract_total",  "label": "Total Job Value",   "color": "text-blue"},
     {"key": "balance_owed",    "label": "Balance Owed",      "color": "text-orange"},
-    {"key": "pipeline_value",  "label": "Pipeline Value",    "color": "text-green"},
+    {"key": "pipeline_value",  "label": "Active Contract Value",    "color": "text-green"},
     {"key": "installation",    "label": "Installation",      "color": "text-orange"},
     {"key": "completed",       "label": "Completed",         "color": "text-grey"},
 ])
@@ -693,7 +693,7 @@ def dashboard():
     statuses = ['deposit_received','design','engineering','permitting','fabrication','installation','completed']
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
     active_jobs    = [j for j in all_jobs if j['status'] != 'completed']
-    pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
+    pipeline_value = sum(float(j['contract_value'] or 0) for j in active_jobs)
     contract_total = sum(float(j['contract_value'] or 0) for j in active_jobs)
     balance_owed   = sum(float(j['contract_value'] or 0) - float(j['deposit_paid'] or 0) for j in active_jobs)
     stats = {
@@ -865,6 +865,7 @@ def remove_from_pipeline(job_id):
     return redirect(url_for('jobs'))
 
 
+@app.route('/jobs/<int:job_id>/status', methods=['POST'])
 @manager_required
 def update_status(job_id):
     # Support both form-POST (from job detail page) and JSON (from dashboard drag-and-drop)
@@ -3259,7 +3260,7 @@ def report():
     }
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
     active_jobs    = [j for j in all_jobs if j['status'] != 'completed']
-    pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
+    pipeline_value = sum(float(j['contract_value'] or 0) for j in active_jobs)
     contract_total = sum(float(j['contract_value']  or 0) for j in active_jobs)
     balance_owed   = sum(float(j['contract_value']  or 0) - float(j['deposit_paid'] or 0) for j in active_jobs)
     stats = {
@@ -3269,7 +3270,9 @@ def report():
         'contract_total': contract_total,
         'balance_owed':   balance_owed,
     }
-    report_date = _dt_module.datetime.now().strftime('%B %d, %Y  %I:%M %p')
+    import pytz as _pytz_report
+    _eastern = _pytz_report.timezone('US/Eastern')
+    report_date = _dt_module.datetime.now(_eastern).strftime('%B %d, %Y  %I:%M %p %Z')
     db.close()
     return render_template('report.html',
                            jobs_by_status=jobs_by_status,
