@@ -865,6 +865,7 @@ def remove_from_pipeline(job_id):
     return redirect(url_for('jobs'))
 
 
+@app.route('/jobs/<int:job_id>/status', methods=['POST'])
 @manager_required
 def update_status(job_id):
     # Support both form-POST (from job detail page) and JSON (from dashboard drag-and-drop)
