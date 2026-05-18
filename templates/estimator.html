@@ -1292,7 +1292,7 @@ function estUpdateAll() {
         if (m) estCalcFrameSection('pf', parseInt(m[1]));
     });
 
-    estUpdateSummary(totalSqft, fabricCost);
+    estUpdateSummary(combinedSqft, fabricCost);
     if (typeof saveFormState === "function") saveFormState();
 }
 
