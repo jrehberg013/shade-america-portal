@@ -545,6 +545,38 @@ def init_db():
     except Exception:
         pass
 
+    # Migrate: create login_log table
+    try:
+        if USE_PG:
+            db.execute("""CREATE TABLE IF NOT EXISTS login_log (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER, username TEXT, name TEXT, role TEXT,
+                logged_in_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        else:
+            db.execute("""CREATE TABLE IF NOT EXISTS login_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER, username TEXT, name TEXT, role TEXT,
+                logged_in_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        db.commit()
+    except Exception:
+        pass
+
+    # Migrate: create estimate_locks table
+    try:
+        if USE_PG:
+            db.execute("""CREATE TABLE IF NOT EXISTS estimate_locks (
+                estimate_id INTEGER PRIMARY KEY,
+                user_id INTEGER, username TEXT, name TEXT,
+                locked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        else:
+            db.execute("""CREATE TABLE IF NOT EXISTS estimate_locks (
+                estimate_id INTEGER PRIMARY KEY,
+                user_id INTEGER, username TEXT, name TEXT,
+                locked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        db.commit()
+    except Exception:
+        pass
+
     # Migrate: update powder prices on existing databases
     for pname, price in [('5" SCH40', 15), ('6" SCH40', 15), ('8" SCH40', 15),
                           ('4x4 HSS', 15), ('4x6 HSS', 15), ('4x8 HSS', 15)]:
@@ -567,7 +599,7 @@ _DEFAULT_STAT_CARDS = json.dumps([
     {"key": "total",           "label": "Total Jobs",        "color": ""},
     {"key": "contract_total",  "label": "Total Job Value",   "color": "text-blue"},
     {"key": "balance_owed",    "label": "Balance Owed",      "color": "text-orange"},
-    {"key": "pipeline_value",  "label": "Active Contract Value",    "color": "text-green"},
+    {"key": "pipeline_value",  "label": "Pipeline Value",    "color": "text-green"},
     {"key": "installation",    "label": "Installation",      "color": "text-orange"},
     {"key": "completed",       "label": "Completed",         "color": "text-grey"},
 ])
@@ -650,6 +682,12 @@ def login():
             if user['must_change_password']:
                 session['must_change'] = True
                 return redirect(url_for('change_password'))
+            try:
+                db.execute("INSERT INTO login_log (user_id, username, name, role) VALUES (?,?,?,?)",
+                           (user['id'], user['username'], user['name'] or user['username'], user['role']))
+                db.commit()
+            except Exception:
+                pass
             return redirect(url_for('field_home') if user['role'] == 'field' else url_for('dashboard'))
         flash('Invalid username or password.', 'error')
     return render_template('login.html')
@@ -693,7 +731,7 @@ def dashboard():
     statuses = ['deposit_received','design','engineering','permitting','fabrication','installation','completed']
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
     active_jobs    = [j for j in all_jobs if j['status'] != 'completed']
-    pipeline_value = sum(float(j['contract_value'] or 0) for j in active_jobs)
+    pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
     contract_total = sum(float(j['contract_value'] or 0) for j in active_jobs)
     balance_owed   = sum(float(j['contract_value'] or 0) - float(j['deposit_paid'] or 0) for j in active_jobs)
     stats = {
@@ -2542,9 +2580,19 @@ def admin_settings():
     section_descs = {r['key']: r['value'] for r in desc_rows}
     pol_row = db.execute("SELECT value FROM policies WHERE key='main'").fetchone()
     policies = pol_row['value'] if pol_row else ''
+    is_james = session.get('username', '').lower() == 'james'
+    login_log = []
+    if is_james:
+        try:
+            login_log = db.execute(
+                "SELECT name, username, role, logged_in_at FROM login_log ORDER BY logged_in_at DESC LIMIT 50"
+            ).fetchall()
+        except Exception:
+            pass
     db.close()
     return render_template('admin_settings.html', forms=forms, stat_cards=stat_cards,
-                           section_descs=section_descs, policies=policies)
+                           section_descs=section_descs, policies=policies,
+                           is_james=is_james, login_log=login_log)
 
 @app.route('/admin/policies', methods=['POST'])
 @admin_required
@@ -3260,7 +3308,7 @@ def report():
     }
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
     active_jobs    = [j for j in all_jobs if j['status'] != 'completed']
-    pipeline_value = sum(float(j['contract_value'] or 0) for j in active_jobs)
+    pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
     contract_total = sum(float(j['contract_value']  or 0) for j in active_jobs)
     balance_owed   = sum(float(j['contract_value']  or 0) - float(j['deposit_paid'] or 0) for j in active_jobs)
     stats = {
@@ -3280,6 +3328,61 @@ def report():
                            statuses=statuses,
                            stats=stats,
                            report_date=report_date)
+
+# ─────────────────────────────────────────────────────────────
+# ESTIMATE LOCKING
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/api/estimates/<int:estimate_id>/lock', methods=['POST'])
+@login_required
+def estimate_lock(estimate_id):
+    db = get_db()
+    try:
+        existing = db.execute("SELECT * FROM estimate_locks WHERE estimate_id=?", (estimate_id,)).fetchone()
+        if existing and existing['user_id'] != session['user_id']:
+            return jsonify({'ok': False, 'locked_by': existing['name'] or existing['username']})
+        if USE_PG:
+            db.execute("""INSERT INTO estimate_locks (estimate_id, user_id, username, name)
+                VALUES (%s,%s,%s,%s) ON CONFLICT (estimate_id) DO UPDATE
+                SET user_id=EXCLUDED.user_id, username=EXCLUDED.username,
+                    name=EXCLUDED.name, locked_at=CURRENT_TIMESTAMP""",
+                (estimate_id, session['user_id'], session['username'], session.get('name','')))
+        else:
+            db.execute("DELETE FROM estimate_locks WHERE estimate_id=?", (estimate_id,))
+            db.execute("INSERT INTO estimate_locks (estimate_id, user_id, username, name) VALUES (?,?,?,?)",
+                (estimate_id, session['user_id'], session['username'], session.get('name','')))
+        db.commit()
+    except Exception:
+        pass
+    db.close()
+    return jsonify({'ok': True})
+
+@app.route('/api/estimates/<int:estimate_id>/unlock', methods=['POST'])
+@login_required
+def estimate_unlock(estimate_id):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM estimate_locks WHERE estimate_id=? AND user_id=?",
+                   (estimate_id, session['user_id']))
+        db.commit()
+    except Exception:
+        pass
+    db.close()
+    return jsonify({'ok': True})
+
+@app.route('/api/estimates/<int:estimate_id>/lock-status')
+@login_required
+def estimate_lock_status(estimate_id):
+    db = get_db()
+    try:
+        row = db.execute("SELECT * FROM estimate_locks WHERE estimate_id=?", (estimate_id,)).fetchone()
+        if row and row['user_id'] != session['user_id']:
+            db.close()
+            return jsonify({'locked': True, 'locked_by': row['name'] or row['username']})
+    except Exception:
+        pass
+    db.close()
+    return jsonify({'locked': False})
 
 # ─────────────────────────────────────────────────────────────
 # EMAIL BACKUP

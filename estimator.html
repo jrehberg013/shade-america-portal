@@ -214,6 +214,41 @@
     </div>
   </div>
   <input type="hidden" name="struct_count" id="struct_count" value="1">
+
+  <!-- Quick Fabric Add -->
+  <div style="margin-top:1.25rem; border-top:1px solid #dde2ea; padding-top:1rem;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.6rem;">
+      <strong style="font-size:.9rem;">Quick Fabric Add</strong>
+      <span style="font-size:.8rem; color:#667;">Enter sq ft directly — repairs, replacements, or known amounts</span>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="est-table" id="quick_fabric_table" style="width:100%;">
+      <thead>
+        <tr>
+          <th style="width:32px;">#</th>
+          <th>Description</th>
+          <th style="width:110px;">Sq Ft</th>
+          <th style="width:110px;">Cost</th>
+          <th style="width:36px;"></th>
+        </tr>
+      </thead>
+      <tbody id="quick_fabric_tbody"></tbody>
+      <tfoot id="quick_fabric_tfoot" style="display:none;">
+        <tr style="background:#f7f9fc; font-weight:600;">
+          <td colspan="2" style="padding:5px 8px; font-size:.85rem; color:#556;">Total</td>
+          <td style="padding:5px 8px; font-size:.85rem; color:#334;" id="quick_fabric_total_sqft">0</td>
+          <td style="padding:5px 8px; font-size:.85rem; color:#2a7a2a;" id="quick_fabric_total_cost">$0.00</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+    <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-top:.6rem;">
+      <input type="text" id="quick_fabric_desc" placeholder="Description (optional)" style="width:220px; font-size:.88rem;">
+      <input type="number" id="quick_fabric_sqft" placeholder="Sq ft" min="0" step="0.01" style="width:90px; font-size:.88rem;">
+      <button type="button" class="btn btn-sm btn-outline" onclick="quickFabricAdd()">+ Add to Total</button>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
@@ -1247,9 +1282,16 @@ function estUpdateAll() {
         totalSqft += area;
     });
     const fabricRate = parseFloat(document.getElementById('fabric_rate_input')?.value) || 0;
-    const fabricCost = totalSqft * fabricRate;
-    $set('total_sqft_lbl', totalSqft.toFixed(0));
+    const quickSqft = window._quickFabricEntries ? window._quickFabricEntries.reduce((s,e)=>s+e.sqft,0) : 0;
+    const combinedSqft = totalSqft + quickSqft;
+    const fabricCost = combinedSqft * fabricRate;
+    $set('total_sqft_lbl', combinedSqft.toFixed(0));
     $set('fabric_cost_lbl', $fmt(fabricCost));
+    const quickCost = quickSqft * fabricRate;
+    const qrow = document.getElementById('quick_fabric_total_row');
+    if (qrow) { qrow.style.display = quickSqft > 0 ? '' : 'none'; }
+    const qlbl = document.getElementById('quick_fabric_total_lbl');
+    if (qlbl) qlbl.textContent = '$' + quickCost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 
     estCalcPoleSection('sail', true, true);
     estCalcPoleSection('hip',  false, true);
@@ -1272,6 +1314,57 @@ function estUpdateAll() {
 
     estUpdateSummary(totalSqft, fabricCost);
     if (typeof saveFormState === "function") saveFormState();
+}
+
+function quickFabricAdd() {
+    const descEl = document.getElementById('quick_fabric_desc');
+    const sqftEl = document.getElementById('quick_fabric_sqft');
+    const sqft = parseFloat(sqftEl?.value) || 0;
+    if (sqft <= 0) { sqftEl?.focus(); return; }
+    const desc = descEl?.value.trim() || 'Fabric';
+    if (!window._quickFabricEntries) window._quickFabricEntries = [];
+    const id = Date.now();
+    window._quickFabricEntries.push({id, desc, sqft});
+    quickFabricRenderTable();
+    if (descEl) descEl.value = '';
+    if (sqftEl) sqftEl.value = '';
+    estUpdateAll();
+}
+
+function quickFabricRemove(id) {
+    if (!window._quickFabricEntries) return;
+    window._quickFabricEntries = window._quickFabricEntries.filter(e => e.id !== id);
+    quickFabricRenderTable();
+    estUpdateAll();
+}
+
+function quickFabricRenderTable() {
+    const tbody = document.getElementById('quick_fabric_tbody');
+    const tfoot = document.getElementById('quick_fabric_tfoot');
+    if (!tbody) return;
+    const entries = window._quickFabricEntries || [];
+    const fabricRate = parseFloat(document.getElementById('fabric_rate_input')?.value) || 0;
+    tbody.innerHTML = '';
+    let totalSqft = 0, totalCost = 0;
+    entries.forEach(function(e, i) {
+        const cost = e.sqft * fabricRate;
+        totalSqft += e.sqft;
+        totalCost += cost;
+        const tr = document.createElement('tr');
+        tr.id = 'qfe_' + e.id;
+        tr.className = 'est-row';
+        tr.innerHTML = '<td style="text-align:center;color:#888;">' + (i+1) + '</td>'
+            + '<td>' + (e.desc || 'Fabric') + '</td>'
+            + '<td style="text-align:right;">' + e.sqft.toFixed(0) + '</td>'
+            + '<td style="text-align:right;color:#2a7a2a;font-weight:600;">$' + cost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',') + '</td>'
+            + '<td style="text-align:center;"><button type="button" class="btn btn-sm btn-danger" onclick="quickFabricRemove(' + e.id + ')">&#x2715;</button></td>';
+        tbody.appendChild(tr);
+    });
+    if (tfoot) tfoot.style.display = entries.length > 0 ? '' : 'none';
+    const tsEl = document.getElementById('quick_fabric_total_sqft');
+    const tcEl = document.getElementById('quick_fabric_total_cost');
+    if (tsEl) tsEl.textContent = totalSqft.toFixed(0);
+    if (tcEl) tcEl.textContent = '$' + totalCost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 }
 
 function estCalcPoleSection(prefix, hasAttach, hasFooters) {
@@ -1714,6 +1807,7 @@ async function estSave() {
     if (d.ok) {
         document.getElementById('currentEstId').value = d.id;
         document.getElementById('estArchiveBtn').style.display = '';
+        estAcquireLock(d.id);
         msg.textContent = '✓ Saved';
         // Update dropdown
         var sel = document.getElementById('estLoadSelect');
@@ -1790,6 +1884,38 @@ async function estDeleteArchived(id, btn) {
     btn.closest('div').remove();
 }
 
+// ── Estimate Locking ──
+function estAcquireLock(estId) {
+    if (!estId) return;
+    fetch('/api/estimates/' + estId + '/lock', {method:'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d.ok) {
+                showLockPopup(d.locked_by);
+            }
+        }).catch(function(){});
+}
+
+function estReleaseLock(estId) {
+    if (!estId) return;
+    fetch('/api/estimates/' + estId + '/unlock', {method:'POST'}).catch(function(){});
+}
+
+function showLockPopup(lockedBy) {
+    var existing = document.getElementById('est-lock-overlay');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.id = 'est-lock-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:10px;padding:2rem;max-width:400px;width:90%;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);">'
+        + '<div style="font-size:2rem;margin-bottom:.75rem;">&#128274;</div>'
+        + '<h3 style="margin:0 0 .75rem;color:#1a3a5c;">Estimate In Use</h3>'
+        + '<p style="color:#556;font-size:.95rem;margin-bottom:1.5rem;"><strong>' + (lockedBy || 'Someone') + '</strong> is currently editing this estimate.<br>Please wait until they are finished.</p>'
+        + '<button onclick="document.getElementById(\'est-lock-overlay\').remove()" style="background:#1a3a5c;color:#fff;border:none;border-radius:6px;padding:.6rem 1.5rem;font-size:.95rem;cursor:pointer;">OK</button>'
+        + '</div>';
+    document.body.appendChild(overlay);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     var form = document.getElementById('estimatorForm');
     form.addEventListener('input',  estUpdateAll);
@@ -1802,7 +1928,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (id) {
         document.getElementById('estArchiveBtn').style.display = '';
         document.getElementById('estDeleteBtn').style.display = '';
+        estAcquireLock(id);
     }
+
+    // Release lock when leaving the page
+    window.addEventListener('beforeunload', function() {
+        var estId = document.getElementById('currentEstId').value;
+        if (estId) estReleaseLock(estId);
+    });
 
     // If server passed load data, use it
     if (window._estLoadData) {
