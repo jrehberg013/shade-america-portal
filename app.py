@@ -2584,9 +2584,26 @@ def admin_settings():
     login_log = []
     if is_james:
         try:
-            login_log = db.execute(
+            import pytz as _pytz_ll
+            import datetime as _dt_ll
+            _eastern_ll = _pytz_ll.timezone('US/Eastern')
+            raw_log = db.execute(
                 "SELECT name, username, role, logged_in_at FROM login_log ORDER BY logged_in_at DESC LIMIT 50"
             ).fetchall()
+            login_log = []
+            for row in raw_log:
+                try:
+                    dt_str = str(row['logged_in_at'])[:19]
+                    dt_utc = _dt_ll.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=_pytz_ll.utc)
+                    dt_est = dt_utc.astimezone(_eastern_ll)
+                    login_log.append({
+                        'name': row['name'],
+                        'username': row['username'],
+                        'role': row['role'],
+                        'logged_in_at': dt_est.strftime('%Y-%m-%d %I:%M %p EST')
+                    })
+                except Exception:
+                    login_log.append(dict(row))
         except Exception:
             pass
     db.close()
