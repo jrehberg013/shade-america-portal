@@ -214,6 +214,21 @@
     </div>
   </div>
   <input type="hidden" name="struct_count" id="struct_count" value="1">
+
+  <!-- Quick Fabric Add -->
+  <div style="margin-top:1rem; border-top:1px solid #dde2ea; padding-top:1rem;">
+    <strong style="font-size:.9rem;">Quick Fabric Add</strong>
+    <p style="font-size:.82rem; color:#667; margin:.2rem 0 .75rem;">Enter sq ft directly — repairs, replacements, or known fabric amounts. Uses same price/sqft above.</p>
+    <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-bottom:.5rem;">
+      <input type="text" id="quick_fabric_desc" placeholder="Description (optional)" style="width:220px; font-size:.88rem;">
+      <input type="number" id="quick_fabric_sqft" placeholder="Sq ft" min="0" step="0.01" style="width:90px; font-size:.88rem;">
+      <button type="button" class="btn btn-sm btn-outline" onclick="quickFabricAdd()">+ Add to Total</button>
+    </div>
+    <div id="quick_fabric_list" style="display:flex; flex-direction:column; gap:.35rem;"></div>
+    <div id="quick_fabric_total_row" style="display:none; margin-top:.5rem; font-size:.88rem; color:#444;">
+      Quick fabric added: <strong id="quick_fabric_total_lbl">$0.00</strong>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
@@ -595,6 +610,7 @@
   </div>
   <div class="form-actions" style="margin-top:1.25rem">
     <button type="submit" class="btn btn-primary btn-lg">Calculate Full Estimate →</button>
+    <button type="button" class="btn btn-outline btn-sm" onclick="clearFormState()" style="margin-left:.75rem;color:#888">Clear Saved Data</button>
   </div>
 </div>
 
@@ -1246,9 +1262,16 @@ function estUpdateAll() {
         totalSqft += area;
     });
     const fabricRate = parseFloat(document.getElementById('fabric_rate_input')?.value) || 0;
-    const fabricCost = totalSqft * fabricRate;
-    $set('total_sqft_lbl', totalSqft.toFixed(0));
+    const quickSqft = window._quickFabricEntries ? window._quickFabricEntries.reduce((s,e)=>s+e.sqft,0) : 0;
+    const combinedSqft = totalSqft + quickSqft;
+    const fabricCost = combinedSqft * fabricRate;
+    $set('total_sqft_lbl', combinedSqft.toFixed(0));
     $set('fabric_cost_lbl', $fmt(fabricCost));
+    const quickCost = quickSqft * fabricRate;
+    const qrow = document.getElementById('quick_fabric_total_row');
+    if (qrow) { qrow.style.display = quickSqft > 0 ? '' : 'none'; }
+    const qlbl = document.getElementById('quick_fabric_total_lbl');
+    if (qlbl) qlbl.textContent = '$' + quickCost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 
     estCalcPoleSection('sail', true, true);
     estCalcPoleSection('hip',  false, true);
@@ -1270,6 +1293,42 @@ function estUpdateAll() {
     });
 
     estUpdateSummary(totalSqft, fabricCost);
+    if (typeof saveFormState === "function") saveFormState();
+}
+
+function quickFabricAdd() {
+    const descEl = document.getElementById('quick_fabric_desc');
+    const sqftEl = document.getElementById('quick_fabric_sqft');
+    const sqft = parseFloat(sqftEl?.value) || 0;
+    if (sqft <= 0) { sqftEl?.focus(); return; }
+    const desc = descEl?.value.trim() || 'Fabric';
+    if (!window._quickFabricEntries) window._quickFabricEntries = [];
+    const id = Date.now();
+    window._quickFabricEntries.push({id, desc, sqft});
+    const list = document.getElementById('quick_fabric_list');
+    if (list) {
+        const row = document.createElement('div');
+        row.id = 'qfe_' + id;
+        row.style.cssText = 'display:flex;align-items:center;gap:.5rem;font-size:.85rem;background:#f7f9fc;border:1px solid #dde2ea;border-radius:4px;padding:.3rem .6rem;';
+        const fabricRate = parseFloat(document.getElementById('fabric_rate_input')?.value) || 0;
+        const cost = sqft * fabricRate;
+        row.innerHTML = '<span style="flex:1;color:#334;">' + desc + '</span>'
+            + '<span style="color:#667;">' + sqft.toFixed(0) + ' sqft</span>'
+            + '<span style="color:#2a7a2a;font-weight:600;min-width:60px;text-align:right;">$' + cost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',') + '</span>'
+            + '<button type="button" onclick="quickFabricRemove(' + id + ')" style="background:#fee;border:1px solid #fcc;border-radius:4px;color:#c00;cursor:pointer;padding:1px 7px;font-size:12px;">✕</button>';
+        list.appendChild(row);
+    }
+    if (descEl) descEl.value = '';
+    if (sqftEl) sqftEl.value = '';
+    estRecalc();
+}
+
+function quickFabricRemove(id) {
+    if (!window._quickFabricEntries) return;
+    window._quickFabricEntries = window._quickFabricEntries.filter(e => e.id !== id);
+    const row = document.getElementById('qfe_' + id);
+    if (row) row.remove();
+    estRecalc();
 }
 
 function estCalcPoleSection(prefix, hasAttach, hasFooters) {
@@ -1604,10 +1663,24 @@ function emailEstimate() {
 /* ===================================================
    INIT + LOCAL STORAGE
 =================================================== */
-// localStorage removed — use 💾 Save button to save estimates to server
+const LS_KEY = 'sa_estimator_v3';
 
-function saveFormState() { /* no-op — localStorage removed */ }
-
+function saveFormState() {
+    const data = {};
+    document.querySelectorAll('#estimatorForm [name]').forEach(function(el) {
+        if (el.name) data[el.name] = el.value;
+    });
+    ['sail','hip','cpost','cbeam'].forEach(function(p) {
+        const tbody = document.getElementById(p + 'Rows');
+        if (!tbody) return;
+        const types = [];
+        tbody.querySelectorAll('.est-row').forEach(function(r) {
+            types.push(r.classList.contains('waste-row') ? 'w' : 'r');
+        });
+        data[p + '_rtypes'] = JSON.stringify(types);
+    });
+    try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
+}
 
 function restoreFormState(saved) {
     if (!saved) return;
@@ -1644,7 +1717,8 @@ function restoreFormState(saved) {
 }
 
 function clearFormState() {
-    if (!confirm('Reset the form? All unsaved data will be lost.')) return;
+    if (!confirm('Clear all saved estimator data and reset the form?')) return;
+    try { localStorage.removeItem(LS_KEY); } catch(e) {}
     location.reload();
 }
 
@@ -1777,6 +1851,9 @@ document.addEventListener('DOMContentLoaded', function() {
     var form = document.getElementById('estimatorForm');
     form.addEventListener('input',  estUpdateAll);
     form.addEventListener('change', estUpdateAll);
+    form.addEventListener('input',  saveFormState);
+    form.addEventListener('change', saveFormState);
+
     // Show archive/delete buttons if an estimate is loaded
     var id = document.getElementById('currentEstId').value;
     if (id) {
@@ -1791,10 +1868,16 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    // Add default frames for blank new estimate
-    estAddHipFrame();
-    estAddCantFrame();
-    estAddPurlinFrame();
+    // Restore localStorage state or add default frames
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch(e) {}
+    if (saved) {
+        restoreFormState(saved);
+    } else {
+        estAddHipFrame();
+        estAddCantFrame();
+        estAddPurlinFrame();
+    }
     estUpdateAll();
 });
 
