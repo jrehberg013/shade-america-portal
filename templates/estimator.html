@@ -216,17 +216,37 @@
   <input type="hidden" name="struct_count" id="struct_count" value="1">
 
   <!-- Quick Fabric Add -->
-  <div style="margin-top:1rem; border-top:1px solid #dde2ea; padding-top:1rem;">
-    <strong style="font-size:.9rem;">Quick Fabric Add</strong>
-    <p style="font-size:.82rem; color:#667; margin:.2rem 0 .75rem;">Enter sq ft directly — repairs, replacements, or known fabric amounts. Uses same price/sqft above.</p>
-    <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-bottom:.5rem;">
+  <div style="margin-top:1.25rem; border-top:1px solid #dde2ea; padding-top:1rem;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.6rem;">
+      <strong style="font-size:.9rem;">Quick Fabric Add</strong>
+      <span style="font-size:.8rem; color:#667;">Enter sq ft directly — repairs, replacements, or known amounts</span>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="est-table" id="quick_fabric_table" style="width:100%;">
+      <thead>
+        <tr>
+          <th style="width:32px;">#</th>
+          <th>Description</th>
+          <th style="width:110px;">Sq Ft</th>
+          <th style="width:110px;">Cost</th>
+          <th style="width:36px;"></th>
+        </tr>
+      </thead>
+      <tbody id="quick_fabric_tbody"></tbody>
+      <tfoot id="quick_fabric_tfoot" style="display:none;">
+        <tr style="background:#f7f9fc; font-weight:600;">
+          <td colspan="2" style="padding:5px 8px; font-size:.85rem; color:#556;">Total</td>
+          <td style="padding:5px 8px; font-size:.85rem; color:#334;" id="quick_fabric_total_sqft">0</td>
+          <td style="padding:5px 8px; font-size:.85rem; color:#2a7a2a;" id="quick_fabric_total_cost">$0.00</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+    <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-top:.6rem;">
       <input type="text" id="quick_fabric_desc" placeholder="Description (optional)" style="width:220px; font-size:.88rem;">
       <input type="number" id="quick_fabric_sqft" placeholder="Sq ft" min="0" step="0.01" style="width:90px; font-size:.88rem;">
       <button type="button" class="btn btn-sm btn-outline" onclick="quickFabricAdd()">+ Add to Total</button>
-    </div>
-    <div id="quick_fabric_list" style="display:flex; flex-direction:column; gap:.35rem;"></div>
-    <div id="quick_fabric_total_row" style="display:none; margin-top:.5rem; font-size:.88rem; color:#444;">
-      Quick fabric added: <strong id="quick_fabric_total_lbl">$0.00</strong>
     </div>
   </div>
 </div>
@@ -1305,19 +1325,7 @@ function quickFabricAdd() {
     if (!window._quickFabricEntries) window._quickFabricEntries = [];
     const id = Date.now();
     window._quickFabricEntries.push({id, desc, sqft});
-    const list = document.getElementById('quick_fabric_list');
-    if (list) {
-        const row = document.createElement('div');
-        row.id = 'qfe_' + id;
-        row.style.cssText = 'display:flex;align-items:center;gap:.5rem;font-size:.85rem;background:#f7f9fc;border:1px solid #dde2ea;border-radius:4px;padding:.3rem .6rem;';
-        const fabricRate = parseFloat(document.getElementById('fabric_rate_input')?.value) || 0;
-        const cost = sqft * fabricRate;
-        row.innerHTML = '<span style="flex:1;color:#334;">' + desc + '</span>'
-            + '<span style="color:#667;">' + sqft.toFixed(0) + ' sqft</span>'
-            + '<span style="color:#2a7a2a;font-weight:600;min-width:60px;text-align:right;">$' + cost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',') + '</span>'
-            + '<button type="button" onclick="quickFabricRemove(' + id + ')" style="background:#fee;border:1px solid #fcc;border-radius:4px;color:#c00;cursor:pointer;padding:1px 7px;font-size:12px;">✕</button>';
-        list.appendChild(row);
-    }
+    quickFabricRenderTable();
     if (descEl) descEl.value = '';
     if (sqftEl) sqftEl.value = '';
     estUpdateAll();
@@ -1326,9 +1334,37 @@ function quickFabricAdd() {
 function quickFabricRemove(id) {
     if (!window._quickFabricEntries) return;
     window._quickFabricEntries = window._quickFabricEntries.filter(e => e.id !== id);
-    const row = document.getElementById('qfe_' + id);
-    if (row) row.remove();
+    quickFabricRenderTable();
     estUpdateAll();
+}
+
+function quickFabricRenderTable() {
+    const tbody = document.getElementById('quick_fabric_tbody');
+    const tfoot = document.getElementById('quick_fabric_tfoot');
+    if (!tbody) return;
+    const entries = window._quickFabricEntries || [];
+    const fabricRate = parseFloat(document.getElementById('fabric_rate_input')?.value) || 0;
+    tbody.innerHTML = '';
+    let totalSqft = 0, totalCost = 0;
+    entries.forEach(function(e, i) {
+        const cost = e.sqft * fabricRate;
+        totalSqft += e.sqft;
+        totalCost += cost;
+        const tr = document.createElement('tr');
+        tr.id = 'qfe_' + e.id;
+        tr.className = 'est-row';
+        tr.innerHTML = '<td style="text-align:center;color:#888;">' + (i+1) + '</td>'
+            + '<td>' + (e.desc || 'Fabric') + '</td>'
+            + '<td style="text-align:right;">' + e.sqft.toFixed(0) + '</td>'
+            + '<td style="text-align:right;color:#2a7a2a;font-weight:600;">$' + cost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',') + '</td>'
+            + '<td style="text-align:center;"><button type="button" class="btn btn-sm btn-danger" onclick="quickFabricRemove(' + e.id + ')">&#x2715;</button></td>';
+        tbody.appendChild(tr);
+    });
+    if (tfoot) tfoot.style.display = entries.length > 0 ? '' : 'none';
+    const tsEl = document.getElementById('quick_fabric_total_sqft');
+    const tcEl = document.getElementById('quick_fabric_total_cost');
+    if (tsEl) tsEl.textContent = totalSqft.toFixed(0);
+    if (tcEl) tcEl.textContent = '$' + totalCost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 }
 
 function estCalcPoleSection(prefix, hasAttach, hasFooters) {
