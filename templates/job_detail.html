@@ -355,9 +355,61 @@
             </div>
         </div>
     </div>
+<!-- Trello Comments Section -->
+{% if job.trello_url %}
+<div class="card" style="margin-top:1.5rem">
+    <div class="card-header card-header-row">
+        <h3>&#128203; Project Activity</h3>
+        <span id="commentsStatus" style="font-size:.8rem;color:var(--muted)">Loading...</span>
+    </div>
+    <div id="commentsList" style="padding:.5rem 0">
+        <div style="padding:1rem;color:var(--muted);font-size:.85rem">Loading comments...</div>
+    </div>
+</div>
+{% endif %}
+
 </div>
 
 <script>
+// -- TRELLO COMMENTS --
+(function() {
+    var list = document.getElementById('commentsList');
+    var status = document.getElementById('commentsStatus');
+    if (!list) return;
+
+    fetch('/api/jobs/{{ job.id }}/trello-comments')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var comments = data.comments || [];
+            if (status) status.textContent = comments.length + ' comment' + (comments.length !== 1 ? 's' : '');
+            if (comments.length === 0) {
+                list.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:.85rem;font-style:italic">No comments yet.</div>';
+                return;
+            }
+            list.innerHTML = comments.map(function(c) {
+                return '<div style="padding:.75rem 1rem;border-bottom:1px solid var(--border)">' +
+                    '<div style="display:flex;justify-content:space-between;margin-bottom:.3rem">' +
+                        '<span style="font-weight:600;font-size:.85rem;color:var(--primary)">' + escHtml(c.author) + '</span>' +
+                        '<span style="font-size:.78rem;color:var(--muted)">' + escHtml(c.date) + '</span>' +
+                    '</div>' +
+                    '<div style="font-size:.88rem;white-space:pre-wrap;color:#333">' + escHtml(c.text) + '</div>' +
+                '</div>';
+            }).join('');
+        })
+        .catch(function() {
+            if (list) list.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:.85rem">Could not load comments.</div>';
+            if (status) status.textContent = '';
+        });
+
+    function escHtml(str) {
+        return String(str || '')
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;');
+    }
+})();
+
 function toggleEditJob() {
     var rv = document.getElementById('jobReadView');
     var ef = document.getElementById('jobEditForm');
