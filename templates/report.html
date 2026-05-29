@@ -257,12 +257,13 @@
         <table class="jobs-table">
             <thead>
                 <tr>
-                    <th style="width:25%">Project Name</th>
-                    <th style="width:18%">Client</th>
-                    <th style="width:20%">Location</th>
-                    <th style="width:12%">Contract</th>
-                    <th style="width:12%">Deposit Paid</th>
-                    <th style="width:13%">Balance Due</th>
+                    <th style="width:22%">Project Name</th>
+                    <th style="width:15%">Client</th>
+                    <th style="width:18%">Location</th>
+                    <th style="width:15%">Status</th>
+                    <th style="width:10%">Contract</th>
+                    <th style="width:10%">Deposit Paid</th>
+                    <th style="width:10%">Balance Due</th>
                 </tr>
             </thead>
             <tbody>
@@ -272,7 +273,7 @@
                 {% set balance = contract - deposit %}
                 <tr>
                     <td>
-                        <div class="job-name">{{ job.name }}</div>
+                        <div class="job-name"><a href="/jobs/{{ job.id }}" style="color:#1a3a5c;text-decoration:none;">{{ job.name }}</a></div>
                         {% if job.notes %}
                         <div class="job-sub">{{ job.notes[:80] }}{% if job.notes|length > 80 %}…{% endif %}</div>
                         {% endif %}
@@ -284,6 +285,13 @@
                         {% endif %}
                     </td>
                     <td>{{ job.location or '—' }}</td>
+                    <td>
+                        {% if job.trello_status %}
+                        <span style="background:#eef4ff;color:#1a3a5c;border:1px solid #c0d0e8;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;">{{ job.trello_status }}</span>
+                        {% else %}
+                        <span class="no-val">—</span>
+                        {% endif %}
+                    </td>
                     <td class="money">
                         {% if contract %}
                         ${{ "{:,.0f}".format(contract) }}
