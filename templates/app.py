@@ -2584,9 +2584,26 @@ def admin_settings():
     login_log = []
     if is_james:
         try:
-            login_log = db.execute(
+            import pytz as _pytz_ll
+            import datetime as _dt_ll
+            _eastern_ll = _pytz_ll.timezone('US/Eastern')
+            raw_log = db.execute(
                 "SELECT name, username, role, logged_in_at FROM login_log ORDER BY logged_in_at DESC LIMIT 50"
             ).fetchall()
+            login_log = []
+            for row in raw_log:
+                try:
+                    dt_str = str(row['logged_in_at'])[:19]
+                    dt_utc = _dt_ll.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=_pytz_ll.utc)
+                    dt_est = dt_utc.astimezone(_eastern_ll)
+                    login_log.append({
+                        'name': row['name'],
+                        'username': row['username'],
+                        'role': row['role'],
+                        'logged_in_at': dt_est.strftime('%Y-%m-%d %I:%M %p EST')
+                    })
+                except Exception:
+                    login_log.append(dict(row))
         except Exception:
             pass
     db.close()
@@ -2863,6 +2880,9 @@ def job_from_trello():
 
     contract_value = 0.0
     deposit_paid   = 0.0
+    cf_phone       = ''
+    cf_location    = ''
+    cf_contact     = ''
 
     try:
         # Fetch card details
@@ -2896,6 +2916,14 @@ def job_from_trello():
                             deposit_paid = num
                     except (TypeError, ValueError):
                         pass
+                if 'text' in val:
+                    text_val = (val['text'] or '').strip()
+                    if 'phone' in fname:
+                        cf_phone = text_val
+                    elif 'location' in fname:
+                        cf_location = text_val
+                    elif 'contact' in fname:
+                        cf_contact = text_val
     except Exception as e:
         job_name = card_name or 'New Job'
         notes    = ''
@@ -2903,9 +2931,10 @@ def job_from_trello():
     # Create the job
     db = get_db()
     db.execute(
-        "INSERT INTO jobs (name,status,trello_url,contract_value,deposit_paid,notes,created_by)"
-        " VALUES (?,?,?,?,?,?,?)",
-        (job_name, status, trello_url, contract_value, deposit_paid, notes, session['user_id'])
+        "INSERT INTO jobs (name,status,trello_url,contract_value,deposit_paid,notes,phone,location,client,created_by)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (job_name, status, trello_url, contract_value, deposit_paid, notes,
+         cf_phone, cf_location, cf_contact, session['user_id'])
     )
     db.commit()
     job_id = db.execute("SELECT last_insert_rowid() AS id").fetchone()['id'] if not USE_PG else              db.execute("SELECT id FROM jobs WHERE trello_url=? ORDER BY id DESC LIMIT 1", (trello_url,)).fetchone()['id']
@@ -2993,6 +3022,9 @@ def trello_sync(job_id):
 
         contract_value = 0.0
         deposit_paid   = 0.0
+        cf_phone       = ''
+        cf_location    = ''
+        cf_contact     = ''
         for item in cf_items:
             fname = cf_name_map.get(item.get('idCustomField'), '').lower()
             val   = item.get('value') or {}
@@ -3007,6 +3039,15 @@ def trello_sync(job_id):
                     contract_value = num
                 elif 'deposit' in fname:
                     deposit_paid = num
+            # Text custom fields
+            if 'text' in val:
+                text_val = (val['text'] or '').strip()
+                if 'phone' in fname:
+                    cf_phone = text_val
+                elif 'location' in fname:
+                    cf_location = text_val
+                elif 'contact' in fname:
+                    cf_contact = text_val
 
         # Fetch attachments, download SA- prefixed ones
         att_url = f'https://api.trello.com/1/cards/{short_link}/attachments?{auth}'
@@ -3053,16 +3094,32 @@ def trello_sync(job_id):
             except Exception:
                 pass
 
-        # Update job with contract value, deposit, and notes (from card desc)
+        # Update job with contract value, deposit, notes, phone, location, contact
         if card_desc:
             db.execute(
-                "UPDATE jobs SET contract_value=?, deposit_paid=?, notes=? WHERE id=?",
-                (contract_value, deposit_paid, card_desc, job_id)
+                "UPDATE jobs SET contract_value=?, deposit_paid=?, notes=?,"
+                " phone=CASE WHEN ? != '' THEN ? ELSE phone END,"
+                " location=CASE WHEN ? != '' THEN ? ELSE location END,"
+                " client=CASE WHEN ? != '' THEN ? ELSE client END"
+                " WHERE id=?",
+                (contract_value, deposit_paid, card_desc,
+                 cf_phone, cf_phone,
+                 cf_location, cf_location,
+                 cf_contact, cf_contact,
+                 job_id)
             )
         else:
             db.execute(
-                "UPDATE jobs SET contract_value=?, deposit_paid=? WHERE id=?",
-                (contract_value, deposit_paid, job_id)
+                "UPDATE jobs SET contract_value=?, deposit_paid=?,"
+                " phone=CASE WHEN ? != '' THEN ? ELSE phone END,"
+                " location=CASE WHEN ? != '' THEN ? ELSE location END,"
+                " client=CASE WHEN ? != '' THEN ? ELSE client END"
+                " WHERE id=?",
+                (contract_value, deposit_paid,
+                 cf_phone, cf_phone,
+                 cf_location, cf_location,
+                 cf_contact, cf_contact,
+                 job_id)
             )
         db.commit()
         db.close()
@@ -3310,12 +3367,14 @@ def report():
     active_jobs    = [j for j in all_jobs if j['status'] != 'completed']
     pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
     contract_total = sum(float(j['contract_value']  or 0) for j in active_jobs)
+    deposits_paid  = sum(float(j['deposit_paid']    or 0) for j in active_jobs)
     balance_owed   = sum(float(j['contract_value']  or 0) - float(j['deposit_paid'] or 0) for j in active_jobs)
     stats = {
         'total':          len(all_jobs),
         'active':         len(active_jobs),
         'pipeline_value': pipeline_value,
         'contract_total': contract_total,
+        'deposits_paid':  deposits_paid,
         'balance_owed':   balance_owed,
     }
     import pytz as _pytz_report
