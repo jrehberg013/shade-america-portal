@@ -3014,11 +3014,6 @@ def trello_sync(job_id):
         with urllib.request.urlopen(cf_def_url, timeout=10) as r:
             cf_defs = json.loads(r.read())
         cf_name_map = {cf['id']: cf['name'] for cf in cf_defs}
-        # Build option label map for dropdown fields: {option_id: label}
-        cf_option_map = {}
-        for cf in cf_defs:
-            for opt in cf.get('options', []):
-                cf_option_map[opt['id']] = opt.get('value', {}).get('text', '')
 
         # Get card custom field values
         cf_val_url = f'https://api.trello.com/1/cards/{short_link}/customFieldItems?{auth}'
@@ -3031,22 +3026,30 @@ def trello_sync(job_id):
         cf_location    = ''
         cf_contact     = ''
         cf_status      = ''
+
+        # Build option label map for dropdown fields: {option_id: label}
+        cf_option_map = {}
+        for cf in cf_defs:
+            for opt in cf.get('options', []):
+                cf_option_map[opt['id']] = opt.get('value', {}).get('text', '')
+
         for item in cf_items:
-            fname = cf_name_map.get(item.get('idCustomField'), '').lower()
-            val   = item.get('value') or {}
-            num   = None
+            fname  = cf_name_map.get(item.get('idCustomField'), '').lower()
+            val    = item.get('value') or {}
+
+            # Number fields (contract, deposit)
             if 'number' in val:
                 try:
                     num = float(val['number'])
+                    if 'contract' in fname:
+                        contract_value = num
+                    elif 'deposit' in fname:
+                        deposit_paid = num
                 except (TypeError, ValueError):
                     pass
-            if num is not None:
-                if 'contract' in fname:
-                    contract_value = num
-                elif 'deposit' in fname:
-                    deposit_paid = num
-            # Text custom fields
-            if 'text' in val:
+
+            # Text fields
+            elif 'text' in val:
                 text_val = (val['text'] or '').strip()
                 if 'phone' in fname:
                     cf_phone = text_val
@@ -3056,9 +3059,12 @@ def trello_sync(job_id):
                     cf_contact = text_val
                 elif 'status' in fname:
                     cf_status = text_val
-            # Dropdown fields — idValue holds the selected option id
-            elif item.get('idValue') and 'status' in fname:
-                cf_status = cf_option_map.get(item['idValue'], '')
+
+            # Dropdown fields — idValue holds selected option id
+            elif item.get('idValue'):
+                opt_label = cf_option_map.get(item['idValue'], '')
+                if 'status' in fname:
+                    cf_status = opt_label
 
         # Fetch attachments, download SA- prefixed ones
         att_url = f'https://api.trello.com/1/cards/{short_link}/attachments?{auth}'
@@ -3257,29 +3263,29 @@ def sync_all_trello_jobs():
                     card = json.loads(r.read())
                 board_id = card.get('idBoard', '')
 
-                # Custom fields — contract value + deposit + status
+                # Custom fields — contract value + deposit
                 contract_value = None
                 deposit_paid   = None
-                trello_status  = None
                 if board_id:
                     cf_def_url = f'https://api.trello.com/1/boards/{board_id}/customFields?{auth}'
                     with urllib.request.urlopen(cf_def_url, timeout=10) as r:
                         cf_defs = json.loads(r.read())
                     cf_name_map = {cf['id']: cf['name'] for cf in cf_defs}
-                    # Build option label map for dropdown fields: {option_id: label}
-                    cf_option_map = {}
-                    for cf in cf_defs:
-                        for opt in cf.get('options', []):
-                            cf_option_map[opt['id']] = opt.get('value', {}).get('text', '')
 
                     cf_val_url = f'https://api.trello.com/1/cards/{short_link}/customFieldItems?{auth}'
                     with urllib.request.urlopen(cf_val_url, timeout=10) as r:
                         cf_items = json.loads(r.read())
 
+                    # Build option label map for dropdown fields
+                    cf_option_map = {}
+                    for cf in cf_defs:
+                        for opt in cf.get('options', []):
+                            cf_option_map[opt['id']] = opt.get('value', {}).get('text', '')
+
+                    trello_status = None
                     for item in cf_items:
                         fname = cf_name_map.get(item.get('idCustomField'), '').lower()
                         val   = item.get('value') or {}
-                        # Number fields (contract, deposit)
                         if 'number' in val:
                             try:
                                 num = float(val['number'])
@@ -3289,10 +3295,8 @@ def sync_all_trello_jobs():
                                     deposit_paid = num
                             except (TypeError, ValueError):
                                 pass
-                        # Text fields
                         elif 'text' in val and 'status' in fname:
                             trello_status = val['text'].strip()
-                        # Dropdown fields — idValue holds the selected option id
                         elif item.get('idValue') and 'status' in fname:
                             trello_status = cf_option_map.get(item['idValue'], '')
 
