@@ -497,7 +497,7 @@ def init_db():
                        (cat, name, price, unit, sort))
 
     # Migrate existing databases — add Trello sync columns if missing
-    for col, typedef in [('trello_url','TEXT'), ('contract_value','REAL DEFAULT 0'), ('deposit_paid','REAL DEFAULT 0')]:
+    for col, typedef in [('trello_url','TEXT'), ('contract_value','REAL DEFAULT 0'), ('deposit_paid','REAL DEFAULT 0'), ('trello_status','TEXT')]:
         try:
             if USE_PG:
                 db.execute(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col} {typedef}")
@@ -3025,22 +3025,28 @@ def trello_sync(job_id):
         cf_phone       = ''
         cf_location    = ''
         cf_contact     = ''
+        cf_status      = ''
+
+        # Build option label map for dropdown fields
+        cf_option_map = {}
+        for cf in cf_defs:
+            for opt in cf.get('options', []):
+                cf_option_map[opt['id']] = opt.get('value', {}).get('text', '')
+
         for item in cf_items:
-            fname = cf_name_map.get(item.get('idCustomField'), '').lower()
-            val   = item.get('value') or {}
-            num   = None
+            fname  = cf_name_map.get(item.get('idCustomField'), '').lower()
+            val    = item.get('value') or {}
+
             if 'number' in val:
                 try:
                     num = float(val['number'])
+                    if 'contract' in fname:
+                        contract_value = num
+                    elif 'deposit' in fname:
+                        deposit_paid = num
                 except (TypeError, ValueError):
                     pass
-            if num is not None:
-                if 'contract' in fname:
-                    contract_value = num
-                elif 'deposit' in fname:
-                    deposit_paid = num
-            # Text custom fields
-            if 'text' in val:
+            elif 'text' in val:
                 text_val = (val['text'] or '').strip()
                 if 'phone' in fname:
                     cf_phone = text_val
@@ -3048,6 +3054,10 @@ def trello_sync(job_id):
                     cf_location = text_val
                 elif 'contact' in fname:
                     cf_contact = text_val
+                elif 'status' in fname:
+                    cf_status = text_val
+            elif item.get('idValue') and 'status' in fname:
+                cf_status = cf_option_map.get(item['idValue'], '')
 
         # Fetch attachments, download SA- prefixed ones
         att_url = f'https://api.trello.com/1/cards/{short_link}/attachments?{auth}'
@@ -3094,18 +3104,20 @@ def trello_sync(job_id):
             except Exception:
                 pass
 
-        # Update job with contract value, deposit, notes, phone, location, contact
+        # Update job with contract value, deposit, notes, phone, location, contact, status
         if card_desc:
             db.execute(
                 "UPDATE jobs SET contract_value=?, deposit_paid=?, notes=?,"
                 " phone=CASE WHEN ? != '' THEN ? ELSE phone END,"
                 " location=CASE WHEN ? != '' THEN ? ELSE location END,"
-                " client=CASE WHEN ? != '' THEN ? ELSE client END"
+                " client=CASE WHEN ? != '' THEN ? ELSE client END,"
+                " trello_status=CASE WHEN ? != '' THEN ? ELSE trello_status END"
                 " WHERE id=?",
                 (contract_value, deposit_paid, card_desc,
                  cf_phone, cf_phone,
                  cf_location, cf_location,
                  cf_contact, cf_contact,
+                 cf_status, cf_status,
                  job_id)
             )
         else:
@@ -3113,12 +3125,14 @@ def trello_sync(job_id):
                 "UPDATE jobs SET contract_value=?, deposit_paid=?,"
                 " phone=CASE WHEN ? != '' THEN ? ELSE phone END,"
                 " location=CASE WHEN ? != '' THEN ? ELSE location END,"
-                " client=CASE WHEN ? != '' THEN ? ELSE client END"
+                " client=CASE WHEN ? != '' THEN ? ELSE client END,"
+                " trello_status=CASE WHEN ? != '' THEN ? ELSE trello_status END"
                 " WHERE id=?",
                 (contract_value, deposit_paid,
                  cf_phone, cf_phone,
                  cf_location, cf_location,
                  cf_contact, cf_contact,
+                 cf_status, cf_status,
                  job_id)
             )
         db.commit()
@@ -3255,6 +3269,13 @@ def sync_all_trello_jobs():
                     with urllib.request.urlopen(cf_val_url, timeout=10) as r:
                         cf_items = json.loads(r.read())
 
+                    # Build option label map for dropdown fields
+                    cf_option_map = {}
+                    for cf in cf_defs:
+                        for opt in cf.get('options', []):
+                            cf_option_map[opt['id']] = opt.get('value', {}).get('text', '')
+
+                    trello_status = None
                     for item in cf_items:
                         fname = cf_name_map.get(item.get('idCustomField'), '').lower()
                         val   = item.get('value') or {}
@@ -3267,18 +3288,26 @@ def sync_all_trello_jobs():
                                     deposit_paid = num
                             except (TypeError, ValueError):
                                 pass
+                        elif 'text' in val and 'status' in fname:
+                            trello_status = val['text'].strip()
+                        elif item.get('idValue') and 'status' in fname:
+                            trello_status = cf_option_map.get(item['idValue'], '')
 
-                # Update dollar values if we got them
-                if contract_value is not None or deposit_paid is not None:
+                # Update dollar values and status if we got them
+                if contract_value is not None or deposit_paid is not None or trello_status is not None:
                     if contract_value is not None and deposit_paid is not None:
                         db.execute(
-                            "UPDATE jobs SET contract_value=?, deposit_paid=? WHERE id=?",
-                            (contract_value, deposit_paid, job_id)
+                            "UPDATE jobs SET contract_value=?, deposit_paid=?, trello_status=COALESCE(?,trello_status) WHERE id=?",
+                            (contract_value, deposit_paid, trello_status, job_id)
                         )
                     elif contract_value is not None:
-                        db.execute("UPDATE jobs SET contract_value=? WHERE id=?", (contract_value, job_id))
-                    else:
-                        db.execute("UPDATE jobs SET deposit_paid=? WHERE id=?", (deposit_paid, job_id))
+                        db.execute("UPDATE jobs SET contract_value=?, trello_status=COALESCE(?,trello_status) WHERE id=?",
+                                   (contract_value, trello_status, job_id))
+                    elif deposit_paid is not None:
+                        db.execute("UPDATE jobs SET deposit_paid=?, trello_status=COALESCE(?,trello_status) WHERE id=?",
+                                   (deposit_paid, trello_status, job_id))
+                    if trello_status is not None:
+                        db.execute("UPDATE jobs SET trello_status=? WHERE id=?", (trello_status, job_id))
 
                 # Attachments — download new SA- files
                 att_url = f'https://api.trello.com/1/cards/{short_link}/attachments?{auth}'
@@ -3342,6 +3371,43 @@ def apple_touch_icon():
 @app.route('/favicon.ico')
 def favicon():
     return app.send_static_file('apple-touch-icon.png')
+
+# ─────────────────────────────────────────────────────────────
+# TRELLO COMMENTS API
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/api/jobs/<int:job_id>/trello-comments')
+@login_required
+def trello_comments(job_id):
+    import re as _re
+    db = get_db()
+    job = db.execute("SELECT trello_url FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job or not job['trello_url']:
+        return jsonify({'comments': []})
+    api_key = os.environ.get('TRELLO_API_KEY', '')
+    token   = os.environ.get('TRELLO_TOKEN', '')
+    if not api_key or not token:
+        return jsonify({'comments': [], 'error': 'Trello not configured'})
+    m = _re.search(r'trello\.com/c/([^/]+)', job['trello_url'])
+    if not m:
+        return jsonify({'comments': []})
+    short_link = m.group(1)
+    auth = f'key={urllib.parse.quote(api_key)}&token={urllib.parse.quote(token)}'
+    try:
+        url = f'https://api.trello.com/1/cards/{short_link}/actions?{auth}&filter=commentCard&limit=50'
+        with urllib.request.urlopen(url, timeout=10) as r:
+            actions = json.loads(r.read())
+        comments = []
+        for a in actions:
+            comments.append({
+                'author': a.get('memberCreator', {}).get('fullName', 'Unknown'),
+                'text':   a.get('data', {}).get('text', ''),
+                'date':   a.get('date', '')[:10]
+            })
+        return jsonify({'comments': comments})
+    except Exception as e:
+        return jsonify({'comments': [], 'error': str(e)})
+
 
 # ─────────────────────────────────────────────────────────────
 # REPORT
