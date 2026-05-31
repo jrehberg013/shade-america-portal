@@ -2625,8 +2625,8 @@ def admin_settings():
                     login_log.append(dict(row))
         except Exception:
             pass
-    db.close()
     crews = get_crews(db)
+    db.close()
     return render_template('admin_settings.html', forms=forms, stat_cards=stat_cards,
                            section_descs=section_descs, policies=policies,
                            is_james=is_james, login_log=login_log, crews=crews)
