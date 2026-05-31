@@ -80,7 +80,17 @@
 {# ── ADMIN TOOLBAR ── #}
 <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
   <button class="sched-btn sched-btn-green" onclick="openModal('addJobModal')">+ Add job</button>
-  <button class="sched-btn sched-btn-blue" onclick="importInstall(this)">⬇ Import from Installation</button>
+  <div style="display:inline-flex;align-items:stretch;border-radius:7px;overflow:hidden;border:1px solid #185FA5;">
+    <button class="sched-btn sched-btn-blue" style="border-radius:0;border:none;border-right:1px solid rgba(255,255,255,.3)" onclick="importPipeline(this, document.getElementById('importStageSelect').value)">⬇ Import from Pipeline</button>
+    <select id="importStageSelect" style="background:#185FA5;color:#fff;border:none;padding:0 8px;font-size:.82rem;font-weight:500;cursor:pointer;outline:none;">
+      <option value="installation">Installation</option>
+      <option value="fabrication">Fabrication</option>
+      <option value="permitting">Permitting</option>
+      <option value="engineering">Engineering</option>
+      <option value="design">Design</option>
+      <option value="deposit_received">Deposit Received</option>
+    </select>
+  </div>
   <button class="sched-btn" onclick="openModal('addDateModal')">+ Add date rows</button>
   <button class="sched-btn" onclick="window.open('/api/schedule/pdf','_blank')">🖨 Print / PDF</button>
   <button class="sched-btn" onclick="shareWhatsApp()">📲 WhatsApp</button>
@@ -469,14 +479,24 @@ async function archiveDate(btn, action){
   row.remove();
 }
 
-async function importInstall(btn){
+async function importPipeline(btn, status){
+  const labels = {
+    'installation':'Installation','fabrication':'Fabrication','permitting':'Permitting',
+    'engineering':'Engineering','design':'Design','deposit_received':'Deposit Received'
+  };
+  const orig = btn.textContent;
   btn.textContent = 'Importing…';
   btn.disabled = true;
   try {
-    const r = await fetch('/api/schedule/import-installation', {method:'POST'});
+    const r = await fetch('/api/schedule/import-pipeline', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status: status})
+    });
     const d = await r.json();
-    if(d.ok){ btn.textContent = '✓ Added ' + d.added; setTimeout(()=>location.reload(), 700); }
-    else { btn.textContent = d.error||'Error'; btn.disabled = false; }
+    if(d.ok){
+      btn.textContent = '✓ Added ' + d.added + ' from ' + (labels[status]||status);
+      setTimeout(()=>location.reload(), 900);
+    } else { btn.textContent = d.error||'Error'; btn.disabled = false; }
   } catch(e){ btn.textContent = 'Error'; btn.disabled = false; }
 }
 

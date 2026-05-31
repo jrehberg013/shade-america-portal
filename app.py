@@ -1634,11 +1634,17 @@ def schedule_restore_archive(archive_id):
 
 
 @app.route('/api/schedule/import-installation', methods=['POST'])
+@app.route('/api/schedule/import-pipeline', methods=['POST'])
 @admin_required
 def schedule_import_installation():
+    valid_statuses = ['deposit_received','design','engineering','permitting','fabrication','installation']
+    data = request.get_json(silent=True) or {}
+    status = data.get('status', 'installation')
+    if status not in valid_statuses:
+        status = 'installation'
     ph = '%s' if USE_PG else '?'
     db = get_db()
-    jobs = db.execute("SELECT * FROM jobs WHERE status='installation'").fetchall()
+    jobs = db.execute(f"SELECT * FROM jobs WHERE status={ph}", (status,)).fetchall()
     added = 0
     for job in jobs:
         name = job['name'] or ''
@@ -1652,7 +1658,7 @@ def schedule_import_installation():
             continue
         db.execute(
             f'INSERT INTO schedule_jobs (name, address, notes, color, source) VALUES ({ph},{ph},{ph},{ph},{ph})',
-            (name, address, '', 'yellow', 'installation')
+            (name, address, '', 'yellow', status)
         )
         db.commit()
         if USE_PG:
@@ -1666,7 +1672,7 @@ def schedule_import_installation():
         db.commit()
         added += 1
     db.close()
-    return jsonify({'ok': True, 'added': added})
+    return jsonify({'ok': True, 'added': added, 'status': status})
 
 
 
