@@ -497,7 +497,7 @@ def init_db():
                        (cat, name, price, unit, sort))
 
     # Migrate existing databases — add Trello sync columns if missing
-    for col, typedef in [('trello_url','TEXT'), ('contract_value','REAL DEFAULT 0'), ('deposit_paid','REAL DEFAULT 0'), ('trello_status','TEXT')]:
+    for col, typedef in [('trello_url','TEXT'), ('contract_value','REAL DEFAULT 0'), ('deposit_paid','REAL DEFAULT 0'), ('trello_status','TEXT'), ('trello_schedule','TEXT')]:
         try:
             if USE_PG:
                 db.execute(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col} {typedef}")
@@ -3026,6 +3026,7 @@ def trello_sync(job_id):
         cf_location    = ''
         cf_contact     = ''
         cf_status      = ''
+        cf_schedule    = ''
 
         # Build option label map for dropdown fields
         cf_option_map = {}
@@ -3056,8 +3057,14 @@ def trello_sync(job_id):
                     cf_contact = text_val
                 elif 'status' in fname:
                     cf_status = text_val
-            elif item.get('idValue') and 'status' in fname:
-                cf_status = cf_option_map.get(item['idValue'], '')
+                elif 'schedule' in fname:
+                    cf_schedule = text_val
+            elif item.get('idValue'):
+                opt_text = cf_option_map.get(item['idValue'], '')
+                if 'status' in fname:
+                    cf_status = opt_text
+                elif 'schedule' in fname:
+                    cf_schedule = opt_text
 
         # Fetch attachments, download SA- prefixed ones
         att_url = f'https://api.trello.com/1/cards/{short_link}/attachments?{auth}'
@@ -3104,20 +3111,22 @@ def trello_sync(job_id):
             except Exception:
                 pass
 
-        # Update job with contract value, deposit, notes, phone, location, contact, status
+        # Update job with contract value, deposit, notes, phone, location, contact, status, schedule
         if card_desc:
             db.execute(
                 "UPDATE jobs SET contract_value=?, deposit_paid=?, notes=?,"
                 " phone=CASE WHEN ? != '' THEN ? ELSE phone END,"
                 " location=CASE WHEN ? != '' THEN ? ELSE location END,"
                 " client=CASE WHEN ? != '' THEN ? ELSE client END,"
-                " trello_status=CASE WHEN ? != '' THEN ? ELSE trello_status END"
+                " trello_status=CASE WHEN ? != '' THEN ? ELSE trello_status END,"
+                " trello_schedule=CASE WHEN ? != '' THEN ? ELSE trello_schedule END"
                 " WHERE id=?",
                 (contract_value, deposit_paid, card_desc,
                  cf_phone, cf_phone,
                  cf_location, cf_location,
                  cf_contact, cf_contact,
                  cf_status, cf_status,
+                 cf_schedule, cf_schedule,
                  job_id)
             )
         else:
@@ -3126,13 +3135,15 @@ def trello_sync(job_id):
                 " phone=CASE WHEN ? != '' THEN ? ELSE phone END,"
                 " location=CASE WHEN ? != '' THEN ? ELSE location END,"
                 " client=CASE WHEN ? != '' THEN ? ELSE client END,"
-                " trello_status=CASE WHEN ? != '' THEN ? ELSE trello_status END"
+                " trello_status=CASE WHEN ? != '' THEN ? ELSE trello_status END,"
+                " trello_schedule=CASE WHEN ? != '' THEN ? ELSE trello_schedule END"
                 " WHERE id=?",
                 (contract_value, deposit_paid,
                  cf_phone, cf_phone,
                  cf_location, cf_location,
                  cf_contact, cf_contact,
                  cf_status, cf_status,
+                 cf_schedule, cf_schedule,
                  job_id)
             )
         db.commit()
@@ -3275,7 +3286,8 @@ def sync_all_trello_jobs():
                         for opt in cf.get('options', []):
                             cf_option_map[opt['id']] = opt.get('value', {}).get('text', '')
 
-                    trello_status = None
+                    trello_status   = None
+                    trello_schedule = None
                     for item in cf_items:
                         fname = cf_name_map.get(item.get('idCustomField'), '').lower()
                         val   = item.get('value') or {}
@@ -3288,13 +3300,21 @@ def sync_all_trello_jobs():
                                     deposit_paid = num
                             except (TypeError, ValueError):
                                 pass
-                        elif 'text' in val and 'status' in fname:
-                            trello_status = val['text'].strip()
-                        elif item.get('idValue') and 'status' in fname:
-                            trello_status = cf_option_map.get(item['idValue'], '')
+                        elif 'text' in val:
+                            text_val = (val['text'] or '').strip()
+                            if 'status' in fname:
+                                trello_status = text_val
+                            elif 'schedule' in fname:
+                                trello_schedule = text_val
+                        elif item.get('idValue'):
+                            opt_text = cf_option_map.get(item['idValue'], '')
+                            if 'status' in fname:
+                                trello_status = opt_text
+                            elif 'schedule' in fname:
+                                trello_schedule = opt_text
 
-                # Update dollar values and status if we got them
-                if contract_value is not None or deposit_paid is not None or trello_status is not None:
+                # Update dollar values and status/schedule if we got them
+                if contract_value is not None or deposit_paid is not None or trello_status is not None or trello_schedule is not None:
                     if contract_value is not None and deposit_paid is not None:
                         db.execute(
                             "UPDATE jobs SET contract_value=?, deposit_paid=?, trello_status=COALESCE(?,trello_status) WHERE id=?",
@@ -3308,6 +3328,8 @@ def sync_all_trello_jobs():
                                    (deposit_paid, trello_status, job_id))
                     if trello_status is not None:
                         db.execute("UPDATE jobs SET trello_status=? WHERE id=?", (trello_status, job_id))
+                    if trello_schedule is not None:
+                        db.execute("UPDATE jobs SET trello_schedule=? WHERE id=?", (trello_schedule, job_id))
 
                 # Attachments — download new SA- files
                 att_url = f'https://api.trello.com/1/cards/{short_link}/attachments?{auth}'

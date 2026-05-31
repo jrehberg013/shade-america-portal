@@ -287,9 +287,12 @@
                     <td>{{ job.location or '—' }}</td>
                     <td>
                         {% if job.trello_status %}
-                        <span style="background:#eef4ff;color:#1a3a5c;border:1px solid #c0d0e8;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;">{{ job.trello_status }}</span>
+                        <span style="background:#eef4ff;color:#1a3a5c;border:1px solid #c0d0e8;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;display:inline-block;margin-bottom:3px;">{{ job.trello_status }}</span>
                         {% else %}
                         <span class="no-val">—</span>
+                        {% endif %}
+                        {% if job.trello_schedule %}
+                        <br><span style="background:#e6f9ee;color:#1a6e3a;border:1px solid #a8dbb8;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;display:inline-block;margin-top:2px;">📅 {{ job.trello_schedule }}</span>
                         {% endif %}
                     </td>
                     <td class="money">
