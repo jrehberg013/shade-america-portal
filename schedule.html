@@ -128,7 +128,7 @@
         <input type="date" class="ef-move-date" onclick="event.stopPropagation()">
         <select class="ef-move-crew" onclick="event.stopPropagation()">
           <option value="">Select crew…</option>
-          <option>Josh &amp; Crew</option><option>Justin &amp; Crew</option><option>LR &amp; Crew</option>
+          {% for c in crews %}<option>{{ c }}</option>{% endfor %}
         </select>
         <div class="job-actions">
           <button class="action-btn blue" onclick="event.stopPropagation();moveToDate(this)">Move to date</button>
@@ -148,7 +148,7 @@
 <table class="sched-table" id="schedTable">
   <thead><tr>
     <th style="width:90px">Date</th>
-    <th>Josh &amp; Crew</th><th>Justin &amp; Crew</th><th>LR &amp; Crew</th>
+    {% for c in crews %}<th>{{ c }}</th>{% endfor %}
     <th style="width:56px"></th>
   </tr></thead>
   <tbody id="schedBody">
@@ -180,7 +180,7 @@
           <input type="date" class="ef-move-date" onclick="event.stopPropagation()">
           <select class="ef-move-crew" onclick="event.stopPropagation()">
             <option value="">Select crew…</option>
-            <option>Josh &amp; Crew</option><option>Justin &amp; Crew</option><option>LR &amp; Crew</option>
+            {% for c in crews %}<option>{{ c }}</option>{% endfor %}
           </select>
           <div class="job-actions">
             <button class="action-btn blue" onclick="event.stopPropagation();moveToDate(this)">Move to date</button>
@@ -228,7 +228,7 @@
       <label>Crew</label>
       <select id="newJobCrew">
         <option value="">Select crew…</option>
-        <option>Josh &amp; Crew</option><option>Justin &amp; Crew</option><option>LR &amp; Crew</option>
+        {% for c in crews %}<option>{{ c }}</option>{% endfor %}
       </select>
     </div>
     <div class="modal-btns">
@@ -314,7 +314,7 @@
 </div>
 
 <script>
-const CREWS = ['Josh & Crew','Justin & Crew','LR & Crew'];
+const CREWS = {{ crews | tojson }};
 
 document.addEventListener('DOMContentLoaded', function(){
   document.querySelectorAll('.date-cell[data-raw]').forEach(function(el){

@@ -123,7 +123,59 @@ function scSave(){
 }
 </script>
 
-<\!-- Policies for Field Staff -->
+<!-- Schedule Crew Names -->
+<div class="section-header" style="margin-top:2rem">
+    <h2>Schedule Crew Names</h2>
+</div>
+<div class="card" style="padding:1.25rem">
+    <p style="font-size:.85rem;color:#666;margin-bottom:1rem">Edit the crew names shown on the schedule. Add or remove rows as needed (max 10).</p>
+    <div id="crew-list" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem;max-width:340px">
+        {% for crew in crews %}
+        <div style="display:flex;gap:.5rem;align-items:center">
+            <input type="text" class="crew-name-input" value="{{ crew }}"
+                style="flex:1;border:1px solid #dde2ea;border-radius:6px;padding:.35rem .6rem;font-size:.88rem">
+            <button type="button" onclick="removeCrew(this)"
+                style="background:none;border:none;color:#A32D2D;cursor:pointer;font-size:1.1rem;padding:0 4px" title="Remove">✕</button>
+        </div>
+        {% endfor %}
+    </div>
+    <div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem">
+        <button type="button" onclick="addCrewRow()" class="btn btn-sm btn-outline">+ Add crew</button>
+    </div>
+    <button type="button" onclick="saveCrews()" class="btn btn-primary">Save Crew Names</button>
+    <span id="crew-msg" style="font-size:.85rem;margin-left:.75rem;color:#2a7a4f"></span>
+</div>
+
+<script>
+function addCrewRow(){
+    const list = document.getElementById('crew-list');
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;gap:.5rem;align-items:center';
+    div.innerHTML = '<input type="text" class="crew-name-input" placeholder="Crew name…" style="flex:1;border:1px solid #dde2ea;border-radius:6px;padding:.35rem .6rem;font-size:.88rem"><button type="button" onclick="removeCrew(this)" style="background:none;border:none;color:#A32D2D;cursor:pointer;font-size:1.1rem;padding:0 4px" title="Remove">✕</button>';
+    list.appendChild(div);
+    div.querySelector('input').focus();
+}
+function removeCrew(btn){
+    const list = document.getElementById('crew-list');
+    if(list.children.length <= 1){ alert('At least one crew name is required.'); return; }
+    btn.closest('div').remove();
+}
+function saveCrews(){
+    const inputs = document.querySelectorAll('.crew-name-input');
+    const crews = Array.from(inputs).map(i=>i.value.trim()).filter(Boolean);
+    if(!crews.length){ alert('At least one crew name is required.'); return; }
+    fetch('/admin/crew-names', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({crews})
+    }).then(r=>r.json()).then(d=>{
+        const msg = document.getElementById('crew-msg');
+        msg.textContent = d.ok ? 'Saved! Reload the schedule to see changes.' : (d.error||'Error saving.');
+        setTimeout(()=>msg.textContent='', 4000);
+    });
+}
+</script>
+
+<!-- Policies for Field Staff -->
 <div class="section-header" style="margin-top:2rem">
     <h2>Field Staff Policies</h2>
 </div>

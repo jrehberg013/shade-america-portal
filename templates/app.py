@@ -611,6 +611,19 @@ def get_stat_cards_config(db):
     except Exception:
         return json.loads(_DEFAULT_STAT_CARDS)
 
+_DEFAULT_CREWS = ['Josh & Crew', 'Justin & Crew', 'LR & Crew']
+
+def get_crews(db):
+    try:
+        row = db.execute("SELECT value FROM settings WHERE key='schedule_crews'").fetchone()
+        if row and row['value']:
+            crews = json.loads(row['value'])
+            if isinstance(crews, list) and crews:
+                return crews
+    except Exception:
+        pass
+    return list(_DEFAULT_CREWS)
+
 
 # ─────────────────────────────────────────────────────────────
 # AUTH HELPERS
@@ -1316,7 +1329,7 @@ def schedule():
     db = get_db()
     ph = '%s' if USE_PG else '?'
     role = session.get('role', 'field')
-    crews = ['Josh & Crew', 'Justin & Crew', 'LR & Crew']
+    crews = get_crews(db)
 
     # Get all saved dates
     dates_rows = db.execute('SELECT slot_date FROM schedule_dates ORDER BY slot_date ASC').fetchall()
@@ -1394,7 +1407,7 @@ def schedule_archive_page():
 
     rows = db.execute(sql, params).fetchall()
     db.close()
-    crews = ['Josh & Crew', 'Justin & Crew', 'LR & Crew']
+    crews = get_crews(db)
     return render_template('schedule_archive.html',
         rows=rows, crews=crews,
         q=q, crew_f=crew_f, date_from=date_from, date_to=date_to
@@ -1697,7 +1710,7 @@ def schedule_pdf():
     for s in slots:
         d = str(s['slot_date'])
         dated.setdefault(d, {}).setdefault(s['crew'], []).append(s)
-    crews = ['Josh & Crew', 'Justin & Crew', 'LR & Crew']
+    crews = get_crews(db)
     day_names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
     months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -2613,9 +2626,10 @@ def admin_settings():
         except Exception:
             pass
     db.close()
+    crews = get_crews(db)
     return render_template('admin_settings.html', forms=forms, stat_cards=stat_cards,
                            section_descs=section_descs, policies=policies,
-                           is_james=is_james, login_log=login_log)
+                           is_james=is_james, login_log=login_log, crews=crews)
 
 @app.route('/admin/policies', methods=['POST'])
 @admin_required
@@ -2657,6 +2671,26 @@ def save_stat_cards():
     else:
         db.execute("INSERT INTO settings (key,value) VALUES ('stat_cards',?)", (val,))
     db.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/crew-names', methods=['POST'])
+@admin_required
+def save_crew_names():
+    data  = request.get_json(silent=True) or {}
+    crews = data.get('crews', [])
+    # Clean and validate — strip blanks, max 10 crews
+    crews = [c.strip() for c in crews if isinstance(c, str) and c.strip()][:10]
+    if not crews:
+        return jsonify({'ok': False, 'error': 'At least one crew name is required'})
+    db  = get_db()
+    val = json.dumps(crews)
+    if db.execute("SELECT key FROM settings WHERE key='schedule_crews'").fetchone():
+        db.execute("UPDATE settings SET value=? WHERE key='schedule_crews'", (val,))
+    else:
+        db.execute("INSERT INTO settings (key,value) VALUES ('schedule_crews',?)", (val,))
+    db.commit()
+    db.close()
     return jsonify({'ok': True})
 
 
