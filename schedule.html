@@ -95,6 +95,7 @@
   <button class="sched-btn" onclick="window.open('/api/schedule/pdf','_blank')">🖨 Print / PDF</button>
   <button class="sched-btn" onclick="shareWhatsApp()">📲 WhatsApp</button>
   <a href="{{ url_for('schedule_archive_page') }}" class="sched-btn">📁 Archive</a>
+  <button class="sched-btn" id="notifyBtn" onclick="notifyTeam()">📧 Notify Team</button>
 </div>
 
 {# ── HOLDING AREA ── #}
@@ -524,6 +525,30 @@ function shareWhatsApp(){
     if(hasJobs) text += rowText + '\n';
   });
   window.open('https://web.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+}
+
+async function notifyTeam(){
+  const btn = document.getElementById('notifyBtn');
+  if(!confirm('Send a schedule update notification to the team?')) return;
+  const orig = btn.textContent;
+  btn.textContent = 'Sending…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/schedule/notify', {method:'POST'});
+    const d = await r.json();
+    if(d.ok){
+      btn.textContent = '✓ Sent!';
+      setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 3000);
+    } else {
+      alert('Failed to send: ' + (d.error || 'Unknown error'));
+      btn.textContent = orig;
+      btn.disabled = false;
+    }
+  } catch(e){
+    alert('Error sending notification.');
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
 }
 
 const _wxCache = {};
