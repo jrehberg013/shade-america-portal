@@ -1743,6 +1743,7 @@ def schedule_pdf():
         holding_html += card_html(h['name'], h['address'], h['color'])
 
     generated = datetime.datetime.now().strftime('%B %d, %Y')
+    crew_headers = ''.join(f'<th>{c}</th>' for c in crews)
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
@@ -1751,12 +1752,14 @@ def schedule_pdf():
   body {{ font-family: Arial, sans-serif; margin: 20px; color: #222; }}
   h1 {{ font-size: 18px; margin-bottom: 4px; }}
   .sub {{ font-size: 11px; color: #888; margin-bottom: 14px; }}
-  table {{ width: 100%; border-collapse: collapse; }}
+  table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
+  td, th {{ word-wrap: break-word; overflow-wrap: break-word; }}
   th {{ background: #f5f7fa; padding: 7px 8px; text-align: left; font-size: 11px; color: #888; border: 1px solid #e8eaed; }}
   .holding-label {{ font-size: 11px; font-weight: 700; text-transform: uppercase; color: #854F0B; margin-bottom: 6px; }}
   .holding-wrap {{ background: #FAEEDA; border: 1px solid #EF9F27; border-radius: 8px; padding: 10px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; }}
+  @page {{ size: landscape; margin: 10mm; }}
   @media print {{
-    @page {{ margin: 15mm; }}
+    @page {{ size: landscape; margin: 10mm; }}
     button {{ display: none !important; }}
     table {{ page-break-inside: auto; }}
     tr {{ page-break-inside: avoid; page-break-after: auto; }}
@@ -1774,7 +1777,7 @@ def schedule_pdf():
 <table>
   <thead><tr>
     <th style="width:70px">Date</th>
-    <th>Josh &amp; Crew</th><th>Justin &amp; Crew</th><th>LR &amp; Crew</th>
+    {crew_headers}
   </tr></thead>
   <tbody>{rows_html}</tbody>
 </table>
@@ -2625,8 +2628,8 @@ def admin_settings():
                     login_log.append(dict(row))
         except Exception:
             pass
-    db.close()
     crews = get_crews(db)
+    db.close()
     return render_template('admin_settings.html', forms=forms, stat_cards=stat_cards,
                            section_descs=section_descs, policies=policies,
                            is_james=is_james, login_log=login_log, crews=crews)
@@ -3570,6 +3573,61 @@ def estimate_lock_status(estimate_id):
         pass
     db.close()
     return jsonify({'locked': False})
+
+# ─────────────────────────────────────────────────────────────
+# SCHEDULE NOTIFICATION EMAIL
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/api/schedule/notify', methods=['POST'])
+@manager_required
+def schedule_notify():
+    """Send a schedule update notification email to the team."""
+    try:
+        from_addr = os.environ.get('NOTIFY_EMAIL_FROM', '')
+        password  = os.environ.get('NOTIFY_EMAIL_PASSWORD', '')
+        recipients_raw = os.environ.get('NOTIFY_EMAIL_TO', '')
+        if not (from_addr and password and recipients_raw):
+            return jsonify({'ok': False, 'error': 'Email not configured. Check Render environment variables.'})
+
+        recipients = [r.strip() for r in recipients_raw.split(',') if r.strip()]
+
+        import pytz as _pytz_notify
+        _eastern_n = _pytz_notify.timezone('US/Eastern')
+        now_str = _dt_module.datetime.now(_eastern_n).strftime('%B %d, %Y at %I:%M %p ET')
+
+        schedule_url = 'https://shadeamerica.team/schedule'
+
+        html_body = f"""
+<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f9f9f9;border-radius:10px;">
+  <div style="background:#3B6D11;border-radius:8px;padding:16px 20px;margin-bottom:20px;">
+    <h2 style="color:#fff;margin:0;font-size:1.1rem;">Shade America &mdash; Schedule Update</h2>
+  </div>
+  <p style="color:#333;font-size:.95rem;margin-bottom:20px;">
+    The schedule has been updated as of <strong>{now_str}</strong>.
+  </p>
+  <a href="{schedule_url}" style="display:inline-block;background:#3B6D11;color:#fff;text-decoration:none;padding:12px 28px;border-radius:7px;font-size:.95rem;font-weight:600;">
+    View Schedule
+  </a>
+  <p style="color:#aaa;font-size:.75rem;margin-top:24px;">Shade America Portal &mdash; shadeamerica.team</p>
+</div>
+"""
+
+        msg = MIMEMultipart('alternative')
+        msg['From']    = from_addr
+        msg['To']      = ', '.join(recipients)
+        msg['Subject'] = 'Shade America \u2014 Schedule Updated'
+        msg.attach(MIMEText(f'The schedule has been updated as of {now_str}.\n\nView it here: {schedule_url}', 'plain'))
+        msg.attach(MIMEText(html_body, 'html'))
+
+        with smtplib.SMTP_SSL('smtp.emailpnl.com', 465) as smtp:
+            smtp.login(from_addr, password)
+            smtp.sendmail(from_addr, recipients, msg.as_string())
+
+        return jsonify({'ok': True})
+    except Exception as e:
+        app.logger.error(f'Schedule notify email failed: {e}')
+        return jsonify({'ok': False, 'error': str(e)})
+
 
 # ─────────────────────────────────────────────────────────────
 # EMAIL BACKUP

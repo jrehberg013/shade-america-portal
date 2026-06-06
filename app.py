@@ -1743,6 +1743,7 @@ def schedule_pdf():
         holding_html += card_html(h['name'], h['address'], h['color'])
 
     generated = datetime.datetime.now().strftime('%B %d, %Y')
+    crew_headers = ''.join(f'<th>{c}</th>' for c in crews)
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
@@ -1751,12 +1752,14 @@ def schedule_pdf():
   body {{ font-family: Arial, sans-serif; margin: 20px; color: #222; }}
   h1 {{ font-size: 18px; margin-bottom: 4px; }}
   .sub {{ font-size: 11px; color: #888; margin-bottom: 14px; }}
-  table {{ width: 100%; border-collapse: collapse; }}
+  table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
+  td, th {{ word-wrap: break-word; overflow-wrap: break-word; }}
   th {{ background: #f5f7fa; padding: 7px 8px; text-align: left; font-size: 11px; color: #888; border: 1px solid #e8eaed; }}
   .holding-label {{ font-size: 11px; font-weight: 700; text-transform: uppercase; color: #854F0B; margin-bottom: 6px; }}
   .holding-wrap {{ background: #FAEEDA; border: 1px solid #EF9F27; border-radius: 8px; padding: 10px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; }}
+  @page {{ size: landscape; margin: 10mm; }}
   @media print {{
-    @page {{ margin: 15mm; }}
+    @page {{ size: landscape; margin: 10mm; }}
     button {{ display: none !important; }}
     table {{ page-break-inside: auto; }}
     tr {{ page-break-inside: avoid; page-break-after: auto; }}
@@ -1774,7 +1777,7 @@ def schedule_pdf():
 <table>
   <thead><tr>
     <th style="width:70px">Date</th>
-    <th>Josh &amp; Crew</th><th>Justin &amp; Crew</th><th>LR &amp; Crew</th>
+    {crew_headers}
   </tr></thead>
   <tbody>{rows_html}</tbody>
 </table>
