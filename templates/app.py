@@ -2180,27 +2180,23 @@ def hip_calc_compute(A1, D1, F1, col_size, rafter_dia, qty=1, glides='No Glides'
     rect = _rect()
     return profile, sq, rect
 
-@app.route('/hip-calc', methods=['GET', 'POST'])
-@manager_required
 def parse_ft_in(val):
     """Parse ft/in strings like 23'9", 23'9, 23 9, 23.25, 23 into decimal feet."""
     import re
     val = str(val).strip()
-    # Feet and inches: 23'9", 23'9, 23' 9", 23'9.5"
     m = re.match(r"^(\d+(?:\.\d+)?)['\'\u2019\s]+(\d+(?:\.\d+)?)[\"\u201d]?$", val)
     if m:
         return float(m.group(1)) + float(m.group(2)) / 12
-    # Feet only with apostrophe: 23'
     m = re.match(r"^(\d+(?:\.\d+)?)['\'\u2019]$", val)
     if m:
         return float(m.group(1))
-    # Space separated where second number < 12: 23 9
     m = re.match(r"^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$", val)
     if m and float(m.group(2)) < 12:
         return float(m.group(1)) + float(m.group(2)) / 12
-    # Plain decimal or integer
     return float(val)
 
+@app.route('/hip-calc', methods=['GET', 'POST'])
+@manager_required
 def hip_calc():
     col_options = [
         'Ø3.5" 11-Ga', 'Ø5.0" 11-Ga', 'Ø5.0" 7-Ga', 'Ø5.5" Sch-40',
