@@ -12,20 +12,20 @@
 
       <div class="input-group">
         <label>Long Side (ft)</label>
-        <input type="number" name="long_side" step="0.5" min="1"
-               value="{{ inputs.get('long_side','') }}" required placeholder="e.g. 27">
+        <input type="text" name="long_side" id="long_side"
+               value="{{ inputs.get('long_side','') }}" required placeholder="e.g. 23'3&quot;">
       </div>
 
       <div class="input-group">
         <label>Short Side (ft)</label>
-        <input type="number" name="short_side" step="0.5" min="1"
-               value="{{ inputs.get('short_side','') }}" required placeholder="e.g. 18">
+        <input type="text" name="short_side" id="short_side"
+               value="{{ inputs.get('short_side','') }}" required placeholder="e.g. 18'6&quot;">
       </div>
 
       <div class="input-group">
         <label>Eave Height (ft)</label>
-        <input type="number" name="eave_ht" step="0.5" min="1"
-               value="{{ inputs.get('eave_ht','') }}" required placeholder="e.g. 11">
+        <input type="text" name="eave_ht" id="eave_ht"
+               value="{{ inputs.get('eave_ht','') }}" required placeholder="e.g. 11'0&quot;">
       </div>
 
       <div class="input-group">
@@ -153,12 +153,42 @@
 }
 </style>
 <script>
-// Wrap each table in a scrollable div for mobile
 document.querySelectorAll('.hip-table').forEach(t => {
   const wrap = document.createElement('div');
   wrap.className = 'hip-table-wrap';
   t.parentNode.insertBefore(wrap, t);
   wrap.appendChild(t);
+});
+
+function parseFtIn(val) {
+  val = val.trim();
+  if (!val) return null;
+  const m1 = val.match(/^(\d+(?:\.\d+)?)[''’\s]+(\d+(?:\.\d+)?)[""”]?$/);
+  if (m1) return parseFloat(m1[1]) + parseFloat(m1[2]) / 12;
+  const m2 = val.match(/^(\d+(?:\.\d+)?)[''’]$/);
+  if (m2) return parseFloat(m2[1]);
+  const m3 = val.match(/^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
+  if (m3 && parseFloat(m3[2]) < 12) return parseFloat(m3[1]) + parseFloat(m3[2]) / 12;
+  const plain = parseFloat(val);
+  if (!isNaN(plain)) return plain;
+  return null;
+}
+
+document.querySelector('.hip-form').addEventListener('submit', function(e) {
+  const fields = ['long_side', 'short_side', 'eave_ht'];
+  for (const id of fields) {
+    const input = document.getElementById(id);
+    const parsed = parseFtIn(input.value);
+    if (parsed === null || isNaN(parsed) || parsed <= 0) {
+      e.preventDefault();
+      input.focus();
+      input.style.borderColor = '#e53e3e';
+      alert('Please enter a valid measurement for ' + input.previousElementSibling.textContent + " (e.g. 23'3" or 23.25)");
+      return;
+    }
+    input.value = Math.round(parsed * 10000) / 10000;
+    input.style.borderColor = '';
+  }
 });
 </script>
 {% endblock %}
