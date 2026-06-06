@@ -2199,7 +2199,7 @@ def parse_ft_in(val):
     return float(val)
 
 @app.route('/hip-calc', methods=['GET', 'POST'])
-@manager_required
+@login_required
 def hip_calc():
     col_options = [
         'Ø3.5" 11-Ga', 'Ø5.0" 11-Ga', 'Ø5.0" 7-Ga', 'Ø5.5" Sch-40',
