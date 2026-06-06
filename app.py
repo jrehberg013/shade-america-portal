@@ -2181,7 +2181,10 @@ def hip_calc_compute(A1, D1, F1, col_size, rafter_dia, qty=1, glides='No Glides'
     return profile, sq, rect
 
 def parse_ft_in(val):
-    """Parse ft/in strings like 23'9", 23'9, 23 9, 23.25, 23 into decimal feet."""
+    """Parse ft/in strings like 23'9", 23'9, 23 9, 23.25, 23 into decimal feet.
+    Accepts: 23'9", 23'9, 23 9, 23.25, 23
+    """
+    # v2 - force redeploy
     import re
     val = str(val).strip()
     m = re.match(r"^(\d+(?:\.\d+)?)['\'\u2019\s]+(\d+(?:\.\d+)?)[\"\u201d]?$", val)
