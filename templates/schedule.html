@@ -67,10 +67,14 @@
 .modal-btns { display:flex; gap:.5rem; justify-content:flex-end; margin-top:.5rem; }
 .modal-divider { border-top:1px solid var(--border,#eee); margin:.75rem 0 .5rem; }
 .modal-sub { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted,#aaa); margin-bottom:.5rem; }
+@page { size: landscape; margin: 0.5in; }
 @media print {
   .sched-toolbar,.holding-section,.modal-bg,nav,header,.arc-cell,.job-expanded,.field-expanded { display:none !important; }
-  .sched-table { font-size:.72rem; min-width:unset; }
+  .sched-table { font-size:.68rem; min-width:unset; width:100%; table-layout:fixed; }
+  .sched-table th, .sched-table td { word-wrap:break-word; overflow-wrap:break-word; }
+  .date-cell { width:70px !important; }
   body { background:#fff; }
+  .sched-table-wrap { overflow:visible !important; }
 }
 </style>
 
