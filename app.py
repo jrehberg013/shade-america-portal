@@ -1023,6 +1023,9 @@ def delete_doc(doc_id):
     job_id = doc['job_id']
     db.execute("DELETE FROM documents WHERE id=?", (doc_id,))
     db.commit()
+    # JSON response for fetch()-based instant delete
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
+        return jsonify({'ok': True})
     flash('File deleted.', 'success')
     return redirect(url_for('job_detail', job_id=job_id))
 
