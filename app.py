@@ -669,6 +669,19 @@ def admin_required(f):
     return decorated
 
 
+def api_key_required(f):
+    """Auth for external, session-less API clients (e.g. inventory site).
+    Checks the X-API-Key header against INVENTORY_API_KEY set in Render env vars."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        expected = os.environ.get('INVENTORY_API_KEY', '')
+        provided = request.headers.get('X-API-Key', '')
+        if not expected or not secrets.compare_digest(provided, expected):
+            return jsonify({'error': 'unauthorized'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
 # ─────────────────────────────────────────────────────────────
 # AUTH ROUTES
 # ─────────────────────────────────────────────────────────────
@@ -3496,6 +3509,84 @@ def trello_comments(job_id):
         return jsonify({'comments': comments})
     except Exception as e:
         return jsonify({'comments': [], 'error': str(e)})
+
+
+# ─────────────────────────────────────────────────────────────
+# INVENTORY API (READ-ONLY, API-KEY AUTH)
+# ─────────────────────────────────────────────────────────────
+# Scoped, read-only integration point for external systems (e.g. the
+# inventory site). Exposes only the same fields shown on the field-view job
+# card: name, contact, phone, location, notes, created date, and drawings
+# (SA- prefixed files only — no photos, no financials, no live Trello calls).
+# Auth is a static API key set via the INVENTORY_API_KEY Render env var,
+# sent by the client as an "X-API-Key" header.
+
+def _job_to_api_dict(job):
+    return {
+        'id':         job['id'],
+        'name':       job['name'],
+        'contact':    job['client'] or '',
+        'phone':      job['phone'] or '',
+        'location':   job['location'] or '',
+        'notes':      job['notes'] or '',
+        'created_at': str(job['created_at']) if job['created_at'] else '',
+    }
+
+def _job_drawings(db, job_id):
+    docs = db.execute(
+        "SELECT id, original_name FROM documents WHERE job_id=? AND doc_type='drawing' ORDER BY uploaded_at DESC",
+        (job_id,)
+    ).fetchall()
+    return [
+        {
+            'id': d['id'],
+            'filename': d['original_name'],
+            'url': url_for('api_v1_document_file', doc_id=d['id'], _external=True)
+        }
+        for d in docs if d['original_name'].upper().startswith('SA-')
+    ]
+
+@app.route('/api/v1/jobs')
+@api_key_required
+def api_v1_jobs():
+    """List active (installation-stage) jobs — same scope as the field view."""
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM jobs WHERE status='installation' ORDER BY updated_at DESC"
+    ).fetchall()
+    jobs = []
+    for job in rows:
+        data = _job_to_api_dict(job)
+        data['drawings'] = _job_drawings(db, job['id'])
+        jobs.append(data)
+    return jsonify({'jobs': jobs})
+
+@app.route('/api/v1/jobs/<int:job_id>')
+@api_key_required
+def api_v1_job_detail(job_id):
+    db = get_db()
+    job = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        return jsonify({'error': 'not found'}), 404
+    data = _job_to_api_dict(job)
+    data['drawings'] = _job_drawings(db, job_id)
+    return jsonify(data)
+
+@app.route('/api/v1/documents/<int:doc_id>/file')
+@api_key_required
+def api_v1_document_file(doc_id):
+    db = get_db()
+    doc = db.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
+    if not doc:
+        abort(404)
+    if doc['doc_type'] != 'drawing' or not doc['original_name'].upper().startswith('SA-'):
+        abort(403)
+    return send_file(
+        io.BytesIO(bytes(doc['file_data'])),
+        mimetype=doc['mime_type'],
+        as_attachment=False,
+        download_name=doc['original_name']
+    )
 
 
 # ─────────────────────────────────────────────────────────────
