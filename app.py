@@ -693,7 +693,7 @@ def dashboard():
     statuses = ['deposit_received','design','engineering','permitting','fabrication','installation','completed']
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
     active_jobs    = [j for j in all_jobs if j['status'] != 'completed']
-    pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
+    pipeline_value = sum(float(j['contract_value'] or 0) for j in active_jobs)
     contract_total = sum(float(j['contract_value'] or 0) for j in active_jobs)
     balance_owed   = sum(float(j['contract_value'] or 0) - float(j['deposit_paid'] or 0) for j in active_jobs)
     stats = {
@@ -3259,7 +3259,7 @@ def report():
     }
     jobs_by_status = {s: [j for j in all_jobs if j['status'] == s] for s in statuses}
     active_jobs    = [j for j in all_jobs if j['status'] != 'completed']
-    pipeline_value = sum(float(j['estimate_total'] or 0) for j in active_jobs)
+    pipeline_value = sum(float(j['contract_value'] or 0) for j in active_jobs)
     contract_total = sum(float(j['contract_value']  or 0) for j in active_jobs)
     balance_owed   = sum(float(j['contract_value']  or 0) - float(j['deposit_paid'] or 0) for j in active_jobs)
     stats = {

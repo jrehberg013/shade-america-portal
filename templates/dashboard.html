@@ -150,15 +150,12 @@ function toggleAnnForm(category) {
                 {% if job.location %}
                 <div class="job-card-loc">📍 {{ job.location }}</div>
                 {% endif %}
-                {% if job.estimate_total %}
-                <div class="job-card-value">${{ "{:,.0f}".format(job.estimate_total) }}</div>
+                {% if job.contract_value %}
+                <div class="job-card-value">${{ "{:,.0f}".format(job.contract_value) }}</div>
                 {% endif %}
                 {% if current_user.role in ['admin','manager'] and job.contract_value %}
                 <div class="job-card-contract">
-                    <span title="Contract">&#128203; ${{ "{:,.0f}".format(job.contract_value) }}</span>
-                    {% if job.deposit_paid %}
-                    <span title="Deposit" style="color:#15803d"> &middot; dep ${{ "{:,.0f}".format(job.deposit_paid) }}</span>
-                    {% endif %}
+                    <span title="Balance Due" style="color:#b91c1c">&#128203; ${{ "{:,.0f}".format(job.contract_value - (job.deposit_paid or 0)) }} due</span>
                 </div>
                 {% endif %}
             </a>
@@ -453,13 +450,11 @@ function toggleAnnForm(category) {
                 a.setAttribute('ondragend','pipelineCardDragEnd(event)');
                 let html='<div class="job-card-name">'+job.name+'</div>';
                 if(job.contract_value){
-                    html+='<div class="job-card-contract"><span>&#128203; $'+
-                        job.contract_value.toLocaleString('en-US',{maximumFractionDigits:0})+'</span>';
-                    if(job.deposit_paid){
-                        html+=' <span style="color:#15803d"> &middot; dep $'+
-                            job.deposit_paid.toLocaleString('en-US',{maximumFractionDigits:0})+'</span>';
-                    }
-                    html+='</div>';
+                    html+='<div class="job-card-value">$'+
+                        job.contract_value.toLocaleString('en-US',{maximumFractionDigits:0})+'</div>';
+                    const balanceDue=job.contract_value-(job.deposit_paid||0);
+                    html+='<div class="job-card-contract"><span style="color:#b91c1c">&#128203; $'+
+                        balanceDue.toLocaleString('en-US',{maximumFractionDigits:0})+' due</span></div>';
                 }
                 a.innerHTML=html;
                 col.prepend(a);
